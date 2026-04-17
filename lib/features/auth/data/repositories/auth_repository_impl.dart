@@ -4,12 +4,14 @@ import '../../domain/entities/auth_failure.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../data_sources/mock_auth_data_source.dart';
+import '../data_sources/user_local_data_source.dart';
 import '../models/user_model.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final MockAuthDataSource dataSource;
+  final UserLocalDataSource userLocalDataSource;
 
-  AuthRepositoryImpl(this.dataSource);
+  AuthRepositoryImpl(this.dataSource, this.userLocalDataSource);
 
   @override
   Future<Either<AuthFailure, User>> signUp({
@@ -26,6 +28,10 @@ class AuthRepositoryImpl implements AuthRepository {
         phoneNumber: phoneNumber,
       );
       final user = UserModel.fromJson(result['user'] as Map<String, dynamic>);
+      final token = result['token']?.toString();
+      if (token != null && token.trim().isNotEmpty) {
+        await userLocalDataSource.saveSession(user: user, token: token);
+      }
       return Right(user);
     } catch (e) {
       return Left(_handleException(e));
@@ -40,6 +46,10 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final result = await dataSource.login(email: email, password: password);
       final user = UserModel.fromJson(result['user'] as Map<String, dynamic>);
+      final token = result['token']?.toString();
+      if (token != null && token.trim().isNotEmpty) {
+        await userLocalDataSource.saveSession(user: user, token: token);
+      }
       return Right(user);
     } catch (e) {
       return Left(_handleException(e));
@@ -118,8 +128,17 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<AuthFailure, User>> getCurrentUser() async {
     try {
+      final cachedUser = await userLocalDataSource.getCachedUser();
+      if (cachedUser != null) {
+        return Right(cachedUser.toEntity());
+      }
+
       final userJson = await dataSource.getCurrentUser();
       final user = UserModel.fromJson(userJson);
+      final token = await userLocalDataSource.getCachedToken();
+      if (token != null) {
+        await userLocalDataSource.saveSession(user: user, token: token);
+      }
       return Right(user);
     } catch (e) {
       return Left(_handleException(e));
@@ -130,8 +149,10 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<AuthFailure, void>> logout() async {
     try {
       await dataSource.logout();
+      await userLocalDataSource.clearSession();
       return const Right(null);
     } catch (e) {
+      await userLocalDataSource.clearSession();
       return Left(_handleException(e));
     }
   }
@@ -139,7 +160,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<bool> isAuthenticated() async {
     try {
-      return await dataSource.isAuthenticated();
+      return await userLocalDataSource.hasValidSession();
     } catch (e) {
       return false;
     }
@@ -148,7 +169,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<String?> getAuthToken() async {
     try {
-      return await dataSource.getAuthToken();
+      return await userLocalDataSource.getCachedToken();
     } catch (e) {
       return null;
     }

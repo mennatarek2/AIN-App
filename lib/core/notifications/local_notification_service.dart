@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 
-class LocalNotificationService {
+import 'push_notification_service.dart';
+
+class LocalNotificationService implements PushNotificationService {
   LocalNotificationService();
 
   final FlutterLocalNotificationsPlugin _plugin =
@@ -19,6 +21,7 @@ class LocalNotificationService {
         importance: Importance.high,
       );
 
+  @override
   Future<void> initialize() async {
     if (_isInitialized || !_isAvailable) return;
 
@@ -51,6 +54,7 @@ class LocalNotificationService {
     }
   }
 
+  @override
   Future<void> requestPermissions() async {
     if (!_isAvailable) return;
 
@@ -73,6 +77,7 @@ class LocalNotificationService {
     await macosImpl?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
+  @override
   Future<void> showReportNotification({
     required String title,
     required String body,

@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../reports/domain/report_model.dart';
+import '../../../reports/domain/repositories/report_repository.dart';
+import '../../../reports/presentation/providers/report_data_providers.dart';
 
 typedef MyReport = ReportModel;
 
@@ -35,9 +35,12 @@ class MyReportsState {
 }
 
 class MyReportsNotifier extends StateNotifier<MyReportsState> {
-  MyReportsNotifier({required this.onReportStatusChanged})
-    : super(_initialState()) {
-    _loadPersistedReports();
+  MyReportsNotifier({
+    required this.onReportStatusChanged,
+    required ReportRepository reportRepository,
+  }) : _reportRepository = reportRepository,
+       super(_initialState()) {
+    _hydrateReports();
   }
 
   final Future<void> Function({
@@ -45,48 +48,53 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
     required String statusLabel,
   })
   onReportStatusChanged;
-
-  static const _reportsCacheKey = 'my_reports_cache_v1';
+  final ReportRepository _reportRepository;
 
   static MyReportsState _initialState() {
     return MyReportsState(
-      reports: const [
-        MyReport(
-          id: 'report-1',
-          title: 'حفرة في الطريق',
-          description: 'حفرة في الطريق تهدد سلامة المركبات',
-          submittedAgo: 'منذ 3 أيام',
-          fullDescription:
-              'يوجد حفرة كبيرة في الطريق الرئيسي تهدد سلامة المركبات والمشاة',
-          reportType: 'مشاكل الطرق',
-          imagePath: 'assets/images/report_image.png',
-          progressIndex: 2,
-          statusLabel: 'قيد المعالجة',
-          statusColor: Color(0xFF2A9AF4),
-          latitude: 30.0452,
-          longitude: 31.2338,
-          locationAddress: 'Nasr City, Cairo',
-        ),
-        MyReport(
-          id: 'report-2',
-          title: 'إنارة معطلة',
-          description: 'أعمدة الإنارة في الشارع معطلة',
-          submittedAgo: 'منذ 5 أيام',
-          fullDescription: 'أعمدة الإنارة في الشارع معطلة منذ أسبوع',
-          reportType: 'الكهرباء والإنارة',
-          imagePath: 'assets/images/report_image.png',
-          progressIndex: 1,
-          statusLabel: 'قيد المراجعة',
-          statusColor: Color(0xFFF3B61F),
-          latitude: 30.0383,
-          longitude: 31.2211,
-          locationAddress: 'Maadi, Cairo',
-        ),
-      ],
+      reports: _defaultReports,
       searchQuery: '',
       filterEnabled: false,
     );
   }
+
+  static const List<MyReport> _defaultReports = [
+    MyReport(
+      id: 'report-1',
+      title: 'حفرة في الطريق',
+      description: 'حفرة في الطريق تهدد سلامة المركبات',
+      submittedAgo: 'منذ 3 أيام',
+      fullDescription:
+          'يوجد حفرة كبيرة في الطريق الرئيسي تهدد سلامة المركبات والمشاة',
+      reportType: 'مشاكل الطرق',
+      imagePath: 'assets/images/report_image.png',
+      progressIndex: 2,
+      statusLabel: 'قيد المعالجة',
+      statusColor: Color(0xFF2A9AF4),
+      latitude: 30.0452,
+      longitude: 31.2338,
+      locationAddress: 'Nasr City, Cairo',
+      isSynced: true,
+      localId: 'seed-report-1',
+    ),
+    MyReport(
+      id: 'report-2',
+      title: 'إنارة معطلة',
+      description: 'أعمدة الإنارة في الشارع معطلة',
+      submittedAgo: 'منذ 5 أيام',
+      fullDescription: 'أعمدة الإنارة في الشارع معطلة منذ أسبوع',
+      reportType: 'الكهرباء والإنارة',
+      imagePath: 'assets/images/report_image.png',
+      progressIndex: 1,
+      statusLabel: 'قيد المراجعة',
+      statusColor: Color(0xFFF3B61F),
+      latitude: 30.0383,
+      longitude: 31.2211,
+      locationAddress: 'Maadi, Cairo',
+      isSynced: true,
+      localId: 'seed-report-2',
+    ),
+  ];
 
   void setSearchQuery(String value) {
     state = state.copyWith(searchQuery: value.trim());
@@ -96,14 +104,14 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
     state = state.copyWith(filterEnabled: !state.filterEnabled);
   }
 
-  void addReportFromSubmission({
+  Future<void> addReportFromSubmission({
     required String title,
     required String description,
     required String reportType,
     required double latitude,
     required double longitude,
     String? locationAddress,
-  }) {
+  }) async {
     final report = MyReport(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       title: title,
@@ -118,10 +126,12 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
       latitude: latitude,
       longitude: longitude,
       locationAddress: locationAddress,
+      isSynced: false,
     );
 
-    state = state.copyWith(reports: [report, ...state.reports]);
-    _persistCurrentReports();
+    final stored = await _reportRepository.createReport(report);
+    final updatedReports = _replaceOrInsert(state.reports, stored);
+    state = state.copyWith(reports: updatedReports);
   }
 
   void updateReportStatus({
@@ -145,7 +155,7 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
     reports[index] = updated;
 
     state = state.copyWith(reports: reports);
-    _persistCurrentReports();
+    unawaited(_reportRepository.updateReport(updated));
 
     unawaited(
       onReportStatusChanged(
@@ -155,66 +165,52 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
     );
   }
 
-  void _persistCurrentReports() {
-    unawaited(_persistReports(state.reports));
+  Future<void> syncPendingReports() async {
+    await _reportRepository.syncUnsyncedReports();
+    final refreshed = await _reportRepository.getCachedReports();
+    if (!mounted || refreshed.isEmpty) return;
+    state = state.copyWith(reports: refreshed);
   }
 
-  Future<void> _loadPersistedReports() async {
-    final prefs = await _safeGetPrefs();
-    if (prefs == null) return;
-
-    final rawJson = prefs.getString(_reportsCacheKey);
-    if (rawJson == null || rawJson.isEmpty) {
-      await _persistReports(state.reports);
-      return;
-    }
-
-    try {
-      final decoded = jsonDecode(rawJson);
-      if (decoded is! List) return;
-
-      final reports = decoded
-          .whereType<Map>()
-          .map((item) => MyReport.fromJson(Map<String, dynamic>.from(item)))
-          .where((report) => report.id.isNotEmpty && report.title.isNotEmpty)
-          .toList();
-
-      if (reports.isEmpty || !mounted) return;
-      state = state.copyWith(reports: reports);
-    } catch (_) {
-      // Keep defaults if persisted payload is malformed.
-    }
+  Future<void> _hydrateReports() async {
+    final reports = await _reportRepository.hydrateReports(
+      fallback: _defaultReports,
+    );
+    if (!mounted || reports.isEmpty) return;
+    state = state.copyWith(reports: reports);
   }
 
-  Future<void> _persistReports(List<MyReport> reports) async {
-    final prefs = await _safeGetPrefs();
-    if (prefs == null) return;
+  List<MyReport> _replaceOrInsert(List<MyReport> reports, MyReport report) {
+    final index = reports.indexWhere(
+      (entry) => entry.localId == report.localId || entry.id == report.id,
+    );
 
-    final payload = reports.map((report) => report.toJson()).toList();
-    await prefs.setString(_reportsCacheKey, jsonEncode(payload));
-  }
-
-  Future<SharedPreferences?> _safeGetPrefs() async {
-    try {
-      return await SharedPreferences.getInstance();
-    } catch (_) {
-      return null;
+    if (index == -1) {
+      return [report, ...reports];
     }
+
+    final nextReports = [...reports];
+    nextReports[index] = report;
+    return nextReports;
   }
 }
 
 final myReportsProvider =
     StateNotifierProvider<MyReportsNotifier, MyReportsState>((ref) {
       final notifications = ref.read(notificationsProvider.notifier);
+      final reportRepository = ref.read(reportRepositoryProvider);
 
-      return MyReportsNotifier(
+      final notifier = MyReportsNotifier(
         onReportStatusChanged: ({required reportTitle, required statusLabel}) {
           return notifications.notifyReportStatusChanged(
             reportTitle: reportTitle,
             statusLabel: statusLabel,
           );
         },
+        reportRepository: reportRepository,
       );
+
+      return notifier;
     });
 
 final filteredMyReportsProvider = Provider<List<MyReport>>((ref) {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/cached_app_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 import 'chatbot_page.dart';
@@ -117,6 +118,7 @@ class ProfilePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final profile = ref.watch(profileProvider);
+    final currentUser = ref.watch(currentUserProvider);
 
     return Scaffold(
       backgroundColor: isDark
@@ -126,7 +128,7 @@ class ProfilePage extends ConsumerWidget {
         children: [
           _ProfileHeader(onBack: () => Navigator.of(context).pop()),
           const SizedBox(height: 30),
-          const _ProfileAvatar(),
+          _ProfileAvatar(imagePath: currentUser?.profileImageUrl),
           const SizedBox(height: 16),
           Text(
             profile.name,
@@ -268,7 +270,9 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar();
+  const _ProfileAvatar({this.imagePath});
+
+  final String? imagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +294,12 @@ class _ProfileAvatar extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Image.asset('assets/images/user_chatbot.png', fit: BoxFit.cover),
+      child: CachedAppImage(
+        imagePath: imagePath?.trim().isNotEmpty == true
+            ? imagePath!
+            : 'assets/images/user_chatbot.png',
+        fit: BoxFit.cover,
+      ),
     );
   }
 }

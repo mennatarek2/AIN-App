@@ -331,7 +331,7 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
                             locationAddress: address,
                           );
 
-                      ref
+                      await ref
                           .read(myReportsProvider.notifier)
                           .addReportFromSubmission(
                             title: _titleController.text.trim(),
@@ -349,7 +349,7 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
                             reportType: _reportType!,
                           );
 
-                      if (!mounted) return;
+                      if (!context.mounted) return;
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const AddReportSuccessPage(),

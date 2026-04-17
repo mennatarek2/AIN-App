@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/notifications/fcm_notification_service.dart';
 import '../../../../core/notifications/local_notification_service.dart';
+import '../../../../core/notifications/push_notification_service.dart';
 
 enum NotificationSection { today, thisWeek }
 
@@ -32,12 +34,12 @@ class NotificationsState {
 }
 
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
-  NotificationsNotifier(this._localNotificationService)
+  NotificationsNotifier(this._pushNotificationService)
     : super(const NotificationsState(items: _mockItems)) {
     _bootstrap();
   }
 
-  final LocalNotificationService _localNotificationService;
+  final PushNotificationService _pushNotificationService;
 
   static const _cacheKey = 'notifications_cache_v1';
 
@@ -83,7 +85,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   ];
 
   Future<void> _bootstrap() async {
-    await _localNotificationService.initialize();
+    await _pushNotificationService.initialize();
     await _loadPersistedItems();
   }
 
@@ -100,7 +102,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
     await _addNotification(item);
 
-    await _localNotificationService.showReportNotification(
+    await _pushNotificationService.showReportNotification(
       title: 'تم إرسال البلاغ بنجاح',
       body: 'تم استلام "$reportTitle" وسيتم مراجعته قريباً.',
     );
@@ -119,7 +121,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
     await _addNotification(item);
 
-    await _localNotificationService.showReportNotification(
+    await _pushNotificationService.showReportNotification(
       title: 'تحديث حالة البلاغ',
       body: 'حالة "$reportTitle": $statusLabel',
     );
@@ -199,13 +201,22 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   }
 }
 
-final localNotificationServiceProvider = Provider<LocalNotificationService>((
+enum PushNotificationMode { local, fcm }
+
+const _pushNotificationMode = PushNotificationMode.local;
+
+final pushNotificationServiceProvider = Provider<PushNotificationService>((
   ref,
 ) {
-  return LocalNotificationService();
+  switch (_pushNotificationMode) {
+    case PushNotificationMode.fcm:
+      return FcmNotificationService();
+    case PushNotificationMode.local:
+      return LocalNotificationService();
+  }
 });
 
 final notificationsProvider =
     StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
-      return NotificationsNotifier(ref.watch(localNotificationServiceProvider));
+      return NotificationsNotifier(ref.watch(pushNotificationServiceProvider));
     });

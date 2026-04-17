@@ -15,6 +15,8 @@ class ReportModel {
     required this.latitude,
     required this.longitude,
     this.locationAddress,
+    this.isSynced = true,
+    this.localId,
   });
 
   final String id;
@@ -30,6 +32,8 @@ class ReportModel {
   final double latitude;
   final double longitude;
   final String? locationAddress;
+  final bool isSynced;
+  final String? localId;
 
   ReportModel copyWith({
     String? id,
@@ -45,6 +49,8 @@ class ReportModel {
     double? latitude,
     double? longitude,
     String? locationAddress,
+    bool? isSynced,
+    String? localId,
   }) {
     return ReportModel(
       id: id ?? this.id,
@@ -60,6 +66,8 @@ class ReportModel {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       locationAddress: locationAddress ?? this.locationAddress,
+      isSynced: isSynced ?? this.isSynced,
+      localId: localId ?? this.localId,
     );
   }
 
@@ -78,6 +86,8 @@ class ReportModel {
       'latitude': latitude,
       'longitude': longitude,
       'locationAddress': locationAddress,
+      'isSynced': isSynced,
+      'localId': localId,
     };
   }
 
@@ -99,6 +109,8 @@ class ReportModel {
       latitude: double.tryParse(json['latitude']?.toString() ?? '') ?? 0,
       longitude: double.tryParse(json['longitude']?.toString() ?? '') ?? 0,
       locationAddress: json['locationAddress']?.toString(),
+      isSynced: json['isSynced'] != false,
+      localId: json['localId']?.toString(),
     );
   }
 }

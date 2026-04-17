@@ -21,6 +21,7 @@ import '../features/home/presentation/pages/home_page.dart';
 import '../features/my_reports/presentation/pages/my_reports_page.dart';
 import '../features/notifications/presentation/pages/notifications_page.dart';
 import '../features/onboarding/presentation/pages/onboarding_page.dart';
+import '../features/reports/presentation/providers/report_sync_provider.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
 import 'routes/app_routes.dart';
 
@@ -29,6 +30,7 @@ class App extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(reportSyncBootstrapProvider);
     final themeMode = ref.watch(appSettingsProvider).themeMode;
 
     return MaterialApp(
@@ -44,7 +46,7 @@ class App extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      initialRoute: AppRoutes.home,
+      initialRoute: AppRoutes.splash,
       routes: {
         AppRoutes.splash: (_) => const SplashPage(),
         AppRoutes.onboarding: (_) => const OnboardingPage(),

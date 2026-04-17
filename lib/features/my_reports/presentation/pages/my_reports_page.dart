@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/cached_app_image.dart';
 import '../../../home/presentation/providers/home_navigation_provider.dart';
 import '../providers/my_reports_provider.dart';
 import 'report_info_page.dart';
@@ -229,8 +230,8 @@ class _MyReportCard extends StatelessWidget {
                 topRight: Radius.circular(10),
                 bottomRight: Radius.circular(10),
               ),
-              child: Image.asset(
-                report.imagePath,
+              child: CachedAppImage(
+                imagePath: report.imagePath,
                 width: 90,
                 height: 106,
                 fit: BoxFit.cover,

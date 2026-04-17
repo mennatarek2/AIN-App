@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/cached_app_image.dart';
 import '../../../location/presentation/widgets/map_screen.dart';
 
 class ReportInfoPage extends StatelessWidget {
@@ -129,20 +130,18 @@ class ReportInfoPage extends StatelessWidget {
                   ],
                 ),
               ),
-              Image.asset(
-                issueImagePath,
+              CachedAppImage(
+                imagePath: issueImagePath,
                 height: 148,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 148,
-                    color: isDark ? const Color(0xFF1A255C) : Colors.grey[300],
-                    child: Icon(
-                      Icons.image_not_supported,
-                      color: isDark ? AppColors.textPrimaryDark : Colors.grey,
-                    ),
-                  );
-                },
+                errorWidget: Container(
+                  height: 148,
+                  color: isDark ? const Color(0xFF1A255C) : Colors.grey[300],
+                  child: Icon(
+                    Icons.image_not_supported,
+                    color: isDark ? AppColors.textPrimaryDark : Colors.grey,
+                  ),
+                ),
               ),
               Container(
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 100),

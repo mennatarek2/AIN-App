@@ -58,11 +58,23 @@ class _SelectReportLocationPageState
 
   Future<void> _moveToCurrentLocation({required bool showErrorSnackBar}) async {
     final service = ref.read(locationServiceProvider);
+    final cache = ref.read(locationLocalDataSourceProvider);
+    final cachedLocation = await cache.getLastKnownLocation();
 
     final access = await service.ensureLocationAccess();
     if (!mounted) return;
 
     if (!access.isGranted) {
+      if (cachedLocation != null) {
+        _selectedLocation = LatLng(
+          cachedLocation.latitude,
+          cachedLocation.longitude,
+        );
+        _address =
+            cachedLocation.address ?? _formatFallbackAddress(_selectedLocation);
+        await _animateCameraTo(_selectedLocation, zoom: 16);
+      }
+
       setState(() {
         _accessStatus = access.status;
         _isResolvingAddress = false;
@@ -78,6 +90,20 @@ class _SelectReportLocationPageState
     if (!mounted) return;
 
     if (currentPosition == null) {
+      if (cachedLocation != null) {
+        final target = LatLng(
+          cachedLocation.latitude,
+          cachedLocation.longitude,
+        );
+        _selectedLocation = target;
+        _address = cachedLocation.address ?? _formatFallbackAddress(target);
+        await _animateCameraTo(target, zoom: 16);
+        setState(() {
+          _accessStatus = LocationAccessStatus.granted;
+        });
+        return;
+      }
+
       if (showErrorSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تعذر الحصول على موقعك الحالي حالياً')),
@@ -156,6 +182,14 @@ class _SelectReportLocationPageState
           : result;
       _isResolvingAddress = false;
     });
+
+    await ref
+        .read(locationLocalDataSourceProvider)
+        .saveLastKnownLocation(
+          latitude: target.latitude,
+          longitude: target.longitude,
+          address: _address,
+        );
   }
 
   Future<void> _onCameraIdle() async {

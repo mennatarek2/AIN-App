@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/data_sources/mock_auth_data_source.dart';
+import '../../data/data_sources/user_local_data_source.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -12,10 +13,15 @@ final mockAuthDataSourceProvider = Provider<MockAuthDataSource>((ref) {
   return MockAuthDataSource();
 });
 
+final userLocalDataSourceProvider = Provider<UserLocalDataSource>((ref) {
+  return UserLocalDataSource();
+});
+
 // Repository Provider
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final dataSource = ref.watch(mockAuthDataSourceProvider);
-  return AuthRepositoryImpl(dataSource);
+  final userLocalDataSource = ref.watch(userLocalDataSourceProvider);
+  return AuthRepositoryImpl(dataSource, userLocalDataSource);
 });
 
 // Auth State Notifier Provider

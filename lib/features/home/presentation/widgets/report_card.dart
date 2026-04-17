@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/cached_app_image.dart';
 
 class ReportCard extends StatelessWidget {
   final String username;
@@ -131,25 +132,19 @@ class ReportCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: Image.asset(
-                  imageUrl,
+                child: CachedAppImage(
+                  imagePath: imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: isDark
-                          ? const Color(0xFF1A255C)
-                          : Colors.grey[300],
-                      child: Center(
-                        child: Icon(
-                          Icons.image_not_supported,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : Colors.grey,
-                          size: 40,
-                        ),
+                  errorWidget: Container(
+                    color: isDark ? const Color(0xFF1A255C) : Colors.grey[300],
+                    child: Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: isDark ? AppColors.textPrimaryDark : Colors.grey,
+                        size: 40,
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ),

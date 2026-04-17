@@ -5,10 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../data/location_local_data_source.dart';
 import '../../data/location_service.dart';
 
 final locationServiceProvider = Provider<LocationService>((ref) {
   return LocationService();
+});
+
+final locationLocalDataSourceProvider = Provider<LocationLocalDataSource>((
+  ref,
+) {
+  return LocationLocalDataSource();
 });
 
 class ReportLocationState {
@@ -28,7 +35,8 @@ class ReportLocationState {
   final bool isResolvingAddress;
   final String? errorMessage;
 
-  bool get canShowMap => accessStatus == LocationAccessStatus.granted;
+  bool get canShowMap =>
+      accessStatus == LocationAccessStatus.granted || selectedLatLng != null;
 
   ReportLocationState copyWith({
     LatLng? selectedLatLng,
@@ -51,12 +59,25 @@ class ReportLocationState {
 }
 
 class ReportLocationNotifier extends StateNotifier<ReportLocationState> {
-  ReportLocationNotifier(this._service) : super(const ReportLocationState());
+  ReportLocationNotifier(this._service, this._localDataSource)
+    : super(const ReportLocationState());
 
   final LocationService _service;
+  final LocationLocalDataSource _localDataSource;
 
   Future<void> initialize() async {
     state = state.copyWith(isLoading: true, clearError: true);
+
+    final cachedLocation = await _localDataSource.getLastKnownLocation();
+    if (cachedLocation != null) {
+      state = state.copyWith(
+        selectedLatLng: LatLng(
+          cachedLocation.latitude,
+          cachedLocation.longitude,
+        ),
+        selectedAddress: cachedLocation.address,
+      );
+    }
 
     final accessResult = await _service.ensureLocationAccess();
     if (!accessResult.isGranted) {
@@ -70,6 +91,20 @@ class ReportLocationNotifier extends StateNotifier<ReportLocationState> {
 
     final position = await _service.getCurrentPosition();
     if (position == null) {
+      if (cachedLocation != null) {
+        state = state.copyWith(
+          accessStatus: LocationAccessStatus.granted,
+          selectedLatLng: LatLng(
+            cachedLocation.latitude,
+            cachedLocation.longitude,
+          ),
+          selectedAddress: cachedLocation.address,
+          isLoading: false,
+          errorMessage: 'GPS unavailable. Using cached location.',
+        );
+        return;
+      }
+
       state = state.copyWith(
         accessStatus: LocationAccessStatus.granted,
         isLoading: false,
@@ -99,6 +134,21 @@ class ReportLocationNotifier extends StateNotifier<ReportLocationState> {
     final position = await _service.getCurrentPosition();
 
     if (position == null) {
+      final cachedLocation = await _localDataSource.getLastKnownLocation();
+      if (cachedLocation != null) {
+        state = state.copyWith(
+          selectedLatLng: LatLng(
+            cachedLocation.latitude,
+            cachedLocation.longitude,
+          ),
+          selectedAddress: cachedLocation.address,
+          accessStatus: LocationAccessStatus.granted,
+          isLoading: false,
+          errorMessage: 'GPS unavailable. Using cached location.',
+        );
+        return;
+      }
+
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Unable to refresh current location.',
@@ -132,6 +182,11 @@ class ReportLocationNotifier extends StateNotifier<ReportLocationState> {
 
     if (!mounted) return;
     state = state.copyWith(selectedAddress: address, isResolvingAddress: false);
+    await _localDataSource.saveLastKnownLocation(
+      latitude: latLng.latitude,
+      longitude: latLng.longitude,
+      address: address,
+    );
   }
 }
 
@@ -140,7 +195,10 @@ final reportLocationProvider =
       ReportLocationNotifier,
       ReportLocationState
     >((ref) {
-      return ReportLocationNotifier(ref.watch(locationServiceProvider));
+      return ReportLocationNotifier(
+        ref.watch(locationServiceProvider),
+        ref.watch(locationLocalDataSourceProvider),
+      );
     });
 
 class LiveLocationState {
@@ -183,9 +241,11 @@ class LiveLocationState {
 }
 
 class LiveLocationNotifier extends StateNotifier<LiveLocationState> {
-  LiveLocationNotifier(this._service) : super(const LiveLocationState());
+  LiveLocationNotifier(this._service, this._localDataSource)
+    : super(const LiveLocationState());
 
   final LocationService _service;
+  final LocationLocalDataSource _localDataSource;
   StreamSubscription<Position>? _positionSubscription;
 
   Future<void> startTracking() async {
@@ -195,22 +255,36 @@ class LiveLocationNotifier extends StateNotifier<LiveLocationState> {
 
     final access = await _service.ensureLocationAccess();
     if (!access.isGranted) {
+      final cachedPosition = await _getCachedPosition();
       state = state.copyWith(
+        currentPosition: cachedPosition,
         accessStatus: access.status,
         isLoading: false,
         isTracking: false,
-        errorMessage: access.message,
+        errorMessage: cachedPosition == null
+            ? access.message
+            : 'GPS unavailable. Using cached location.',
       );
       return;
     }
 
     final currentPosition = await _service.getCurrentPosition();
     if (currentPosition != null) {
+      await _persistPosition(currentPosition);
       state = state.copyWith(
         currentPosition: currentPosition,
         accessStatus: LocationAccessStatus.granted,
         lastUpdated: DateTime.now(),
       );
+    } else {
+      final cachedPosition = await _getCachedPosition();
+      if (cachedPosition != null) {
+        state = state.copyWith(
+          currentPosition: cachedPosition,
+          accessStatus: LocationAccessStatus.granted,
+          lastUpdated: DateTime.now(),
+        );
+      }
     }
 
     await _positionSubscription?.cancel();
@@ -222,6 +296,7 @@ class LiveLocationNotifier extends StateNotifier<LiveLocationState> {
         .listen(
           (position) {
             if (!mounted) return;
+            unawaited(_persistPosition(position));
             state = state.copyWith(
               currentPosition: position,
               accessStatus: LocationAccessStatus.granted,
@@ -263,6 +338,31 @@ class LiveLocationNotifier extends StateNotifier<LiveLocationState> {
     await _service.openDeviceLocationSettings();
   }
 
+  Future<Position?> _getCachedPosition() async {
+    final cachedLocation = await _localDataSource.getLastKnownLocation();
+    if (cachedLocation == null) return null;
+
+    return Position(
+      longitude: cachedLocation.longitude,
+      latitude: cachedLocation.latitude,
+      timestamp: DateTime.now(),
+      accuracy: 0,
+      altitude: 0,
+      heading: 0,
+      speed: 0,
+      speedAccuracy: 0,
+      altitudeAccuracy: 0,
+      headingAccuracy: 0,
+    );
+  }
+
+  Future<void> _persistPosition(Position position) {
+    return _localDataSource.saveLastKnownLocation(
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+  }
+
   @override
   void dispose() {
     _positionSubscription?.cancel();
@@ -274,7 +374,10 @@ final liveLocationProvider =
     StateNotifierProvider.autoDispose<LiveLocationNotifier, LiveLocationState>((
       ref,
     ) {
-      final notifier = LiveLocationNotifier(ref.watch(locationServiceProvider));
+      final notifier = LiveLocationNotifier(
+        ref.watch(locationServiceProvider),
+        ref.watch(locationLocalDataSourceProvider),
+      );
       ref.onDispose(notifier.stopTracking);
       return notifier;
     });
