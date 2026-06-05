@@ -60,7 +60,10 @@ class _MyReportsPageState extends ConsumerState<MyReportsPage> {
                               submittedAgo: report.submittedAgo,
                               description: report.fullDescription,
                               reportType: report.reportType,
-                              issueImagePath: report.imagePath,
+                              attachments: report.attachments,
+                              legacyImagePath: report.attachments.isEmpty
+                                  ? report.imagePath
+                                  : '',
                               progressIndex: report.progressIndex,
                               latitude: report.latitude,
                               longitude: report.longitude,

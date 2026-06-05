@@ -4,15 +4,20 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/cached_app_image.dart';
 import '../../../location/presentation/widgets/map_screen.dart';
+import '../../../reports/domain/attachment_model.dart';
 
-class ReportInfoPage extends StatelessWidget {
+class ReportInfoPage extends StatefulWidget {
   const ReportInfoPage({
     super.key,
     required this.title,
     required this.submittedAgo,
     required this.description,
     required this.reportType,
-    required this.issueImagePath,
+    /// All attachments (images/videos) for this report.
+    /// Falls back to [legacyImagePath] if empty.
+    this.attachments = const [],
+    /// Legacy single image path for backward compat with local/unsynced reports.
+    this.legacyImagePath = '',
     required this.progressIndex,
     required this.latitude,
     required this.longitude,
@@ -23,18 +28,35 @@ class ReportInfoPage extends StatelessWidget {
   final String submittedAgo;
   final String description;
   final String reportType;
-  final String issueImagePath;
+  final List<AttachmentModel> attachments;
+  final String legacyImagePath;
   final int progressIndex;
   final double latitude;
   final double longitude;
   final String? locationAddress;
 
-  static const List<String> _statusLabels = [
-    'تم الاستلام',
-    'قيد المراجعة',
-    'قيد المعالجة',
-    'تم الحل',
-  ];
+  @override
+  State<ReportInfoPage> createState() => _ReportInfoPageState();
+}
+
+class _ReportInfoPageState extends State<ReportInfoPage> {
+  int _currentImageIndex = 0;
+
+  /// Effective list of image URLs to display.
+  /// Uses attachments if available, otherwise wraps legacyImagePath.
+  List<String> get _imageUrls {
+    if (widget.attachments.isNotEmpty) {
+      return widget.attachments
+          .map((a) => a.fullUrl)
+          .where((url) => url.isNotEmpty)
+          .toList();
+    }
+    if (widget.legacyImagePath.trim().isNotEmpty) {
+      return [widget.legacyImagePath];
+    }
+    return [];
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +68,7 @@ class ReportInfoPage extends StatelessWidget {
     final secondaryText = isDark
         ? AppColors.textSecondaryDark
         : AppColors.textSecondaryLight;
+    final images = _imageUrls;
 
     return Scaffold(
       backgroundColor: background,
@@ -61,15 +84,15 @@ class ReportInfoPage extends StatelessWidget {
                   children: [
                     Positioned.fill(
                       child: MapScreen(
-                        initialTarget: LatLng(latitude, longitude),
+                        initialTarget: LatLng(widget.latitude, widget.longitude),
                         initialZoom: 15,
                         markers: {
                           Marker(
                             markerId: const MarkerId('report-location-marker'),
-                            position: LatLng(latitude, longitude),
+                            position: LatLng(widget.latitude, widget.longitude),
                             infoWindow: InfoWindow(
-                              title: title,
-                              snippet: locationAddress,
+                              title: widget.title,
+                              snippet: widget.locationAddress,
                             ),
                           ),
                         },
@@ -82,7 +105,7 @@ class ReportInfoPage extends StatelessWidget {
                         onTap: () => Navigator.of(context).pop(),
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
-                          padding: EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(4),
                           child: Icon(
                             Icons.arrow_forward_ios,
                             color: primaryText,
@@ -104,7 +127,7 @@ class ReportInfoPage extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            title,
+                            widget.title,
                             textDirection: TextDirection.rtl,
                             textAlign: TextAlign.right,
                             style: TextStyle(
@@ -115,7 +138,7 @@ class ReportInfoPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          submittedAgo,
+                          widget.submittedAgo,
                           textDirection: TextDirection.rtl,
                           style: TextStyle(
                             fontSize: 13,
@@ -126,15 +149,20 @@ class ReportInfoPage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    _ProgressTimeline(currentStep: progressIndex),
+                    _ProgressTimeline(currentStep: widget.progressIndex),
                   ],
                 ),
               ),
-              CachedAppImage(
-                imagePath: issueImagePath,
-                height: 148,
-                fit: BoxFit.cover,
-                errorWidget: Container(
+              // Attachment gallery
+              if (images.isNotEmpty)
+                _AttachmentGallery(
+                  imageUrls: images,
+                  currentIndex: _currentImageIndex,
+                  onPageChanged: (i) => setState(() => _currentImageIndex = i),
+                  isDark: isDark,
+                )
+              else
+                Container(
                   height: 148,
                   color: isDark ? const Color(0xFF1A255C) : Colors.grey[300],
                   child: Icon(
@@ -142,7 +170,6 @@ class ReportInfoPage extends StatelessWidget {
                     color: isDark ? AppColors.textPrimaryDark : Colors.grey,
                   ),
                 ),
-              ),
               Container(
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 100),
                 child: Column(
@@ -150,17 +177,17 @@ class ReportInfoPage extends StatelessWidget {
                   children: [
                     _InfoRow(
                       label: 'الوصف',
-                      value: description,
+                      value: widget.description,
                       valueMaxLines: 2,
                     ),
                     const SizedBox(height: 12),
-                    _InfoRow(label: 'نوع البلاغ', value: reportType),
+                    _InfoRow(label: 'نوع البلاغ', value: widget.reportType),
                     const SizedBox(height: 12),
                     _InfoRow(
                       label: 'الموقع',
                       value:
-                          locationAddress ??
-                          '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}',
+                          widget.locationAddress ??
+                          '${widget.latitude.toStringAsFixed(5)}, ${widget.longitude.toStringAsFixed(5)}',
                       valueMaxLines: 3,
                     ),
                   ],
@@ -179,6 +206,13 @@ class _ProgressTimeline extends StatelessWidget {
 
   final int currentStep;
 
+  static const List<String> _statusLabels = [
+    'تم الاستلام',
+    'قيد المراجعه',
+    'قيد المعالجه',
+    'تم الحل',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -194,9 +228,9 @@ class _ProgressTimeline extends StatelessWidget {
         Row(
           textDirection: TextDirection.rtl,
           children: [
-            for (var i = 0; i < ReportInfoPage._statusLabels.length; i++) ...[
+            for (var i = 0; i < _statusLabels.length; i++) ...[
               _StepDot(isDone: i <= currentStep),
-              if (i < ReportInfoPage._statusLabels.length - 1)
+              if (i < _statusLabels.length - 1)
                 Expanded(child: Container(height: 1, color: lineColor)),
             ],
           ],
@@ -205,10 +239,10 @@ class _ProgressTimeline extends StatelessWidget {
         Row(
           textDirection: TextDirection.rtl,
           children: [
-            for (var i = 0; i < ReportInfoPage._statusLabels.length; i++)
+            for (var i = 0; i < _statusLabels.length; i++)
               Expanded(
                 child: Text(
-                  ReportInfoPage._statusLabels[i],
+                  _statusLabels[i],
                   textAlign: TextAlign.center,
                   textDirection: TextDirection.rtl,
                   maxLines: 2,
@@ -223,6 +257,74 @@ class _ProgressTimeline extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _AttachmentGallery extends StatelessWidget {
+  const _AttachmentGallery({
+    required this.imageUrls,
+    required this.currentIndex,
+    required this.onPageChanged,
+    required this.isDark,
+  });
+
+  final List<String> imageUrls;
+  final int currentIndex;
+  final ValueChanged<int> onPageChanged;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 200,
+      child: Stack(
+        children: [
+          PageView.builder(
+            itemCount: imageUrls.length,
+            onPageChanged: onPageChanged,
+            itemBuilder: (context, index) {
+              return CachedAppImage(
+                imagePath: imageUrls[index],
+                fit: BoxFit.cover,
+                errorWidget: Container(
+                  color: isDark
+                      ? const Color(0xFF1A255C)
+                      : Colors.grey[300],
+                  child: Icon(
+                    Icons.image_not_supported,
+                    color: isDark ? AppColors.textPrimaryDark : Colors.grey,
+                  ),
+                ),
+              );
+            },
+          ),
+          if (imageUrls.length > 1)
+            Positioned(
+              bottom: 8,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  imageUrls.length,
+                  (i) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: i == currentIndex ? 12 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: i == currentIndex
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/cached_app_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
+import '../widgets/profile_state_banner.dart';
 import 'chatbot_page.dart';
 import 'edit_profile_page.dart';
 import 'points_page.dart';
@@ -117,102 +118,131 @@ class ProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final profileAsync = ref.watch(profileAsyncProvider);
+    // Use profileProvider (from profile API) as the primary source of truth.
+    // This carries profilePhotoUrl fetched from GET /Profile/my-profile.
     final profile = ref.watch(profileProvider);
-    final currentUser = ref.watch(currentUserProvider);
+    final isLoading = profileAsync.isLoading;
+    final errorText = profileAsync.hasError
+        ? 'حدث خطأ: ${profileAsync.error}'
+        : null;
+
+    // Debug log to trace what photo URL we are trying to display
+    print('[ProfilePage] profile?.profilePhotoUrl = ${profile?.profilePhotoUrl}');
 
     return Scaffold(
       backgroundColor: isDark
           ? const Color(0xFF060C3A)
           : AppColors.backgroundLight,
-      body: Column(
-        children: [
-          _ProfileHeader(onBack: () => Navigator.of(context).pop()),
-          const SizedBox(height: 30),
-          _ProfileAvatar(imagePath: currentUser?.profileImageUrl),
-          const SizedBox(height: 16),
-          Text(
-            profile.name,
-            style: TextStyle(
-              fontSize: 40 * 0.525,
-              fontWeight: FontWeight.w600,
-              color: isDark
-                  ? const Color(0xFFF3F6F9)
-                  : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            textDirection: TextDirection.rtl,
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
             children: [
-              Icon(Icons.circle, size: 12, color: profile.levelDotColor),
-              const SizedBox(width: 8),
+              _ProfileHeader(onBack: () => Navigator.of(context).pop()),
+              ProfileStateBanner(
+                isLoading: isLoading,
+                errorText: errorText,
+                onRetry: () =>
+                    ref.read(profileAsyncProvider.notifier).refresh(),
+              ),
+              const SizedBox(height: 30),
+              // Use the profile photo URL from the Profile API, not from auth state
+              _ProfileAvatar(imageUrl: profile?.profilePhotoUrl),
+              const SizedBox(height: 16),
               Text(
-                profile.level,
-                textDirection: TextDirection.rtl,
+                profile?.name ?? 'بلا اسم',
                 style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w400,
+                  fontSize: 40 * 0.525,
+                  fontWeight: FontWeight.w600,
                   color: isDark
                       ? const Color(0xFFF3F6F9)
-                      : const Color(0x80060C3A),
+                      : AppColors.textPrimaryLight,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                textDirection: TextDirection.rtl,
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 12,
+                    color: profile?.levelDotColor ?? Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    profile?.level ?? 'مستخدم جديد',
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w400,
+                      color: isDark
+                          ? const Color(0xFFF3F6F9)
+                          : const Color(0x80060C3A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 29),
+                child: Column(
+                  children: [
+                    _ProfileActionRow(
+                      title: 'تعديل الملف الشخصي',
+                      trailingIcon: Icons.edit_outlined,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const EditProfilePage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _ProfileActionRow(
+                      title: 'النقاط',
+                      trailingIcon: Icons.star_border_rounded,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const PointsPage()),
+                        );
+                      },
+                    ),
+                    _ProfileActionRow(
+                      title: 'الإعدادات',
+                      trailingIcon: Icons.settings_outlined,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _ProfileActionRow(
+                      title: 'المساعد الذكي',
+                      trailingIcon: Icons.support_agent_rounded,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ChatbotPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    _ProfileActionRow(
+                      title: 'تسجيل الخروج',
+                      trailingIcon: Icons.logout_outlined,
+                      withDivider: false,
+                      onTap: () => _showLogoutDialog(context, ref),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 29),
-            child: Column(
-              children: [
-                _ProfileActionRow(
-                  title: 'تعديل الملف الشخصي',
-                  trailingIcon: Icons.edit_outlined,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const EditProfilePage(),
-                      ),
-                    );
-                  },
-                ),
-                _ProfileActionRow(
-                  title: 'النقاط',
-                  trailingIcon: Icons.star_border_rounded,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PointsPage()),
-                    );
-                  },
-                ),
-                _ProfileActionRow(
-                  title: 'الإعدادات',
-                  trailingIcon: Icons.settings_outlined,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SettingsPage()),
-                    );
-                  },
-                ),
-                _ProfileActionRow(
-                  title: 'المساعد الذكي',
-                  trailingIcon: Icons.support_agent_rounded,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ChatbotPage()),
-                    );
-                  },
-                ),
-                _ProfileActionRow(
-                  title: 'تسجيل الخروج',
-                  trailingIcon: Icons.logout_outlined,
-                  withDivider: false,
-                  onTap: () => _showLogoutDialog(context, ref),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -249,7 +279,7 @@ class _ProfileHeader extends StatelessWidget {
           ),
           Positioned.fill(
             child: Align(
-              alignment: Alignment(0, 0.32),
+              alignment: const Alignment(0, 0.32),
               child: Text(
                 'حسابي',
                 textDirection: TextDirection.rtl,
@@ -269,14 +299,20 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
+/// Profile avatar widget — shows network image if URL is available,
+/// falls back to default avatar asset otherwise.
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({this.imagePath});
+  const _ProfileAvatar({this.imageUrl});
 
-  final String? imagePath;
+  /// Absolute URL returned by the Profile API, or null for default avatar.
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasImage = imageUrl != null && imageUrl!.trim().isNotEmpty;
+
+    print('[_ProfileAvatar] Rendering image. URL: $imageUrl, hasImage: $hasImage');
 
     return Container(
       width: 148,
@@ -295,9 +331,7 @@ class _ProfileAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: CachedAppImage(
-        imagePath: imagePath?.trim().isNotEmpty == true
-            ? imagePath!
-            : 'assets/images/user_chatbot.png',
+        imagePath: hasImage ? imageUrl! : 'assets/images/user_chatbot.png',
         fit: BoxFit.cover,
       ),
     );

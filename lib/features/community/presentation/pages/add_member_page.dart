@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../providers/communities_provider.dart';
 import 'add_member_success_page.dart';
 
-class AddMemberPage extends StatelessWidget {
-  const AddMemberPage({super.key});
+class AddMemberPage extends ConsumerStatefulWidget {
+  const AddMemberPage({super.key, required this.communityId});
+
+  final String communityId;
+
+  @override
+  ConsumerState<AddMemberPage> createState() => _AddMemberPageState();
+}
+
+class _AddMemberPageState extends ConsumerState<AddMemberPage> {
+  final _emailController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +52,7 @@ class AddMemberPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
+                    controller: _emailController,
                     textDirection: TextDirection.rtl,
                     textAlign: TextAlign.right,
                     decoration: InputDecoration(
@@ -89,7 +107,16 @@ class AddMemberPage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          onPressed: () {
+                          onPressed: () async {
+                            final email = _emailController.text.trim();
+                            if (email.isEmpty) return;
+                            await ref
+                                .read(communitiesProvider.notifier)
+                                .addMemberByEmail(
+                                  communityId: widget.communityId,
+                                  email: email,
+                                );
+                            if (!context.mounted) return;
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => const AddMemberSuccessPage(),

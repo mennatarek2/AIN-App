@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:ain_graduation_project/core/network/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../widgets/comments_bottom_sheet.dart';
 import '../widgets/report_card.dart';
+import '../../../reports/domain/report_model.dart';
+import '../../../reports/domain/repositories/report_repository.dart';
+import '../../../reports/presentation/providers/report_data_providers.dart';
 
 class HomeReport {
   const HomeReport({
@@ -19,6 +23,7 @@ class HomeReport {
     required this.latitude,
     required this.longitude,
     this.locationAddress,
+    this.createdByName,
   });
 
   final String id;
@@ -30,6 +35,8 @@ class HomeReport {
   final double latitude;
   final double longitude;
   final String? locationAddress;
+  /// Name of the report creator — null for anonymous reports.
+  final String? createdByName;
 
   Map<String, dynamic> toJson() {
     return {
@@ -44,12 +51,14 @@ class HomeReport {
               'label': tag.label,
               'dotColor': tag.dotColor.toARGB32(),
               'showPin': tag.showPin,
+              'showDot': tag.showDot,
             },
           )
           .toList(),
       'latitude': latitude,
       'longitude': longitude,
       'locationAddress': locationAddress,
+      'createdByName': createdByName,
     };
   }
 
@@ -66,6 +75,7 @@ class HomeReport {
                         const Color(0xFF9E9E9E).toARGB32(),
                   ),
                   showPin: tag['showPin'] == true,
+                  showDot: tag['showDot'] != false,
                 ),
               )
               .where((tag) => tag.label.isNotEmpty)
@@ -77,13 +87,158 @@ class HomeReport {
       username: json['username']?.toString() ?? '',
       timeAgo: json['timeAgo']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
-      imageUrl:
-          json['imageUrl']?.toString() ?? 'assets/images/report_image.png',
+      imageUrl: _extractImageUrl(json),
       tags: parsedTags,
       latitude: double.tryParse(json['latitude']?.toString() ?? '') ?? 0,
       longitude: double.tryParse(json['longitude']?.toString() ?? '') ?? 0,
       locationAddress: json['locationAddress']?.toString(),
+      createdByName: json['createdByName']?.toString(),
     );
+  }
+
+  static String _extractImageUrl(Map<String, dynamic> json) {
+    const preferredKeys = [
+      'imageUrl',
+      'imagePath',
+      'attachmentUrl',
+      'attachment',
+      'image',
+      'images',
+      'attachments',
+      'media',
+      'files',
+      'reportImages',
+      'reportAttachments',
+      'fileUrl',
+      'filePath',
+      'url',
+      'path',
+      'src',
+      'downloadUrl',
+      'contentUrl',
+      'originalUrl',
+      'thumbnailUrl',
+      'photo',
+      'photoUrl',
+      'file',
+      'fileName',
+    ];
+
+    for (final key in preferredKeys) {
+      final value = _extractStringValue(json[key]);
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return _findStringInJson(json, preferredKeys) ?? '';
+  }
+
+  static String? _extractStringValue(dynamic value) {
+    if (value == null) return null;
+
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      // Build full URL if it's a relative path
+      if (trimmed.startsWith('/')) {
+        return '${ApiConfig.baseUrl}$trimmed';
+      }
+      return trimmed;
+    }
+
+    if (value is List) {
+      for (final item in value) {
+        final v = _extractStringValue(item);
+        if (v != null && v.isNotEmpty) return v;
+      }
+      return null;
+    }
+
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      // Check all possible image/file path fields in order of preference
+      final possibleImagePath =
+          map['filePath'] ??
+          map['path'] ??
+          map['url'] ??
+          map['fileUrl'] ??
+          map['attachment'] ??
+          map['imageUrl'] ??
+          map['imagePath'] ??
+          map['fileName'];
+
+      if (possibleImagePath != null) {
+        return _extractStringValue(possibleImagePath);
+      }
+      return null;
+    }
+
+    final stringValue = value.toString().trim();
+    return stringValue.isEmpty ? null : stringValue;
+  }
+
+  static String? _findStringInJson(
+    dynamic value,
+    List<String> preferredKeys, {
+    String? currentKey,
+  }) {
+    if (value == null) return null;
+
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+
+      for (final entry in map.entries) {
+        final nested = _findStringInJson(
+          entry.value,
+          preferredKeys,
+          currentKey: entry.key.toString(),
+        );
+        if (nested != null && nested.isNotEmpty) {
+          return nested;
+        }
+      }
+      return null;
+    }
+
+    if (value is List) {
+      for (final item in value) {
+        final nested = _findStringInJson(
+          item,
+          preferredKeys,
+          currentKey: currentKey,
+        );
+        if (nested != null && nested.isNotEmpty) {
+          return nested;
+        }
+      }
+      return null;
+    }
+
+    final stringValue = value.toString().trim();
+    if (stringValue.isEmpty) return null;
+
+    if (currentKey != null && preferredKeys.contains(currentKey)) {
+      return stringValue;
+    }
+
+    return _looksLikeImageReference(stringValue) ? stringValue : null;
+  }
+
+  static bool _looksLikeImageReference(String value) {
+    final lower = value.toLowerCase();
+    return lower.startsWith('http://') ||
+        lower.startsWith('https://') ||
+        lower.startsWith('file://') ||
+        lower.startsWith('/') ||
+        lower.startsWith('assets/') ||
+        lower.startsWith('storage/') ||
+        lower.startsWith('content://') ||
+        lower.startsWith('blob:') ||
+        RegExp(
+          r'\.(png|jpe?g|gif|webp|bmp|heic|heif)(\?|#|$)',
+        ).hasMatch(lower) ||
+        lower.contains('/');
   }
 }
 
@@ -116,69 +271,24 @@ class HomeFeedState {
 }
 
 class HomeFeedNotifier extends StateNotifier<HomeFeedState> {
-  HomeFeedNotifier() : super(_initialState()) {
-    _loadPersistedData();
+  HomeFeedNotifier(this._reportRepository) : super(_initialState()) {
+    unawaited(_bootstrap());
   }
 
-  static const _reportsCacheKey = 'home_feed_reports_cache_v1';
-  static const _commentsCacheKey = 'home_feed_comments_cache_v1';
+  final ReportRepository _reportRepository;
+
+  static const _reportsCacheKey = 'home_feed_reports_cache_v2';
+  static const _commentsCacheKey = 'home_feed_comments_cache_v2';
+
+  Future<void> _bootstrap() async {
+    await _loadPersistedData();
+    await _loadRemoteReports();
+  }
 
   static HomeFeedState _initialState() {
     return HomeFeedState(
-      reports: [
-        HomeReport(
-          id: 'report-1',
-          username: 'Ahmed',
-          timeAgo: '20 دقيقة',
-          title: 'حفرة في الطريق تهدد سلامة المشاة والمركبات',
-          imageUrl: 'assets/images/report_image.png',
-          latitude: 30.0452,
-          longitude: 31.2338,
-          locationAddress: 'Nasr City, Cairo',
-          tags: [
-            ReportTag(
-              label: 'مدينة نصر، القاهرة',
-              dotColor: Colors.red,
-              showPin: true,
-            ),
-            ReportTag(label: 'قيد المراجعة', dotColor: Colors.amber),
-            ReportTag(label: 'مشاكل الطرق', dotColor: Colors.grey),
-          ],
-        ),
-        HomeReport(
-          id: 'report-2',
-          username: 'Amr M',
-          timeAgo: '30 دقيقة',
-          title: 'يوجد حريق في الشارع، مع وجود نيران ودخان كثيف',
-          imageUrl: 'assets/images/report_image.png',
-          latitude: 30.0383,
-          longitude: 31.2211,
-          locationAddress: 'Maadi, Cairo',
-          tags: [
-            ReportTag(label: 'القاهرة', dotColor: Colors.red, showPin: true),
-            ReportTag(label: 'تم الإبلاغ', dotColor: Colors.green),
-            ReportTag(label: 'سلامة', dotColor: Colors.grey),
-          ],
-        ),
-      ],
-      commentsByReport: {
-        'report-1': [
-          CommentItemData(
-            id: 'c1',
-            username: 'ايمان عصام',
-            text: 'تم إرسال بلاغ مشابه اليوم. نحتاج تدخل سريع.',
-            timeAgo: 'منذ 15 دقيقة',
-            likesCount: 4,
-          ),
-          CommentItemData(
-            id: 'c2',
-            username: 'عبدالرحمن سيد',
-            text: 'الطريق في هذه المنطقة أصبح خطير خاصة ليلا.',
-            timeAgo: 'منذ 32 دقيقة',
-            likesCount: 2,
-          ),
-        ],
-      },
+      reports: const [],
+      commentsByReport: const {},
       searchQuery: '',
       filterEnabled: false,
     );
@@ -244,6 +354,10 @@ class HomeFeedNotifier extends StateNotifier<HomeFeedState> {
     _persistCurrentData();
   }
 
+  Future<void> refreshReportsFromApi() async {
+    await _loadRemoteReports();
+  }
+
   void addReport({
     required String title,
     required String category,
@@ -252,40 +366,8 @@ class HomeFeedNotifier extends StateNotifier<HomeFeedState> {
     required double latitude,
     required double longitude,
     String? locationAddress,
-  }) {
-    final reportId = DateTime.now().microsecondsSinceEpoch.toString();
-    final newReport = HomeReport(
-      id: reportId,
-      username: 'أنت',
-      timeAgo: 'الآن',
-      title: title,
-      imageUrl: 'assets/images/report_image.png',
-      latitude: latitude,
-      longitude: longitude,
-      locationAddress: locationAddress,
-      tags: [
-        ReportTag(
-          label:
-              locationAddress ??
-              '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}',
-          dotColor: Colors.red,
-          showPin: true,
-        ),
-        ReportTag(label: 'تم الإرسال', dotColor: Colors.green),
-        ReportTag(label: category, dotColor: Colors.grey),
-        ReportTag(
-          label: '$reportType • $visibility',
-          dotColor: Colors.blueGrey,
-        ),
-      ],
-    );
-
-    state = state.copyWith(
-      reports: [newReport, ...state.reports],
-      commentsByReport: {...state.commentsByReport, reportId: const []},
-    );
-    _persistCurrentData();
-  }
+    String? imagePath,
+  }) {}
 
   void _persistCurrentData() {
     unawaited(_persistData(state.reports, state.commentsByReport));
@@ -368,6 +450,82 @@ class HomeFeedNotifier extends StateNotifier<HomeFeedState> {
     }
   }
 
+  Future<void> _loadRemoteReports() async {
+    try {
+      final remote = await _reportRepository.fetchPublicReports();
+      if (!mounted) return;
+
+      final mapped = remote
+          .map(
+            (report) {
+              // Determine display name: use createdByName for non-anonymous,
+              // 'مجهول' for anonymous, 'مستخدم' as default fallback.
+              final String username;
+              final visibility = report.visibility?.toLowerCase();
+              if (visibility == 'anonymous') {
+                username = 'مجهول';
+              } else if (report.createdByName != null &&
+                  report.createdByName!.trim().isNotEmpty) {
+                username = report.createdByName!;
+              } else {
+                username = 'مستخدم';
+              }
+
+              return HomeReport(
+                id: report.id,
+                username: username,
+                createdByName: report.createdByName,
+                timeAgo: _formatRelativeArabic(report.submittedAgo),
+                title: report.title,
+                // imagePath is now a computed getter — returns first attachment
+                // URL or falls back to legacy path. No guessing needed.
+                imageUrl: report.imagePath,
+                latitude: report.latitude,
+                longitude: report.longitude,
+                locationAddress: report.locationAddress,
+                tags: [
+                  ReportTag(
+                    label: report.reportType.isNotEmpty
+                        ? report.reportType
+                        : 'بلاغ',
+                    dotColor: Colors.grey,
+                    showDot: false,
+                  ),
+                  ReportTag(
+                    label: report.statusLabel,
+                    dotColor: report.statusColor,
+                  ),
+                  ReportTag(
+                    label: _getLocationName(
+                      report.latitude,
+                      report.longitude,
+                      report.locationAddress,
+                    ),
+                    dotColor: Colors.red,
+                    showPin: true,
+                  ),
+                ],
+              );
+            },
+          )
+          .toList();
+
+      // Debug: print image paths returned from API
+      for (final r in mapped) {
+        try {
+          print(
+            'HomeFeed report loaded -> id: ${r.id}, imageUrl: "${r.imageUrl}"',
+          );
+        } catch (_) {}
+      }
+
+      state = state.copyWith(reports: mapped);
+      _persistCurrentData();
+    } catch (_) {
+      // Keep cached data on failure.
+    }
+  }
+
   Future<void> _persistData(
     List<HomeReport> reports,
     Map<String, List<CommentItemData>> commentsByReport,
@@ -405,11 +563,38 @@ class HomeFeedNotifier extends StateNotifier<HomeFeedState> {
       return null;
     }
   }
+
+  String _cityLabel(String? address) {
+    return ReportModel.extractCity(address) ?? 'غير محدد';
+  }
+
+  /// Formats relative time in Arabic
+  String _formatRelativeArabic(String timeAgoString) {
+    if (timeAgoString.isEmpty) return 'الآن';
+    // API provides pre-formatted Arabic time strings
+    return timeAgoString;
+  }
+
+  /// Gets location display name from coordinates or address
+  String _getLocationName(double latitude, double longitude, String? address) {
+    // Prefer address if available, otherwise show coordinates
+    if (address != null && address.trim().isNotEmpty) {
+      return _cityLabel(address);
+    }
+    // Fallback to formatted coordinates
+    if (latitude != 0 || longitude != 0) {
+      final lat = latitude.toStringAsFixed(2);
+      final lng = longitude.toStringAsFixed(2);
+      return '$lat°, $lng°';
+    }
+    return 'غير محدد';
+  }
 }
 
 final homeFeedProvider = StateNotifierProvider<HomeFeedNotifier, HomeFeedState>(
   (ref) {
-    return HomeFeedNotifier();
+    final repository = ref.watch(reportRepositoryProvider);
+    return HomeFeedNotifier(repository);
   },
 );
 

@@ -162,7 +162,8 @@ class _CommunityInfoPageState extends ConsumerState<CommunityInfoPage> {
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const AddMemberPage(),
+                                builder: (_) =>
+                                    AddMemberPage(communityId: widget.communityId),
                               ),
                             );
                           },

@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-
 import '../../../../config/routes/app_routes.dart';
+import '../../../../core/widgets/checkmark_success_animation.dart';
 
 class PasswordChangedSuccessPage extends StatelessWidget {
   const PasswordChangedSuccessPage({super.key});
-
-  static const String _checkmarkAnimationAssetPath =
-      'assets/animations/report_success.lottie';
 
   @override
   Widget build(BuildContext context) {
@@ -23,28 +19,7 @@ class PasswordChangedSuccessPage extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 140),
-                SizedBox(
-                  width: 180,
-                  height: 180,
-                  child: Lottie.asset(
-                    _checkmarkAnimationAssetPath,
-                    fit: BoxFit.contain,
-                    repeat: false,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          size: 80,
-                          color: Colors.white,
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                const CheckmarkSuccessAnimation(),
                 const SizedBox(height: 52),
                 Text(
                   'تم تغيير كلمة المرور بنجاح',

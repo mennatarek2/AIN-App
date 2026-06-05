@@ -7,6 +7,7 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../../../reports/domain/report_model.dart';
 import '../../../reports/domain/repositories/report_repository.dart';
 import '../../../reports/presentation/providers/report_data_providers.dart';
+import '../../../profile/presentation/providers/profile_provider.dart';
 
 typedef MyReport = ReportModel;
 
@@ -69,8 +70,8 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
       reportType: 'مشاكل الطرق',
       imagePath: 'assets/images/report_image.png',
       progressIndex: 2,
-      statusLabel: 'قيد المعالجة',
-      statusColor: Color(0xFF2A9AF4),
+      statusLabel: 'قيد المعالجه',
+      statusColor: Color(0xFF38A0FA),
       latitude: 30.0452,
       longitude: 31.2338,
       locationAddress: 'Nasr City, Cairo',
@@ -86,8 +87,8 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
       reportType: 'الكهرباء والإنارة',
       imagePath: 'assets/images/report_image.png',
       progressIndex: 1,
-      statusLabel: 'قيد المراجعة',
-      statusColor: Color(0xFFF3B61F),
+      statusLabel: 'قيد المراجعه',
+      statusColor: Color(0xFFFFCA28),
       latitude: 30.0383,
       longitude: 31.2211,
       locationAddress: 'Maadi, Cairo',
@@ -107,29 +108,51 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
   Future<void> addReportFromSubmission({
     required String title,
     required String description,
-    required String reportType,
+    required String categoryName,
+    required String subCategoryName,
+    required String subCategoryId,
     required double latitude,
     required double longitude,
     String? locationAddress,
+    String? visibility,
+    String? imagePath,
   }) async {
+    // Use provided image path or empty string (don't use placeholder)
+    // Placeholder should only be used for display, not for storage
+    final finalImagePath = imagePath?.trim().isNotEmpty == true
+        ? imagePath!
+        : '';
+
+    print(
+      '[MyReports] Adding report - Title: $title, ImagePath: $finalImagePath',
+    );
+
     final report = MyReport(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       title: title,
       description: description,
       submittedAgo: 'الآن',
       fullDescription: description,
-      reportType: reportType,
-      imagePath: 'assets/images/report_image.png',
+      reportType: subCategoryName,
+      imagePath: finalImagePath, // Store actual path, empty if not provided
       progressIndex: 0,
       statusLabel: 'تم الاستلام',
-      statusColor: const Color(0xFF2A9AF4),
+      statusColor: const Color(0xFF38A0FA),
       latitude: latitude,
       longitude: longitude,
       locationAddress: locationAddress,
       isSynced: false,
+      categoryName: categoryName,
+      subCategoryName: subCategoryName,
+      subCategoryId: subCategoryId,
+      visibility: visibility,
     );
 
     final stored = await _reportRepository.createReport(report);
+    print(
+      '[MyReports] Report stored - ID: ${stored.id}, ImagePath: ${stored.imagePath}',
+    );
+
     final updatedReports = _replaceOrInsert(state.reports, stored);
     state = state.copyWith(reports: updatedReports);
   }
@@ -167,17 +190,31 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
 
   Future<void> syncPendingReports() async {
     await _reportRepository.syncUnsyncedReports();
-    final refreshed = await _reportRepository.getCachedReports();
-    if (!mounted || refreshed.isEmpty) return;
-    state = state.copyWith(reports: refreshed);
+    final refreshed = await _reportRepository.fetchVisibleReports();
+    final fallback = refreshed.isEmpty
+        ? await _reportRepository.getCachedReports()
+        : refreshed;
+    if (!mounted || fallback.isEmpty) return;
+    state = state.copyWith(reports: fallback);
   }
 
   Future<void> _hydrateReports() async {
-    final reports = await _reportRepository.hydrateReports(
-      fallback: _defaultReports,
-    );
-    if (!mounted || reports.isEmpty) return;
-    state = state.copyWith(reports: reports);
+    try {
+      final reports = await _reportRepository.hydrateReports(
+        fallback: _defaultReports,
+      );
+      print('[MyReports] Hydrated reports count: ${reports.length}');
+      reports.forEach((r) => print('[MyReports]   - ${r.id}: ${r.title}'));
+
+      if (!mounted || reports.isEmpty) {
+        print('[MyReports] No reports to hydrate');
+        return;
+      }
+
+      state = state.copyWith(reports: reports);
+    } catch (e) {
+      print('[MyReports] Error hydrating reports: $e');
+    }
   }
 
   List<MyReport> _replaceOrInsert(List<MyReport> reports, MyReport report) {
@@ -209,6 +246,12 @@ final myReportsProvider =
         },
         reportRepository: reportRepository,
       );
+
+      ref.listen<UserProfile?>(profileProvider, (previous, next) {
+        if (previous == null || next == null) return;
+        if (previous.id == next.id && previous.email == next.email) return;
+        unawaited(notifier.syncPendingReports());
+      });
 
       return notifier;
     });

@@ -24,6 +24,7 @@ class EmailVerificationPage extends ConsumerStatefulWidget {
 }
 
 class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
+  static const int _otpLength = 6;
   String _code = '';
 
   String _normalizeDigits(String input) {
@@ -60,10 +61,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     required String nextRoute,
     String? email,
   }) async {
-    if (_code.length < 4) {
+    if (_code.length < _otpLength) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى إدخال رمز التحقق كاملا'),
+        SnackBar(
+          content: Text('يرجى إدخال رمز التحقق المكون من $_otpLength أرقام'),
           backgroundColor: Colors.red,
         ),
       );
@@ -136,6 +137,20 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     }
   }
 
+  Future<void> _handleResend(bool isSignUpFlow) async {
+    if (!isSignUpFlow) return;
+
+    final notifier = ref.read(emailVerificationNotifierProvider.notifier);
+    final success = await notifier.resendOtp();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'تم إعادة إرسال الرمز' : 'تعذر إعادة الإرسال'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final args =
@@ -169,7 +184,13 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: isSignUpFlow
-            ? _buildSignUpVerification(context, nextRoute, isLoading, email)
+            ? _buildSignUpVerification(
+                context,
+                nextRoute,
+                isLoading,
+                email,
+                isSignUpFlow,
+              )
             : _buildForgotPasswordVerification(
                 context,
                 nextRoute,
@@ -248,7 +269,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'أدخل رمز التحقق المكون من 4 أرقام الذي تم إرساله إلى بريدك الإلكتروني',
+              'أدخل رمز التحقق المكون من 6 أرقام الذي تم إرساله إلى بريدك الإلكتروني',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 18,
@@ -257,7 +278,11 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
               ),
             ),
             const SizedBox(height: 32),
-            _OtpFields(onChanged: _handleCodeChanged, enabled: !isLoading),
+            _OtpFields(
+              onChanged: _handleCodeChanged,
+              enabled: !isLoading,
+              length: _otpLength,
+            ),
             const SizedBox(height: 40),
             _PrimaryButton(
               label: 'استمرار',
@@ -282,6 +307,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     String nextRoute,
     bool isLoading,
     String? email,
+    bool isSignUpFlow,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -331,7 +357,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
                     ),
                     const SizedBox(height: 28),
                     Text(
-                      'أدخل رمز التحقق المكون من 4 أرقام الذي تم إرساله إلى بريدك الإلكتروني',
+                      'أدخل رمز التحقق المكون من 6 أرقام الذي تم إرساله إلى بريدك الإلكتروني',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontSize: 18,
@@ -343,6 +369,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
                     _OtpFields(
                       onChanged: _handleCodeChanged,
                       enabled: !isLoading,
+                      length: _otpLength,
                     ),
                     const SizedBox(height: 172),
                     Padding(
@@ -402,7 +429,11 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
                       child: SizedBox(
                         height: 52,
                         child: OutlinedButton(
-                          onPressed: () {},
+                          onPressed: isLoading
+                              ? null
+                              : () {
+                                  _handleResend(isSignUpFlow);
+                                },
                           style: OutlinedButton.styleFrom(
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -435,18 +466,23 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
 }
 
 class _OtpFields extends StatefulWidget {
-  const _OtpFields({required this.onChanged, required this.enabled});
+  const _OtpFields({
+    required this.onChanged,
+    required this.enabled,
+    required this.length,
+  });
 
   final ValueChanged<String> onChanged;
   final bool enabled;
+  final int length;
 
   @override
   State<_OtpFields> createState() => _OtpFieldsState();
 }
 
 class _OtpFieldsState extends State<_OtpFields> {
-  final _controllers = List.generate(
-    4,
+  late final List<TextEditingController> _controllers = List.generate(
+    widget.length,
     (_) => TextEditingController(),
     growable: false,
   );
@@ -463,50 +499,75 @@ class _OtpFieldsState extends State<_OtpFields> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(4, (index) {
-        return SizedBox(
-          width: 56,
-          height: 56,
-          child: TextField(
-            controller: _controllers[index],
-            enabled: widget.enabled,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            style: const TextStyle(
-              color: Color(0xFF060C3A),
-              fontWeight: FontWeight.w600,
-              fontSize: 18,
-            ),
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: colorScheme.outlineVariant),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 6.0;
+        const maxFieldWidth = 44.0;
+        const minFieldWidth = 32.0;
+        const fieldHeight = 56.0;
+
+        final totalSpacing = spacing * (widget.length - 1);
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final fieldWidth = ((availableWidth - totalSpacing) / widget.length)
+            .clamp(minFieldWidth, maxFieldWidth)
+            .toDouble();
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(widget.length, (index) {
+            return Padding(
+              padding: EdgeInsetsDirectional.only(
+                end: index == widget.length - 1 ? 0 : spacing,
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              child: SizedBox(
+                width: fieldWidth,
+                height: fieldHeight,
+                child: TextField(
+                  controller: _controllers[index],
+                  enabled: widget.enabled,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  maxLength: 1,
+                  style: const TextStyle(
+                    color: Color(0xFF060C3A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                  ),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colorScheme.outlineVariant),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colorScheme.outlineVariant),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: colorScheme.primary,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    if (value.isNotEmpty && index < _controllers.length - 1) {
+                      FocusScope.of(context).nextFocus();
+                    }
+                    final code = _controllers.map((c) => c.text).join();
+                    widget.onChanged(code);
+                  },
+                ),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-              ),
-            ),
-            onChanged: (value) {
-              if (value.isNotEmpty && index < _controllers.length - 1) {
-                FocusScope.of(context).nextFocus();
-              }
-              final code = _controllers.map((c) => c.text).join();
-              widget.onChanged(code);
-            },
-          ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 }

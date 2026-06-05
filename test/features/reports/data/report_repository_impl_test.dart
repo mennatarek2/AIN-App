@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ain_graduation_project/core/network/api_client.dart';
 import 'package:ain_graduation_project/core/network/connectivity_service.dart';
 import 'package:ain_graduation_project/features/reports/data/data_sources/report_local_data_source.dart';
 import 'package:ain_graduation_project/features/reports/data/data_sources/report_remote_data_source.dart';
@@ -20,18 +21,30 @@ class _FakeConnectivityService extends ConnectivityService {
 }
 
 class _FakeReportRemoteDataSource extends ReportRemoteDataSource {
-  _FakeReportRemoteDataSource({this.failuresBeforeSuccess = 0});
+  _FakeReportRemoteDataSource({this.failuresBeforeSuccess = 0})
+    : super(
+        _FakeApiClient(),
+        readToken: _readToken,
+      );
 
   int failuresBeforeSuccess;
   int attemptCount = 0;
 
+  static Future<String?> _readToken() async => 'test-token';
+
   @override
-  Future<void> submitReport(ReportModel report) async {
+  Future<ReportModel> submitReport(ReportModel report) async {
     attemptCount++;
     if (attemptCount <= failuresBeforeSuccess) {
       throw Exception('forced remote failure');
     }
+    // Return the same report marked as synced (simulating server response)
+    return report.copyWith(isSynced: true);
   }
+}
+
+class _FakeApiClient extends ApiClient {
+  _FakeApiClient() : super(baseUrl: 'https://example.com/api');
 }
 
 ReportModel _report({required String id, bool isSynced = false}) {
@@ -50,6 +63,8 @@ ReportModel _report({required String id, bool isSynced = false}) {
     longitude: 31.0,
     locationAddress: 'Cairo',
     isSynced: isSynced,
+    subCategoryId: 'sub-cat-1',
+    visibility: 'Public',
   );
 }
 

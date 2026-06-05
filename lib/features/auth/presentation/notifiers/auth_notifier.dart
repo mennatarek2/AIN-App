@@ -30,6 +30,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String password,
     required String name,
     required String phoneNumber,
+    required String ssn,
   }) async {
     state = const AuthLoading();
 
@@ -38,6 +39,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       password: password,
       name: name,
       phoneNumber: phoneNumber,
+      ssn: ssn,
     );
 
     return result.fold(
@@ -57,6 +59,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthLoading();
 
     final result = await _repository.login(email: email, password: password);
+
+    return result.fold(
+      (failure) {
+        state = AuthError(failure);
+        return false;
+      },
+      (user) {
+        state = AuthAuthenticated(user);
+        return true;
+      },
+    );
+  }
+
+  /// Complete sign up after document verification
+  Future<bool> completeSignUp() async {
+    final currentUser = state is AuthAuthenticated
+        ? (state as AuthAuthenticated).user
+        : null;
+
+    state = const AuthLoading();
+
+    final result = await _repository.completeSignUp(
+      email: currentUser?.email ?? '',
+      name: currentUser?.name ?? '',
+    );
 
     return result.fold(
       (failure) {

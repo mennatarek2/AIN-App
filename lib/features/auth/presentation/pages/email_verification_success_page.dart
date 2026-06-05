@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
+import '../../../../core/widgets/checkmark_success_animation.dart';
 
 class EmailVerificationSuccessArgs {
   final String nextRoute;
@@ -9,9 +9,6 @@ class EmailVerificationSuccessArgs {
 
 class EmailVerificationSuccessPage extends StatelessWidget {
   const EmailVerificationSuccessPage({super.key});
-
-  static const String _checkmarkAnimationAssetPath =
-      'assets/animations/report_success.lottie';
 
   @override
   Widget build(BuildContext context) {
@@ -31,28 +28,7 @@ class EmailVerificationSuccessPage extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 140),
-                SizedBox(
-                  width: 180,
-                  height: 180,
-                  child: Lottie.asset(
-                    _checkmarkAnimationAssetPath,
-                    fit: BoxFit.contain,
-                    repeat: false,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          size: 80,
-                          color: Colors.white,
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                const CheckmarkSuccessAnimation(),
                 const SizedBox(height: 52),
                 Text(
                   'تم التحقق من البريد الإلكتروني بنجاح',

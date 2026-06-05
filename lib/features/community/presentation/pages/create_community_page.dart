@@ -1,19 +1,21 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../providers/communities_provider.dart';
 import 'confirm_community_added_page.dart';
 
-class CreateCommunityPage extends StatefulWidget {
+class CreateCommunityPage extends ConsumerStatefulWidget {
   const CreateCommunityPage({super.key});
 
   @override
-  State<CreateCommunityPage> createState() => _CreateCommunityPageState();
+  ConsumerState<CreateCommunityPage> createState() => _CreateCommunityPageState();
 }
 
-class _CreateCommunityPageState extends State<CreateCommunityPage> {
+class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
   final _groupNameController = TextEditingController();
   final _memberEmailController = TextEditingController();
   final _picker = ImagePicker();
@@ -103,11 +105,42 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          onPressed: () {
+                          onPressed: () async {
+                            final groupName = _groupNameController.text.trim();
+                            final firstMemberEmail = _memberEmailController.text
+                                .trim();
+                            if (groupName.isEmpty) return;
+
+                            await ref
+                                .read(communitiesProvider.notifier)
+                                .createCommunity(
+                                  name: groupName,
+                                  description: groupName,
+                                );
+
+                            Community? createdCommunity;
+                            for (final community
+                                in ref.read(communitiesProvider).communities) {
+                              if (community.title == groupName) {
+                                createdCommunity = community;
+                                break;
+                              }
+                            }
+
+                            if (createdCommunity != null &&
+                                firstMemberEmail.isNotEmpty) {
+                              await ref
+                                  .read(communitiesProvider.notifier)
+                                  .addMemberByEmail(
+                                    communityId: createdCommunity.id,
+                                    email: firstMemberEmail,
+                                  );
+                            }
+
+                            if (!context.mounted) return;
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    const ConfirmCommunityAddedPage(),
+                                builder: (_) => const ConfirmCommunityAddedPage(),
                               ),
                             );
                           },

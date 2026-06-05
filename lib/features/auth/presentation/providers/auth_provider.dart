@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_providers.dart';
+import '../../data/data_sources/auth_remote_data_source.dart';
 import '../../data/data_sources/mock_auth_data_source.dart';
 import '../../data/data_sources/user_local_data_source.dart';
 import '../../data/repositories/auth_repository_impl.dart';
@@ -17,11 +19,16 @@ final userLocalDataSourceProvider = Provider<UserLocalDataSource>((ref) {
   return UserLocalDataSource();
 });
 
+final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
+  return AuthRemoteDataSource(ref.watch(apiClientProvider));
+});
+
 // Repository Provider
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final dataSource = ref.watch(mockAuthDataSourceProvider);
   final userLocalDataSource = ref.watch(userLocalDataSourceProvider);
-  return AuthRepositoryImpl(dataSource, userLocalDataSource);
+  final remoteDataSource = ref.watch(authRemoteDataSourceProvider);
+  return AuthRepositoryImpl(remoteDataSource, dataSource, userLocalDataSource);
 });
 
 // Auth State Notifier Provider

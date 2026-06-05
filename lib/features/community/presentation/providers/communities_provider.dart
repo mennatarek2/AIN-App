@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_providers.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/community_remote_data_source.dart';
 import '../pages/community_info_page.dart';
 
 class Community {
@@ -40,7 +43,11 @@ class CommunitiesState {
 }
 
 class CommunitiesNotifier extends StateNotifier<CommunitiesState> {
-  CommunitiesNotifier() : super(_initialState());
+  CommunitiesNotifier(this._remoteDataSource) : super(_initialState()) {
+    _loadFromApi();
+  }
+
+  final CommunityRemoteDataSource _remoteDataSource;
 
   static CommunitiesState _initialState() {
     return CommunitiesState(
@@ -105,11 +112,89 @@ class CommunitiesNotifier extends StateNotifier<CommunitiesState> {
     updatedCommunities.add(community);
     state = state.copyWith(communities: updatedCommunities);
   }
+
+  Future<void> createCommunity({
+    required String name,
+    required String description,
+  }) async {
+    await _remoteDataSource.createCommunity(name: name, description: description);
+    await _loadFromApi();
+  }
+
+  Future<void> addMemberByEmail({
+    required String communityId,
+    required String email,
+  }) async {
+    await _remoteDataSource.addMemberByEmail(
+      communityId: communityId,
+      email: email,
+    );
+    await _loadFromApi();
+  }
+
+  Future<void> leaveCommunity(String communityId) async {
+    await _remoteDataSource.leaveCommunity(communityId);
+    await _loadFromApi();
+  }
+
+  Future<void> _loadFromApi() async {
+    try {
+      final communities = await _remoteDataSource.fetchAllCommunities();
+      if (communities.isEmpty || !mounted) return;
+
+      final mapped = <Community>[];
+      for (final item in communities) {
+        final members = await _remoteDataSource.fetchCommunityMembers(item.id);
+        mapped.add(
+          Community(
+            id: item.id,
+            title: item.name,
+            membersPreview: _buildMembersPreview(members),
+            iconPath: 'assets/images/family_comm.png',
+            members: members
+                .map(
+                  (member) => CommunityMember(
+                    name: member.displayName?.trim().isNotEmpty == true
+                        ? member.displayName!
+                        : member.email,
+                    status: 'عضو',
+                    statusColor: const Color(0xFF2E8B57),
+                  ),
+                )
+                .toList(),
+          ),
+        );
+      }
+
+      if (!mounted || mapped.isEmpty) return;
+      state = state.copyWith(communities: mapped);
+    } catch (_) {
+      // Keep seeded fallback data if the API fails.
+    }
+  }
+
+  String _buildMembersPreview(List<CommunityMemberApiModel> members) {
+    if (members.isEmpty) return '';
+    final names = members
+        .map((member) => member.displayName ?? member.email)
+        .where((name) => name.trim().isNotEmpty)
+        .take(3)
+        .toList();
+    return names.join(' , ');
+  }
 }
+
+final communityRemoteDataSourceProvider = Provider<CommunityRemoteDataSource>((ref) {
+  final userLocal = ref.watch(userLocalDataSourceProvider);
+  return CommunityRemoteDataSource(
+    ref.watch(apiClientProvider),
+    readToken: userLocal.getCachedToken,
+  );
+});
 
 final communitiesProvider =
     StateNotifierProvider<CommunitiesNotifier, CommunitiesState>((ref) {
-      return CommunitiesNotifier();
+      return CommunitiesNotifier(ref.watch(communityRemoteDataSourceProvider));
     });
 
 final filteredCommunitiesProvider = Provider<List<Community>>((ref) {

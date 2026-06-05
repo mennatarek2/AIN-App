@@ -132,19 +132,32 @@ class ReportCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: CachedAppImage(
-                  imagePath: imageUrl,
-                  fit: BoxFit.cover,
-                  errorWidget: Container(
-                    color: isDark ? const Color(0xFF1A255C) : Colors.grey[300],
-                    child: Center(
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: isDark ? AppColors.textPrimaryDark : Colors.grey,
-                        size: 40,
+                child: Builder(
+                  builder: (context) {
+                    if (imageUrl.trim().isEmpty) {
+                      print('[ReportCard] No image for report: $title');
+                    } else {
+                      print('[ReportCard] Loading image - $imageUrl');
+                    }
+                    return CachedAppImage(
+                      imagePath: imageUrl,
+                      fit: BoxFit.cover,
+                      errorWidget: Container(
+                        color: isDark
+                            ? const Color(0xFF1A255C)
+                            : Colors.grey[300],
+                        child: Center(
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : Colors.grey,
+                            size: 40,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -213,11 +226,13 @@ class ReportTag {
   final String label;
   final Color dotColor;
   final bool showPin;
+  final bool showDot;
 
   ReportTag({
     required this.label,
     required this.dotColor,
     this.showPin = false,
+    this.showDot = true,
   });
 }
 
@@ -254,14 +269,16 @@ class _TagChip extends StatelessWidget {
         children: [
           tag.showPin
               ? Icon(Icons.location_on, size: 12, color: tag.dotColor)
-              : Container(
+              : tag.showDot
+              ? Container(
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
                     color: tag.dotColor,
                     shape: BoxShape.circle,
                   ),
-                ),
+                )
+              : const SizedBox(width: 8, height: 8),
           const SizedBox(width: 6),
           Flexible(
             child: Text(

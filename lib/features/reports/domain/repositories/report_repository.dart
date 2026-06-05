@@ -12,4 +12,14 @@ abstract class ReportRepository {
   Future<void> updateReport(ReportModel report);
 
   Future<List<ReportModel>> syncUnsyncedReports();
+
+  Future<List<ReportModel>> fetchPublicReports({
+    int pageNumber = 1,
+    int pageSize = 20,
+  });
+
+  Future<List<ReportModel>> fetchVisibleReports({
+    int pageNumber = 1,
+    int pageSize = 20,
+  });
 }

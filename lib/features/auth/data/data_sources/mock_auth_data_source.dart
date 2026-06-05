@@ -31,10 +31,10 @@ class MockAuthDataSource {
     ).join();
   }
 
-  /// Generate 4-digit verification code
+  /// Generate 6-digit verification code (matches OTP UI length).
   String _generateVerificationCode() {
     final random = Random();
-    return (1000 + random.nextInt(9000)).toString();
+    return (100000 + random.nextInt(900000)).toString();
   }
 
   String _normalizeDigits(String input) {
@@ -211,8 +211,9 @@ class MockAuthDataSource {
   }) async {
     await _delay();
 
+    final normalizedCode = _normalizeDigits(code);
     if (!_verificationCodes.containsKey(email) ||
-        _verificationCodes[email] != code) {
+        _verificationCodes[email] != normalizedCode) {
       throw Exception('Invalid verification code');
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
+import '../../domain/utils/username_utils.dart';
 import 'email_verification_page.dart';
 import '../providers/auth_provider.dart';
 import '../state/auth_state_simple.dart';
@@ -18,6 +19,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _ssnController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -26,6 +28,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _ssnController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -36,12 +39,24 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       return;
     }
 
+    final email = _emailController.text.trim();
+    if (UsernameUtils.fromEmail(email) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('البريد الإلكتروني غير صحيح'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final notifier = ref.read(authNotifierProvider.notifier);
     final success = await notifier.signUp(
-      email: _emailController.text.trim(),
+      email: email,
       password: _passwordController.text,
       name: _nameController.text.trim(),
       phoneNumber: _phoneController.text.trim(),
+      ssn: _ssnController.text.trim(),
     );
 
     if (success && mounted) {
@@ -49,7 +64,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         AppRoutes.emailVerification,
         arguments: EmailVerificationArgs(
           nextRoute: AppRoutes.idVerificationIntro,
-          email: _emailController.text.trim(),
+          email: email,
         ),
       );
     }
@@ -146,7 +161,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         children: [
           const SizedBox(height: 28),
           _buildInput(
-            hint: 'اسم المستخدم',
+            hint: 'الاسم الكامل',
             textInputAction: TextInputAction.next,
             controller: _nameController,
             enabled: !isLoading,
@@ -172,6 +187,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
             hint: 'رقم الهوية الشخصية',
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.next,
+            controller: _ssnController,
             enabled: !isLoading,
           ),
           const SizedBox(height: 16),
@@ -228,7 +244,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
           return 'هذا الحقل مطلوب';
         }
         if (keyboardType == TextInputType.emailAddress) {
-          if (!value.contains('@')) {
+          if (UsernameUtils.fromEmail(value) == null) {
             return 'البريد الإلكتروني غير صحيح';
           }
         }

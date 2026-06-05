@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/checkmark_success_animation.dart';
 
 class AddMemberSuccessPage extends StatelessWidget {
   const AddMemberSuccessPage({super.key});
-
-  static const String _checkmarkAnimationAssetPath =
-      'assets/animations/report_success.lottie';
 
   @override
   Widget build(BuildContext context) {
@@ -34,28 +30,7 @@ class AddMemberSuccessPage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 150,
-                  height: 150,
-                  child: Lottie.asset(
-                    _checkmarkAnimationAssetPath,
-                    repeat: false,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          size: 80,
-                          color: Colors.white,
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                const CheckmarkSuccessAnimation(),
                 const SizedBox(height: 18),
                 Text(
                   'تمت إضافة العضو بنجاح',

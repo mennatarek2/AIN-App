@@ -10,6 +10,7 @@ abstract class AuthRepository {
     required String password,
     required String name,
     required String phoneNumber,
+    required String ssn,
   });
 
   /// Login with email and password
@@ -40,6 +41,15 @@ abstract class AuthRepository {
     required String email,
     required String code,
   });
+
+  /// Complete sign up after all verification steps
+  Future<Either<AuthFailure, User>> completeSignUp({
+    required String email,
+    required String name,
+  });
+
+  /// Resend OTP for sign-up verification
+  Future<Either<AuthFailure, void>> resendOtp();
 
   /// Upload ID verification documents
   Future<Either<AuthFailure, void>> uploadIdDocuments({

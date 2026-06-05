@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 class UserLocalDataSource {
   static const _userCacheKey = 'auth_cached_user_v1';
   static const _tokenCacheKey = 'auth_cached_token_v1';
+  static const _signupTokenKey = 'auth_cached_signup_token_v1';
 
   Future<void> saveSession({
     required UserModel user,
@@ -46,6 +47,27 @@ class UserLocalDataSource {
     return token;
   }
 
+  Future<void> saveSignupToken(String token) async {
+    final prefs = await _safeGetPrefs();
+    if (prefs == null) return;
+    await prefs.setString(_signupTokenKey, token);
+  }
+
+  Future<String?> getSignupToken() async {
+    final prefs = await _safeGetPrefs();
+    if (prefs == null) return null;
+
+    final token = prefs.getString(_signupTokenKey);
+    if (token == null || token.trim().isEmpty) return null;
+    return token;
+  }
+
+  Future<void> clearSignupToken() async {
+    final prefs = await _safeGetPrefs();
+    if (prefs == null) return;
+    await prefs.remove(_signupTokenKey);
+  }
+
   Future<bool> hasValidSession() async {
     final user = await getCachedUser();
     final token = await getCachedToken();
@@ -58,6 +80,7 @@ class UserLocalDataSource {
 
     await prefs.remove(_userCacheKey);
     await prefs.remove(_tokenCacheKey);
+    await prefs.remove(_signupTokenKey);
   }
 
   Future<SharedPreferences?> _safeGetPrefs() async {

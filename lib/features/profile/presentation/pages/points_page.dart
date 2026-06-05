@@ -73,11 +73,11 @@ class PointsPage extends ConsumerWidget {
                         Icon(
                           Icons.circle,
                           size: 12,
-                          color: profile.levelDotColor,
+                          color: profile?.levelDotColor ?? Colors.grey,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          profile.level,
+                          profile?.level ?? 'مستخدم جديد',
                           textDirection: TextDirection.rtl,
                           style: TextStyle(
                             fontSize: 17,
@@ -89,7 +89,7 @@ class PointsPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'متبقي ${profile.pointsToNextLevel} نقطة لتصل مستوى ${profile.level} !\nاستمر في المشاركة',
+                      'متبقي ${profile?.pointsToNextLevel ?? 100} نقطة لتصل مستوى ${profile?.level ?? 'مستخدم جديد'} !\nاستمر في المشاركة',
                       textDirection: TextDirection.rtl,
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -104,7 +104,7 @@ class PointsPage extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(100),
                       child: LinearProgressIndicator(
                         minHeight: 16,
-                        value: (profile.points % 100) / 100,
+                        value: ((profile?.points ?? 0) % 100) / 100,
                         backgroundColor: isDark
                             ? const Color(0xFFD9D9D9)
                             : const Color(0xFFE0E2E6),
@@ -140,25 +140,25 @@ class PointsPage extends ConsumerWidget {
                     _LevelItem(
                       label: 'مستخدم جديد',
                       dotColor: const Color(0xFF697184),
-                      achieved: profile.points >= 0,
+                      achieved: (profile?.points ?? 0) >= 0,
                     ),
                     const SizedBox(height: 10),
                     _LevelItem(
                       label: 'مساهم',
                       dotColor: const Color(0xFF498EF4),
-                      achieved: profile.points >= 100,
+                      achieved: (profile?.points ?? 0) >= 100,
                     ),
                     const SizedBox(height: 10),
                     _LevelItem(
                       label: 'موثق',
                       dotColor: const Color(0xFF14B57A),
-                      achieved: profile.points >= 200,
+                      achieved: (profile?.points ?? 0) >= 200,
                     ),
                     const SizedBox(height: 10),
                     _LevelItem(
                       label: 'متميز',
                       dotColor: const Color(0xFFF59E0B),
-                      achieved: profile.points >= 300,
+                      achieved: (profile?.points ?? 0) >= 300,
                     ),
                     const SizedBox(height: 24),
                   ],

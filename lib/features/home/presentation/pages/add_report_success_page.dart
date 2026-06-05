@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-
 import '../../../../config/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/checkmark_success_animation.dart';
 
 class AddReportSuccessPage extends StatelessWidget {
   const AddReportSuccessPage({super.key});
 
   static const double _designW = 430;
   static const double _designH = 932;
-  static const String _checkmarkAnimationAssetPath =
-      'assets/animations/report_success.lottie';
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -44,27 +40,11 @@ class AddReportSuccessPage extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned(
-                      left: sx(125),
+                      left: 0,
+                      right: 0,
                       top: sx(140),
-                      width: sx(180),
-                      height: sx(180),
-                      child: Lottie.asset(
-                        _checkmarkAnimationAssetPath,
-                        repeat: false,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check_rounded,
-                              size: 80,
-                              color: Colors.white,
-                            ),
-                          );
-                        },
+                      child: Center(
+                        child: CheckmarkSuccessAnimation(size: sx(140)),
                       ),
                     ),
                     Positioned(

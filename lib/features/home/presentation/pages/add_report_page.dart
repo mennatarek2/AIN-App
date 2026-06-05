@@ -15,6 +15,20 @@ import '../../../my_reports/presentation/providers/my_reports_provider.dart';
 import 'add_report_success_page.dart';
 import 'select_report_location_page.dart';
 
+class CategoryOption {
+  const CategoryOption({required this.name, required this.subCategories});
+
+  final String name;
+  final List<SubCategoryOption> subCategories;
+}
+
+class SubCategoryOption {
+  const SubCategoryOption({required this.id, required this.name});
+
+  final String id;
+  final String name;
+}
+
 class AddReportPage extends ConsumerStatefulWidget {
   const AddReportPage({super.key});
 
@@ -23,16 +37,103 @@ class AddReportPage extends ConsumerStatefulWidget {
 }
 
 class _AddReportPageState extends ConsumerState<AddReportPage> {
-  String? _reportType;
-  String? _category;
+  CategoryOption? _selectedCategory;
+  SubCategoryOption? _selectedSubCategory;
   String? _visibility;
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late final ImagePicker _imagePicker;
   XFile? _selectedImage;
+  bool _isSubmitting = false;
 
-  final _reportTypeOptions = const ['حريق', 'حادث سير', 'تلف مرافق'];
-  final _categoryOptions = const ['طرق', 'أمن', 'سلامة'];
+  final _categoryOptions = const [
+    CategoryOption(
+      name: 'الأمن',
+      subCategories: [
+        SubCategoryOption(
+          id: '4364b582-d500-4762-80fb-4ef7501a7ec6',
+          name: 'ﺳطو',
+        ),
+        SubCategoryOption(
+          id: '3087d4ea-352b-4c35-8f1f-e5f508b009fd',
+          name: 'ﺳرﻗﺔ',
+        ),
+      ],
+    ),
+    CategoryOption(
+      name: 'السلامة العامة',
+      subCategories: [
+        SubCategoryOption(
+          id: '0d7b168e-d6ea-48b9-b78f-6bdb70a7e1a1',
+          name: 'ﻣواد ﺧطرة',
+        ),
+        SubCategoryOption(
+          id: '59eb1e96-57be-4d3b-a131-520fdc5e69d7',
+          name: 'مشاكل المواصلات',
+        ),
+        SubCategoryOption(
+          id: '660e8400-e29b-41d4-a716-446655440000',
+          name: 'تلف الطرق',
+        ),
+      ],
+    ),
+    CategoryOption(
+      name: 'الحوادث المنزلية',
+      subCategories: [
+        SubCategoryOption(
+          id: 'b8c89a18-86cc-49f4-bd4d-a6e771625056',
+          name: 'حوادث داخل المنزل',
+        ),
+        SubCategoryOption(
+          id: 'd445ddd4-f37d-4866-a774-b26d7b481ca7',
+          name: 'إصابات منزلية',
+        ),
+        SubCategoryOption(
+          id: '1c556438-f145-4298-97e6-d9af5ad6ab17',
+          name: 'حرائق',
+        ),
+      ],
+    ),
+    CategoryOption(
+      name: 'المرافق العامة',
+      subCategories: [
+        SubCategoryOption(
+          id: 'fee18c42-a2a1-4db6-9be0-c3fd83886f6f',
+          name: 'انقطاع المياه',
+        ),
+        SubCategoryOption(
+          id: '034e5a26-4fd8-4f83-ac4f-c40d4c5f2364',
+          name: 'انقطاع الكهرباء',
+        ),
+        SubCategoryOption(
+          id: '8f5d66d4-6a48-4754-a2f0-cce8a48457ef',
+          name: 'مشاكل الصرف الصحي',
+        ),
+      ],
+    ),
+    CategoryOption(
+      name: 'مشاكل إلكترونية',
+      subCategories: [
+        SubCategoryOption(
+          id: '4379a043-16e7-4206-94fc-4d30097cd84d',
+          name: 'الاختراق',
+        ),
+        SubCategoryOption(
+          id: 'a69a3f06-152b-44a8-a6f7-34e7343dba5a',
+          name: 'التنمر الإلكتروني',
+        ),
+        SubCategoryOption(
+          id: '5a19f80f-f265-46cb-b53c-a0890c72ca58',
+          name: 'الاحتيال',
+        ),
+        SubCategoryOption(
+          id: 'd5f4f7c4-34c7-4fbf-a4ec-56f95ed9f1d4',
+          name: 'إساءة الاستخدام',
+        ),
+      ],
+    ),
+    CategoryOption(name: 'أخرى', subCategories: []),
+  ];
   final _visibilityOptions = const ['عام', 'مجهول', 'سري'];
 
   @override
@@ -110,14 +211,9 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
                     Expanded(
                       child: SizedBox(
                         height: 48,
-                        child: _buildDropdown(
-                          value: _reportType,
-                          hint: 'نوع البلاغ',
-                          items: _reportTypeOptions,
+                        child: _buildCategoryDropdown(
                           textColor: fieldTextColor,
                           borderColor: fieldBorderColor,
-                          onChanged: (value) =>
-                              setState(() => _reportType = value),
                         ),
                       ),
                     ),
@@ -125,33 +221,28 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
                     Expanded(
                       child: SizedBox(
                         height: 48,
-                        child: _buildDropdown(
-                          value: _category,
-                          hint: 'الفئة',
-                          items: _categoryOptions,
+                        child: _buildSubCategoryDropdown(
                           textColor: fieldTextColor,
                           borderColor: fieldBorderColor,
-                          onChanged: (value) =>
-                              setState(() => _category = value),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: SizedBox(
-                        height: 48,
-                        child: _buildDropdown(
-                          value: _visibility,
-                          hint: 'الظهور',
-                          items: _visibilityOptions,
-                          textColor: fieldTextColor,
-                          borderColor: fieldBorderColor,
-                          onChanged: (value) =>
-                              setState(() => _visibility = value),
                         ),
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 17),
+                child: SizedBox(
+                  height: 48,
+                  child: _buildDropdown(
+                    value: _visibility,
+                    hint: 'الظهور',
+                    items: _visibilityOptions,
+                    textColor: fieldTextColor,
+                    borderColor: fieldBorderColor,
+                    onChanged: (value) => setState(() => _visibility = value),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -291,85 +382,160 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: TextButton(
-                    onPressed: () async {
-                      if (!_isFormValid) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('يرجى تعبئة جميع الحقول المطلوبة'),
-                          ),
-                        );
-                        return;
-                      }
+                    onPressed: _isSubmitting
+                        ? null
+                        : () async {
+                            if (!_isFormValid) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'يرجى تعبئة جميع الحقول المطلوبة',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
 
-                      final location = ref
-                          .read(reportLocationProvider)
-                          .selectedLatLng;
-                      if (location == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'يرجى اختيار موقع البلاغ على الخريطة',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
+                            final location = ref
+                                .read(reportLocationProvider)
+                                .selectedLatLng;
+                            if (location == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'يرجى اختيار موقع البلاغ على الخريطة',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
 
-                      final address = ref
-                          .read(reportLocationProvider)
-                          .selectedAddress;
+                            final address = ref
+                                .read(reportLocationProvider)
+                                .selectedAddress;
 
-                      ref
-                          .read(homeFeedProvider.notifier)
-                          .addReport(
-                            title: _titleController.text.trim(),
-                            category: _category!,
-                            reportType: _reportType!,
-                            visibility: _visibility!,
-                            latitude: location.latitude,
-                            longitude: location.longitude,
-                            locationAddress: address,
-                          );
+                            final category = _selectedCategory!;
+                            final subCategory = _resolveSubCategory();
+                            final subCategoryId = _resolveSubCategoryId();
+                            final hasSubCategories =
+                                (category.subCategories).isNotEmpty;
 
-                      await ref
-                          .read(myReportsProvider.notifier)
-                          .addReportFromSubmission(
-                            title: _titleController.text.trim(),
-                            description: _descriptionController.text.trim(),
-                            reportType: _reportType!,
-                            latitude: location.latitude,
-                            longitude: location.longitude,
-                            locationAddress: address,
-                          );
+                            if (subCategory == null || subCategory.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'يرجى اختيار التصنيف الفرعي قبل الإرسال',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            if (hasSubCategories &&
+                                (subCategoryId == null ||
+                                    subCategoryId.isEmpty)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'تعذر تحديد معرف التصنيف الفرعي، يرجى إعادة الاختيار',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
 
-                      await ref
-                          .read(notificationsProvider.notifier)
-                          .notifyReportSubmitted(
-                            reportTitle: _titleController.text.trim(),
-                            reportType: _reportType!,
-                          );
+                            final reportType = subCategory;
+                            final apiVisibility = _mapVisibilityToApi(
+                              _visibility!,
+                            );
 
-                      if (!context.mounted) return;
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AddReportSuccessPage(),
-                        ),
-                      );
-                    },
+                            // Show loading state
+                            if (!mounted) return;
+                            setState(() => _isSubmitting = true);
+
+                            try {
+                              // Add report locally
+                              await ref
+                                  .read(myReportsProvider.notifier)
+                                  .addReportFromSubmission(
+                                    title: _titleController.text.trim(),
+                                    description: _descriptionController.text
+                                        .trim(),
+                                    categoryName: category.name,
+                                    subCategoryName: reportType,
+                                    subCategoryId: subCategoryId ?? '',
+                                    latitude: location.latitude,
+                                    longitude: location.longitude,
+                                    locationAddress: address,
+                                    visibility: apiVisibility,
+                                    imagePath: _selectedImage?.path,
+                                  );
+
+                              // Refresh feed from API
+                              await ref
+                                  .read(homeFeedProvider.notifier)
+                                  .refreshReportsFromApi();
+
+                              // Send notification
+                              await ref
+                                  .read(notificationsProvider.notifier)
+                                  .notifyReportSubmitted(
+                                    reportTitle: _titleController.text.trim(),
+                                    reportType: reportType,
+                                  );
+
+                              if (!mounted) return;
+                              setState(() => _isSubmitting = false);
+
+                              // Navigate to success page
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const AddReportSuccessPage(),
+                                ),
+                              );
+                            } catch (e) {
+                              if (!mounted) return;
+                              setState(() => _isSubmitting = false);
+
+                              // Show error message
+                              final errorMessage = _extractErrorMessage(e);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'حدث خطأ أثناء إرسال البلاغ: $errorMessage',
+                                    textDirection: TextDirection.rtl,
+                                  ),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          },
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFFF3F6F9),
+                      disabledForegroundColor: const Color(0xFFF3F6F9),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: const Text(
-                      'إرسال',
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFFF3F6F9),
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'إرسال',
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -383,14 +549,31 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
 
   bool get _isFormValid {
     final selectedLocation = ref.read(reportLocationProvider).selectedLatLng;
+    final hasSubCategory = _resolveSubCategory()?.trim().isNotEmpty == true;
+    final hasSubCategoryId =
+        (_selectedCategory?.subCategories ?? []).isEmpty ||
+        _resolveSubCategoryId() != null;
 
-    return _reportType != null &&
-        _category != null &&
+    return _selectedCategory != null &&
+        hasSubCategory &&
+        hasSubCategoryId &&
         _visibility != null &&
         _titleController.text.trim().isNotEmpty &&
         _descriptionController.text.trim().isNotEmpty &&
-        _selectedImage != null &&
         selectedLocation != null;
+  }
+
+  String _mapVisibilityToApi(String value) {
+    switch (value) {
+      case 'عام':
+        return 'Public';
+      case 'مجهول':
+        return 'Anonymous';
+      case 'سري':
+        return 'Confidential';
+      default:
+        return 'Public';
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -496,6 +679,129 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildCategoryDropdown({
+    required Color borderColor,
+    required Color textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: borderColor, width: 1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<CategoryOption>(
+          value: _selectedCategory,
+          isExpanded: true,
+          dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor),
+          style: TextStyle(
+            fontSize: 17,
+            color: textColor,
+            fontWeight: FontWeight.w400,
+          ),
+          hint: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'التصنيف الرئيسي',
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontSize: 17,
+                color: textColor,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+          onChanged: (value) {
+            setState(() {
+              _selectedCategory = value;
+              _selectedSubCategory = null;
+            });
+          },
+          items: _categoryOptions
+              .map(
+                (option) => DropdownMenuItem<CategoryOption>(
+                  value: option,
+                  alignment: Alignment.centerRight,
+                  child: Text(option.name, textDirection: TextDirection.rtl),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubCategoryDropdown({
+    required Color borderColor,
+    required Color textColor,
+  }) {
+    final subCategories =
+        _selectedCategory?.subCategories ?? const <SubCategoryOption>[];
+    final hasSubCategories = subCategories.isNotEmpty;
+    final hasCategory = _selectedCategory != null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: borderColor, width: 1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<SubCategoryOption>(
+          value: _selectedSubCategory,
+          isExpanded: true,
+          dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor),
+          style: TextStyle(
+            fontSize: 17,
+            color: textColor,
+            fontWeight: FontWeight.w400,
+          ),
+          hint: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              hasCategory
+                  ? (hasSubCategories ? 'التصنيف الفرعي' : 'لا يوجد تصنيف فرعي')
+                  : 'التصنيف الفرعي',
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontSize: 17,
+                color: textColor,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+          onChanged: hasSubCategories
+              ? (value) => setState(() => _selectedSubCategory = value)
+              : null,
+          items: subCategories
+              .map(
+                (option) => DropdownMenuItem<SubCategoryOption>(
+                  value: option,
+                  alignment: Alignment.centerRight,
+                  child: Text(option.name, textDirection: TextDirection.rtl),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
+  String? _resolveSubCategory() {
+    final category = _selectedCategory;
+    if (category == null) return null;
+    if (category.subCategories.isEmpty) return category.name;
+    return _selectedSubCategory?.name;
+  }
+
+  String? _resolveSubCategoryId() {
+    final category = _selectedCategory;
+    if (category == null || category.subCategories.isEmpty) return null;
+    return _selectedSubCategory?.id;
   }
 
   Widget _buildLocationSelector({
@@ -698,6 +1004,23 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
 
     if (!mounted || selectedLocation == null) return;
     await notifier.selectLocation(selectedLocation);
+  }
+
+  String _extractErrorMessage(Object error) {
+    if (error is Exception) {
+      final message = error.toString();
+      if (message.contains('Missing auth token')) {
+        return 'يرجى تسجيل الدخول أولا';
+      } else if (message.contains('Missing sub category id')) {
+        return 'يرجى اختيار التصنيف الفرعي';
+      } else if (message.contains('ApiException')) {
+        return 'فشل الاتصال بالخادم. يرجى المحاولة لاحقا';
+      } else if (message.contains('SocketException')) {
+        return 'لا يوجد اتصال بالإنترنت';
+      }
+      return message.replaceAll('Exception: ', '');
+    }
+    return 'حدث خطأ غير متوقع';
   }
 }
 
