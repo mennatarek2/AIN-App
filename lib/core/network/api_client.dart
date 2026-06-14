@@ -301,6 +301,7 @@ class ApiClient {
 
     final message = _extractError(body);
     print('[API] Error: $status - $message');
+    if (body.isNotEmpty) print('[API] Error Body: $body');
     throw ApiException(message, statusCode: status);
   }
 

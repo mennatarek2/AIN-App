@@ -16,11 +16,12 @@ enum SosScreenMode { idle, triggering, active, resolved, cancelled }
 enum SosSeverity { low, standard, high, critical }
 
 extension SosSeverityExt on SosSeverity {
+  /// API `SOSSeverity` enum: 0 = Standard, 1 = High, 2 = Critical.
   int get apiIntValue => switch (this) {
         SosSeverity.low      => 0,
-        SosSeverity.standard => 1,
-        SosSeverity.high     => 2,
-        SosSeverity.critical => 3,
+        SosSeverity.standard => 0,
+        SosSeverity.high     => 1,
+        SosSeverity.critical => 2,
       };
 
   // Keep string value for any legacy code
@@ -262,7 +263,6 @@ class SosNotifier extends StateNotifier<SosState> {
         longitude: position.longitude,
         severity: state.severity.apiIntValue,
         accuracyMeters: position.accuracy,
-        altitudeMeters: position.altitude,
         message: state.optionalMessage.trim().isEmpty
             ? null
             : state.optionalMessage.trim(),

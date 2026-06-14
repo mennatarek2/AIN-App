@@ -115,15 +115,18 @@ class SosRemoteDataSource {
   ApiClient get apiClient => _client;
 
   /// Triggers a new SOS alert and returns the created model.
+  ///
+  /// [severity] must be an integer 0–2 (Standard / High / Critical) per
+  /// `TriggerSOSDto`. Do not send `altitudeMeters` here — it is not part of
+  /// the trigger schema (use [updateLocation] for live pings instead).
   Future<SosAlertModel?> trigger({
     required String communityId,
     required double latitude,
     required double longitude,
-    required int severity,          // ← int, NOT String (API expects 0/1/2/3)
+    required int severity,
     double? accuracyMeters,
-    double? altitudeMeters,
     String? message,
-    int? durationMinutes,
+    int durationMinutes = 30,
   }) async {
     final token = await readToken();
     final response = await _client.postJson(
@@ -133,11 +136,10 @@ class SosRemoteDataSource {
         'communityId': communityId,
         'latitude': latitude,
         'longitude': longitude,
-        'severity': severity,
+        'severity': severity.clamp(0, 2),
         if (accuracyMeters != null) 'accuracyMeters': accuracyMeters,
-        if (altitudeMeters != null) 'altitudeMeters': altitudeMeters,
-        if (message != null && message.trim().isNotEmpty) 'message': message,
-        if (durationMinutes != null) 'durationMinutes': durationMinutes,
+        if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
+        'durationMinutes': durationMinutes,
       },
     );
     final map = _extractMap(response);

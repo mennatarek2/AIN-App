@@ -31,7 +31,7 @@ class SosAlertModel {
 
   factory SosAlertModel.fromApiJson(Map<String, dynamic> json) {
     // The API now returns integer status (0=Active,1=Resolved,2=Cancelled,3=FalseAlarm)
-    // and integer severity (0=Low,1=Standard,2=High,3=Critical).
+    // and integer severity (0=Standard,1=High,2=Critical).
     // We convert to readable strings for the UI.
     final rawStatus = json['status'];
     final statusStr = rawStatus is int
@@ -40,7 +40,7 @@ class SosAlertModel {
 
     final rawSeverity = json['severity'];
     final severityStr = rawSeverity is int
-        ? const ['Low', 'Standard', 'High', 'Critical'][rawSeverity.clamp(0, 3)]
+        ? const ['Standard', 'High', 'Critical'][rawSeverity.clamp(0, 2)]
         : rawSeverity?.toString() ?? 'Standard';
 
     // triggeredAt may come as createdAtUtc in newer responses
