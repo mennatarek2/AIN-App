@@ -16,16 +16,17 @@ final homeNavigationProvider =
       return HomeNavigationNotifier();
     });
 
-const Map<int, String> _bottomNavRoutes = {
+/// Maps tab index to named route.
+/// Index 2 (Report) is a special action — not in this map.
+const Map<int, String> bottomNavRoutes = {
   0: AppRoutes.home,
-  1: AppRoutes.myReports,
-  2: AppRoutes.community,
-  3: AppRoutes.notifications,
+  1: AppRoutes.community,
+  3: AppRoutes.sos,
+  4: AppRoutes.profile,
 };
 
 void navigateFromBottomNav(BuildContext context, int index) {
-  final routeName = _bottomNavRoutes[index];
+  final routeName = bottomNavRoutes[index];
   if (routeName == null) return;
-
   Navigator.of(context).pushReplacementNamed(routeName);
 }

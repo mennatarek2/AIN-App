@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/notifications/local_notification_service.dart';
+import '../core/realtime/signalr_bridge.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_provider.dart';
+import '../features/auth/data/data_sources/user_local_data_source.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/sign_up_page.dart';
 import '../features/auth/presentation/pages/forgot_password_page.dart';
@@ -16,22 +19,65 @@ import '../features/auth/presentation/pages/id_verification_intro_page.dart';
 import '../features/auth/presentation/pages/selfie_capture_page.dart';
 import '../features/auth/presentation/pages/verification_progress_page.dart';
 import '../features/auth/presentation/pages/verification_success_page.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
+import '../features/auth/presentation/state/auth_state_simple.dart';
 import '../features/community/presentation/pages/community_page.dart';
 import '../features/home/presentation/pages/home_page.dart';
+import '../features/home/presentation/pages/map_page.dart';
 import '../features/my_reports/presentation/pages/my_reports_page.dart';
 import '../features/notifications/presentation/pages/notifications_page.dart';
 import '../features/onboarding/presentation/pages/onboarding_page.dart';
+import '../features/profile/presentation/pages/profile_page.dart';
+import '../features/reports/presentation/pages/report_detail_page.dart';
 import '../features/reports/presentation/providers/report_sync_provider.dart';
+import '../features/sos/presentation/pages/sos_page.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
 import 'routes/app_routes.dart';
 
-class App extends ConsumerWidget {
+class App extends ConsumerStatefulWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<App> createState() => _AppState();
+}
+
+class _AppState extends ConsumerState<App> {
+  @override
+  void initState() {
+    super.initState();
+    // If already authenticated on cold start, connect SignalR.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeBootstrapSignalR();
+    });
+  }
+
+  Future<void> _maybeBootstrapSignalR() async {
+    final authState = ref.read(authNotifierProvider);
+    if (authState is AuthAuthenticated) {
+      final token = await UserLocalDataSource().getCachedToken();
+      if (token != null && token.isNotEmpty) {
+        await ref.read(signalRBridgeProvider).start(token: token);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(reportSyncBootstrapProvider);
     final themeMode = ref.watch(appSettingsProvider).themeMode;
+
+    // Listen for auth state changes → start/stop SignalR automatically.
+    ref.listen<AuthState>(authNotifierProvider, (previous, next) async {
+      final bridge = ref.read(signalRBridgeProvider);
+      if (next is AuthAuthenticated) {
+        final token = await UserLocalDataSource().getCachedToken();
+        if (token != null && token.isNotEmpty) {
+          await bridge.start(token: token);
+        }
+      } else if (next is AuthUnauthenticated) {
+        await bridge.stop();
+      }
+    });
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -46,6 +92,9 @@ class App extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      // Global navigator key — used by LocalNotificationService tap handler
+      // and SOS background notification navigation.
+      navigatorKey: appNavigatorKey,
       initialRoute: AppRoutes.splash,
       routes: {
         AppRoutes.splash: (_) => const SplashPage(),
@@ -64,9 +113,25 @@ class App extends ConsumerWidget {
         AppRoutes.verificationProgress: (_) => const VerificationProgressPage(),
         AppRoutes.verificationSuccess: (_) => const VerificationSuccessPage(),
         AppRoutes.home: (_) => const HomePage(),
+        AppRoutes.map: (_) => const MapPage(),
         AppRoutes.myReports: (_) => const MyReportsPage(),
         AppRoutes.community: (_) => const CommunityPage(),
         AppRoutes.notifications: (_) => const NotificationsPage(),
+        AppRoutes.profile: (_) => const ProfilePage(),
+        AppRoutes.sos: (_) => const SosPage(),
+      },
+      // Routes that require arguments cannot use the static routes table.
+      onGenerateRoute: (settings) {
+        if (settings.name == AppRoutes.reportDetail) {
+          final reportId = settings.arguments as String?;
+          if (reportId != null && reportId.isNotEmpty) {
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => ReportDetailPage(reportId: reportId),
+            );
+          }
+        }
+        return null;
       },
     );
   }

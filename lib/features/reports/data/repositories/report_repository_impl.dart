@@ -173,12 +173,18 @@ class ReportRepositoryImpl implements ReportRepository {
   @override
   Future<List<ReportModel>> fetchPublicReports({
     int pageNumber = 1,
-    int pageSize = 20,
+    int pageSize = 10,
+    String? categoryId,
+    String? status,
+    String? search,
   }) async {
     try {
       return await remoteDataSource.fetchPublicReports(
         pageNumber: pageNumber,
         pageSize: pageSize,
+        categoryId: categoryId,
+        status: status,
+        search: search,
       );
     } catch (_) {
       return const [];
@@ -198,6 +204,21 @@ class ReportRepositoryImpl implements ReportRepository {
     } catch (_) {
       return const [];
     }
+  }
+
+  @override
+  Future<ReportModel?> getReport(String id) async {
+    return remoteDataSource.fetchReportById(id);
+  }
+
+  @override
+  Future<void> updateVisibility(String id, String visibility) async {
+    await remoteDataSource.updateVisibility(id, visibility);
+  }
+
+  @override
+  Future<void> deleteReport(String id) async {
+    await remoteDataSource.deleteReport(id);
   }
 
   /// Submits a report to the server with retry logic.
@@ -254,5 +275,31 @@ class ReportRepositoryImpl implements ReportRepository {
     }
 
     return hasCategory && hasSubCategoryId && hasVisibility;
+  }
+
+  @override
+  Future<List<ReportModel>> fetchMyReports({
+    int pageNumber = 1,
+    int pageSize = 10,
+    String? statusFilter,
+  }) async {
+    return remoteDataSource.fetchMyReports(
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      statusFilter: statusFilter,
+    );
+  }
+
+  @override
+  Future<ReportModel> submitReportWithProgress(
+    ReportModel report, {
+    void Function(double)? onProgress,
+    List<String>? attachmentPaths,
+  }) async {
+    return remoteDataSource.submitReportWithProgress(
+      report,
+      onProgress: onProgress,
+      attachmentPaths: attachmentPaths,
+    );
   }
 }

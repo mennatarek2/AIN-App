@@ -27,6 +27,7 @@ class ReportModel {
     this.visibility,
     this.authorityName,
     this.createdByName,
+    this.createdById,
   }) : _legacyImagePath = imagePath;
 
   final String id;
@@ -67,6 +68,8 @@ class ReportModel {
   final String? visibility;
   final String? authorityName;
   final String? createdByName;
+  /// The reporter's user ID — used for owner-check (`createdById == currentUserId`).
+  final String? createdById;
 
   ReportModel copyWith({
     String? id,
@@ -91,6 +94,7 @@ class ReportModel {
     String? visibility,
     String? authorityName,
     String? createdByName,
+    String? createdById,
   }) {
     return ReportModel(
       id: id ?? this.id,
@@ -115,6 +119,7 @@ class ReportModel {
       visibility: visibility ?? this.visibility,
       authorityName: authorityName ?? this.authorityName,
       createdByName: createdByName ?? this.createdByName,
+      createdById: createdById ?? this.createdById,
     );
   }
 
@@ -142,6 +147,7 @@ class ReportModel {
       'visibility': visibility,
       'authorityName': authorityName,
       'createdByName': createdByName,
+      'createdById': createdById,
     };
   }
 
@@ -183,6 +189,7 @@ class ReportModel {
       visibility: json['visibility']?.toString(),
       authorityName: json['authorityName']?.toString(),
       createdByName: json['createdByName']?.toString(),
+      createdById: json['createdById']?.toString(),
     );
   }
 
@@ -288,6 +295,10 @@ class ReportModel {
       visibility: json['visibility']?.toString(),
       authorityName: json['authorityName']?.toString(),
       createdByName: json['createdByName']?.toString(),
+      createdById:
+          json['createdById']?.toString() ??
+          json['reporterId']?.toString() ??
+          json['userId']?.toString(),
     );
   }
 

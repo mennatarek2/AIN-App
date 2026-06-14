@@ -57,8 +57,8 @@ class ProfileLocalDataSource {
       'phoneNumber': profile.phoneNumber,
       'userName': profile.userName,
       'isVerified': profile.isVerified,
-      'points': profile.points,
-      // Persist the profile photo URL so it survives app restarts
+      'trustPoints': profile.trustPoints,
+      'badge': profile.badge,
       'profilePhotoUrl': profile.profilePhotoUrl,
     };
   }
@@ -71,7 +71,9 @@ class ProfileLocalDataSource {
       phoneNumber: json['phoneNumber'] as String? ?? '',
       userName: json['userName'] as String? ?? '',
       isVerified: json['isVerified'] as bool? ?? false,
-      points: json['points'] as int? ?? 0,
+      // Support both old cache key 'points' and new 'trustPoints'
+      trustPoints: (json['trustPoints'] ?? json['points']) as int? ?? 0,
+      badge: json['badge'] as String? ?? 'Newcomer',
       profilePhotoUrl: json['profilePhotoUrl'] as String?,
     );
   }

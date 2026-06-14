@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import 'community_info_page.dart';
+import '../providers/communities_provider.dart' show CommunityMember;
 
 class MemberDetailsPage extends StatelessWidget {
   const MemberDetailsPage({

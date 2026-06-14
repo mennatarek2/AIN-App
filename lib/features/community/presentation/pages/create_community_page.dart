@@ -107,34 +107,39 @@ class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
                           ),
                           onPressed: () async {
                             final groupName = _groupNameController.text.trim();
-                            final firstMemberEmail = _memberEmailController.text
-                                .trim();
+                            final firstMemberEmail =
+                                _memberEmailController.text.trim();
                             if (groupName.isEmpty) return;
 
-                            await ref
+                            final result = await ref
                                 .read(communitiesProvider.notifier)
                                 .createCommunity(
                                   name: groupName,
                                   description: groupName,
                                 );
 
-                            Community? createdCommunity;
-                            for (final community
-                                in ref.read(communitiesProvider).communities) {
-                              if (community.title == groupName) {
-                                createdCommunity = community;
-                                break;
-                              }
-                            }
+                            if (!context.mounted) return;
 
-                            if (createdCommunity != null &&
-                                firstMemberEmail.isNotEmpty) {
+                            if (result != null && firstMemberEmail.isNotEmpty) {
                               await ref
                                   .read(communitiesProvider.notifier)
                                   .addMemberByEmail(
-                                    communityId: createdCommunity.id,
+                                    communityId: result.id,
                                     email: firstMemberEmail,
                                   );
+                            }
+
+                            if (!context.mounted) return;
+
+                            // Show invite code dialog if we got one
+                            if (result?.inviteCode != null) {
+                              await showDialog<void>(
+                                context: context,
+                                builder: (_) => _InviteCodeDialog(
+                                  code: result!.inviteCode!,
+                                  communityName: result.name,
+                                ),
+                              );
                             }
 
                             if (!context.mounted) return;
@@ -339,6 +344,87 @@ class _FormField extends StatelessWidget {
         fontWeight: FontWeight.w400,
         color: textColor,
       ),
+    );
+  }
+}
+
+// ─── Invite Code Dialog ───────────────────────────────────────────────────────
+
+class _InviteCodeDialog extends StatelessWidget {
+  const _InviteCodeDialog({required this.code, required this.communityName});
+
+  final String code;
+  final String communityName;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF121A5C) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Column(
+        children: [
+          const Icon(Icons.group_add_rounded, size: 48, color: Color(0xFF498EF4)),
+          const SizedBox(height: 8),
+          Text(
+            'تم إنشاء "$communityName"',
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'شارك كود الدعوة مع من تريد إضافتهم',
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF498EF4).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF498EF4), width: 1.5),
+            ),
+            child: Text(
+              code,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 6,
+                color: Color(0xFF498EF4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () {
+              // Copy to clipboard
+              // Share.share('Join my community on AIN! Use code: $code');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('تم نسخ الكود: $code'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('نسخ الكود'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('حسناً', style: TextStyle(fontSize: 16)),
+        ),
+      ],
     );
   }
 }

@@ -8,7 +8,8 @@ class ProfileModel {
     required this.phoneNumber,
     required this.userName,
     this.isVerified = false,
-    this.points = 0,
+    this.trustPoints = 0,
+    this.badge = 'Newcomer',
     this.profilePhotoUrl,
   });
 
@@ -18,28 +19,37 @@ class ProfileModel {
   final String phoneNumber;
   final String userName;
   final bool isVerified;
-  final int points;
+  /// Raw trust points from API (trustPoints field)
+  final int trustPoints;
+  /// Badge string from API: 'Newcomer' | 'Contributor' | 'Trusted' | 'Guardian'
+  final String badge;
   final String? profilePhotoUrl;
 
-  // Calculate level dynamically based on points
+  // Keep legacy getters for backwards compatibility
+  int get points => trustPoints;
+
   String get level {
-    if (points < 100) return 'مستخدم جديد';
-    if (points < 200) return 'مساهم';
-    if (points < 300) return 'موثق';
-    return 'متميز';
+    return switch (badge.toLowerCase()) {
+      'guardian'    => 'حارس',
+      'trusted'     => 'موثوق',
+      'contributor' => 'مساهم',
+      _             => 'مستخدم جديد',
+    };
   }
 
   Color get levelDotColor {
-    if (points < 100) return const Color(0xFF697184);
-    if (points < 200) return const Color(0xFF498EF4);
-    if (points < 300) return const Color(0xFF14B57A);
-    return const Color(0xFFF59E0B);
+    return switch (badge.toLowerCase()) {
+      'guardian'    => const Color(0xFFF59E0B),
+      'trusted'     => const Color(0xFF10B981),
+      'contributor' => const Color(0xFF3B82F6),
+      _             => const Color(0xFF697184),
+    };
   }
 
   int get pointsToNextLevel {
-    if (points < 100) return 100 - points;
-    if (points < 200) return 200 - points;
-    if (points < 300) return 300 - points;
+    if (trustPoints < 20)  return 20 - trustPoints;
+    if (trustPoints < 50)  return 50 - trustPoints;
+    if (trustPoints < 100) return 100 - trustPoints;
     return 0;
   }
 
@@ -50,7 +60,8 @@ class ProfileModel {
     String? phoneNumber,
     String? userName,
     bool? isVerified,
-    int? points,
+    int? trustPoints,
+    String? badge,
     String? profilePhotoUrl,
     bool clearPhoto = false,
   }) {
@@ -61,7 +72,8 @@ class ProfileModel {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       userName: userName ?? this.userName,
       isVerified: isVerified ?? this.isVerified,
-      points: points ?? this.points,
+      trustPoints: trustPoints ?? this.trustPoints,
+      badge: badge ?? this.badge,
       profilePhotoUrl:
           clearPhoto ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
     );
@@ -78,7 +90,8 @@ class ProfileModel {
           phoneNumber == other.phoneNumber &&
           userName == other.userName &&
           isVerified == other.isVerified &&
-          points == other.points &&
+          trustPoints == other.trustPoints &&
+          badge == other.badge &&
           profilePhotoUrl == other.profilePhotoUrl;
 
   @override
@@ -89,6 +102,7 @@ class ProfileModel {
       phoneNumber.hashCode ^
       userName.hashCode ^
       isVerified.hashCode ^
-      points.hashCode ^
+      trustPoints.hashCode ^
+      badge.hashCode ^
       profilePhotoUrl.hashCode;
 }

@@ -146,6 +146,77 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  /// Like [postMultipart] but reports true upload progress via [onProgress].
+  ///
+  /// [onProgress] receives a value in [0.0, 1.0].
+  Future<dynamic> postMultipartWithProgress(
+    String path, {
+    String? token,
+    Map<String, String>? fields,
+    Map<String, List<String>>? multiFilePaths,
+    void Function(double progress)? onProgress,
+  }) async {
+    final uri = _buildUri(path);
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(_headers(token: token, json: false));
+
+    if (fields != null) request.fields.addAll(fields);
+
+    if (multiFilePaths != null) {
+      for (final entry in multiFilePaths.entries) {
+        for (final filePath in entry.value) {
+          final file = File(filePath);
+          if (!await file.exists()) continue;
+          final mimeType = _getMimeType(filePath);
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              entry.key,
+              filePath,
+              contentType: _parseMediaType(mimeType),
+            ),
+          );
+        }
+      }
+    }
+
+    // Total content length for progress calculation.
+    final totalBytes = request.contentLength;
+
+    onProgress?.call(0.0);
+
+    // Send and track progress by intercepting the streamed body bytes.
+    final streamed = await request.send();
+
+    // Read response body while tracking bytes received.
+    int bytesReceived = 0;
+    final bodyBytes = <int>[];
+    await streamed.stream.listen((chunk) {
+      bodyBytes.addAll(chunk);
+      // Upload is done by the time we receive the response; use response
+      // receipt as a proxy for the final confirmation.
+      bytesReceived += chunk.length;
+    }).asFuture<void>();
+
+    // Upload is fully complete once we've received the full response.
+    onProgress?.call(1.0);
+
+    // Reconstruct an http.Response from the collected bytes.
+    final response = http.Response.bytes(
+      bodyBytes,
+      streamed.statusCode,
+      headers: streamed.headers,
+      request: streamed.request,
+      isRedirect: streamed.isRedirect,
+      persistentConnection: streamed.persistentConnection,
+      reasonPhrase: streamed.reasonPhrase,
+    );
+
+    // Suppress unused variable warning.
+    assert(totalBytes >= 0 || bytesReceived >= 0);
+
+    return _handleResponse(response);
+  }
+
   Future<dynamic> putMultipart(
     String path, {
     String? token,

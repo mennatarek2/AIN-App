@@ -170,7 +170,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                         itemCount: _comments.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 14),
+                        separatorBuilder: (context, i) => const SizedBox(height: 14),
                         itemBuilder: (context, index) {
                           final comment = _comments[index];
                           return _CommentListItem(

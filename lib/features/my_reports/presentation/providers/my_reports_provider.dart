@@ -1,273 +1,199 @@
-import 'dart:async';
-
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../reports/domain/report_model.dart';
 import '../../../reports/domain/repositories/report_repository.dart';
 import '../../../reports/presentation/providers/report_data_providers.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 
-typedef MyReport = ReportModel;
+// ─────────────────────────────────────────────────────────────────────────────
+// Status filter options
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Filter options for My Reports list.
+enum MyReportsFilter {
+  all(null, 'الكل'),
+  underReview('UnderReview', 'قيد المراجعة'),
+  dispatched('Dispatched', 'موزع'),
+  resolved('Resolved', 'تم الحل'),
+  rejected('Rejected', 'مرفوض');
+
+  const MyReportsFilter(this.apiValue, this.label);
+
+  final String? apiValue;
+  final String label;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────────
 
 class MyReportsState {
   const MyReportsState({
-    required this.reports,
-    required this.searchQuery,
-    required this.filterEnabled,
+    this.reports = const [],
+    this.isLoading = false,
+    this.isLoadingMore = false,
+    this.filter = MyReportsFilter.all,
+    this.page = 1,
+    this.hasMore = true,
+    this.error,
   });
 
-  final List<MyReport> reports;
-  final String searchQuery;
-  final bool filterEnabled;
+  final List<ReportModel> reports;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final MyReportsFilter filter;
+  final int page;
+  final bool hasMore;
+  final String? error;
 
   MyReportsState copyWith({
-    List<MyReport>? reports,
-    String? searchQuery,
-    bool? filterEnabled,
+    List<ReportModel>? reports,
+    bool? isLoading,
+    bool? isLoadingMore,
+    MyReportsFilter? filter,
+    int? page,
+    bool? hasMore,
+    String? error,
+    bool clearError = false,
   }) {
     return MyReportsState(
       reports: reports ?? this.reports,
-      searchQuery: searchQuery ?? this.searchQuery,
-      filterEnabled: filterEnabled ?? this.filterEnabled,
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      filter: filter ?? this.filter,
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifier
+// ─────────────────────────────────────────────────────────────────────────────
 
 class MyReportsNotifier extends StateNotifier<MyReportsState> {
-  MyReportsNotifier({
-    required this.onReportStatusChanged,
-    required ReportRepository reportRepository,
-  }) : _reportRepository = reportRepository,
-       super(_initialState()) {
-    _hydrateReports();
+  MyReportsNotifier(this._repo, this._ref) : super(const MyReportsState()) {
+    refresh();
   }
 
-  final Future<void> Function({
-    required String reportTitle,
-    required String statusLabel,
-  })
-  onReportStatusChanged;
-  final ReportRepository _reportRepository;
+  final ReportRepository _repo;
+  final Ref _ref;
+  static const int _pageSize = 10;
 
-  static MyReportsState _initialState() {
-    return MyReportsState(
-      reports: _defaultReports,
-      searchQuery: '',
-      filterEnabled: false,
-    );
-  }
+  // ── Refresh (reset to page 1) ──
 
-  static const List<MyReport> _defaultReports = [
-    MyReport(
-      id: 'report-1',
-      title: 'حفرة في الطريق',
-      description: 'حفرة في الطريق تهدد سلامة المركبات',
-      submittedAgo: 'منذ 3 أيام',
-      fullDescription:
-          'يوجد حفرة كبيرة في الطريق الرئيسي تهدد سلامة المركبات والمشاة',
-      reportType: 'مشاكل الطرق',
-      imagePath: 'assets/images/report_image.png',
-      progressIndex: 2,
-      statusLabel: 'قيد المعالجه',
-      statusColor: Color(0xFF38A0FA),
-      latitude: 30.0452,
-      longitude: 31.2338,
-      locationAddress: 'Nasr City, Cairo',
-      isSynced: true,
-      localId: 'seed-report-1',
-    ),
-    MyReport(
-      id: 'report-2',
-      title: 'إنارة معطلة',
-      description: 'أعمدة الإنارة في الشارع معطلة',
-      submittedAgo: 'منذ 5 أيام',
-      fullDescription: 'أعمدة الإنارة في الشارع معطلة منذ أسبوع',
-      reportType: 'الكهرباء والإنارة',
-      imagePath: 'assets/images/report_image.png',
-      progressIndex: 1,
-      statusLabel: 'قيد المراجعه',
-      statusColor: Color(0xFFFFCA28),
-      latitude: 30.0383,
-      longitude: 31.2211,
-      locationAddress: 'Maadi, Cairo',
-      isSynced: true,
-      localId: 'seed-report-2',
-    ),
-  ];
+  Future<void> refresh() async {
+    if (!mounted) return;
+    state = state.copyWith(isLoading: true, page: 1, clearError: true);
 
-  void setSearchQuery(String value) {
-    state = state.copyWith(searchQuery: value.trim());
-  }
-
-  void toggleFilter() {
-    state = state.copyWith(filterEnabled: !state.filterEnabled);
-  }
-
-  Future<void> addReportFromSubmission({
-    required String title,
-    required String description,
-    required String categoryName,
-    required String subCategoryName,
-    required String subCategoryId,
-    required double latitude,
-    required double longitude,
-    String? locationAddress,
-    String? visibility,
-    String? imagePath,
-  }) async {
-    // Use provided image path or empty string (don't use placeholder)
-    // Placeholder should only be used for display, not for storage
-    final finalImagePath = imagePath?.trim().isNotEmpty == true
-        ? imagePath!
-        : '';
-
-    print(
-      '[MyReports] Adding report - Title: $title, ImagePath: $finalImagePath',
-    );
-
-    final report = MyReport(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      title: title,
-      description: description,
-      submittedAgo: 'الآن',
-      fullDescription: description,
-      reportType: subCategoryName,
-      imagePath: finalImagePath, // Store actual path, empty if not provided
-      progressIndex: 0,
-      statusLabel: 'تم الاستلام',
-      statusColor: const Color(0xFF38A0FA),
-      latitude: latitude,
-      longitude: longitude,
-      locationAddress: locationAddress,
-      isSynced: false,
-      categoryName: categoryName,
-      subCategoryName: subCategoryName,
-      subCategoryId: subCategoryId,
-      visibility: visibility,
-    );
-
-    final stored = await _reportRepository.createReport(report);
-    print(
-      '[MyReports] Report stored - ID: ${stored.id}, ImagePath: ${stored.imagePath}',
-    );
-
-    final updatedReports = _replaceOrInsert(state.reports, stored);
-    state = state.copyWith(reports: updatedReports);
-  }
-
-  void updateReportStatus({
-    required String reportId,
-    required String statusLabel,
-    required int progressIndex,
-    required Color statusColor,
-  }) {
-    final index = state.reports.indexWhere((report) => report.id == reportId);
-    if (index == -1) return;
-
-    final existing = state.reports[index];
-    final updated = existing.copyWith(
-      statusLabel: statusLabel,
-      progressIndex: progressIndex,
-      statusColor: statusColor,
-      submittedAgo: existing.submittedAgo,
-    );
-
-    final reports = [...state.reports];
-    reports[index] = updated;
-
-    state = state.copyWith(reports: reports);
-    unawaited(_reportRepository.updateReport(updated));
-
-    unawaited(
-      onReportStatusChanged(
-        reportTitle: updated.title,
-        statusLabel: statusLabel,
-      ),
-    );
-  }
-
-  Future<void> syncPendingReports() async {
-    await _reportRepository.syncUnsyncedReports();
-    final refreshed = await _reportRepository.fetchVisibleReports();
-    final fallback = refreshed.isEmpty
-        ? await _reportRepository.getCachedReports()
-        : refreshed;
-    if (!mounted || fallback.isEmpty) return;
-    state = state.copyWith(reports: fallback);
-  }
-
-  Future<void> _hydrateReports() async {
     try {
-      final reports = await _reportRepository.hydrateReports(
-        fallback: _defaultReports,
+      final items = await _repo.fetchMyReports(
+        pageNumber: 1,
+        pageSize: _pageSize,
+        statusFilter: state.filter.apiValue,
       );
-      print('[MyReports] Hydrated reports count: ${reports.length}');
-      reports.forEach((r) => print('[MyReports]   - ${r.id}: ${r.title}'));
+      if (!mounted) return;
+      state = state.copyWith(
+        reports: items,
+        isLoading: false,
+        page: 1,
+        hasMore: items.length >= _pageSize,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
 
-      if (!mounted || reports.isEmpty) {
-        print('[MyReports] No reports to hydrate');
-        return;
+  // ── Load more (append next page) ──
+
+  Future<void> loadMore() async {
+    if (!mounted || state.isLoadingMore || !state.hasMore) return;
+    final nextPage = state.page + 1;
+    state = state.copyWith(isLoadingMore: true);
+
+    try {
+      final items = await _repo.fetchMyReports(
+        pageNumber: nextPage,
+        pageSize: _pageSize,
+        statusFilter: state.filter.apiValue,
+      );
+      if (!mounted) return;
+      state = state.copyWith(
+        reports: [...state.reports, ...items],
+        isLoadingMore: false,
+        page: nextPage,
+        hasMore: items.length >= _pageSize,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(isLoadingMore: false);
+    }
+  }
+
+  // ── Filter ──
+
+  Future<void> setFilter(MyReportsFilter filter) async {
+    if (filter == state.filter) return;
+    state = state.copyWith(filter: filter);
+    await refresh();
+  }
+
+  // ── Visibility update ──
+
+  Future<void> updateVisibility(String id, String visibility) async {
+    try {
+      await _repo.updateVisibility(id, visibility);
+      // Update local state
+      final updated = state.reports.map((r) {
+        return r.id == id ? r.copyWith(visibility: visibility) : r;
+      }).toList();
+      if (mounted) state = state.copyWith(reports: updated);
+    } catch (_) {
+      // Ignore — caller can handle
+    }
+  }
+
+  // ── Delete ──
+
+  Future<bool> deleteReport(String id) async {
+    // Optimistic removal
+    final originalReports = [...state.reports];
+    final updatedReports = state.reports.where((r) => r.id != id).toList();
+    if (mounted) state = state.copyWith(reports: updatedReports);
+
+    try {
+      await _repo.deleteReport(id);
+
+      // Refresh trust profile immediately after successful deletion
+      _ref.invalidate(profileProvider);
+
+      return true;
+    } catch (e) {
+      // On 404, item is gone upstream — keep it removed locally
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('404') || errStr.contains('not found')) {
+        _ref.invalidate(profileProvider);
+        return true;
       }
 
-      state = state.copyWith(reports: reports);
-    } catch (e) {
-      print('[MyReports] Error hydrating reports: $e');
+      // On other errors, restore the list
+      if (mounted) state = state.copyWith(reports: originalReports);
+      return false;
     }
-  }
-
-  List<MyReport> _replaceOrInsert(List<MyReport> reports, MyReport report) {
-    final index = reports.indexWhere(
-      (entry) => entry.localId == report.localId || entry.id == report.id,
-    );
-
-    if (index == -1) {
-      return [report, ...reports];
-    }
-
-    final nextReports = [...reports];
-    nextReports[index] = report;
-    return nextReports;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Providers
+// ─────────────────────────────────────────────────────────────────────────────
 
 final myReportsProvider =
     StateNotifierProvider<MyReportsNotifier, MyReportsState>((ref) {
-      final notifications = ref.read(notificationsProvider.notifier);
-      final reportRepository = ref.read(reportRepositoryProvider);
-
-      final notifier = MyReportsNotifier(
-        onReportStatusChanged: ({required reportTitle, required statusLabel}) {
-          return notifications.notifyReportStatusChanged(
-            reportTitle: reportTitle,
-            statusLabel: statusLabel,
-          );
-        },
-        reportRepository: reportRepository,
-      );
-
-      ref.listen<UserProfile?>(profileProvider, (previous, next) {
-        if (previous == null || next == null) return;
-        if (previous.id == next.id && previous.email == next.email) return;
-        unawaited(notifier.syncPendingReports());
-      });
-
-      return notifier;
+      final repo = ref.watch(reportRepositoryProvider);
+      return MyReportsNotifier(repo, ref);
     });
 
-final filteredMyReportsProvider = Provider<List<MyReport>>((ref) {
-  final state = ref.watch(myReportsProvider);
-  final query = state.searchQuery;
-
-  if (query.isEmpty) {
-    return state.reports;
-  }
-
-  return state.reports
-      .where(
-        (report) =>
-            report.title.contains(query) || report.reportType.contains(query),
-      )
-      .toList();
-});
+// Legacy alias (used by some existing code)
+typedef MyReport = ReportModel;

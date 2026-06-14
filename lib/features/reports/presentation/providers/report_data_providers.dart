@@ -6,7 +6,9 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/data_sources/report_local_data_source.dart';
 import '../../data/data_sources/report_remote_data_source.dart';
 import '../../data/repositories/report_repository_impl.dart';
+import '../../data/social_remote_data_source.dart';
 import '../../domain/repositories/report_repository.dart';
+import '../../domain/report_model.dart';
 
 final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
   return ConnectivityService();
@@ -35,3 +37,19 @@ final reportRepositoryProvider = Provider<ReportRepository>((ref) {
     connectivityService: ref.watch(connectivityServiceProvider),
   );
 });
+
+/// Provider for [SocialRemoteDataSource] (comments + likes).
+final socialRemoteDataSourceProvider = Provider<SocialRemoteDataSource>((ref) {
+  final userLocal = ref.watch(userLocalDataSourceProvider);
+  return SocialRemoteDataSource(
+    ref.watch(apiClientProvider),
+    readToken: userLocal.getCachedToken,
+  );
+});
+
+/// Fetches a single report by ID. Family provider — re-fetched per unique ID.
+/// Throws [ApiException] on 403/404 so the UI can render appropriate error states.
+final reportDetailProvider =
+    FutureProvider.family<ReportModel?, String>((ref, id) async {
+      return ref.read(reportRepositoryProvider).getReport(id);
+    });

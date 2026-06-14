@@ -6,9 +6,12 @@ class ReportCard extends StatelessWidget {
   final String username;
   final String timeAgo;
   final String title;
+  final String description;
   final String imageUrl;
   final List<ReportTag> tags;
   final int commentCount;
+  final int attachmentCount;
+  final VoidCallback? onTap;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
@@ -18,9 +21,12 @@ class ReportCard extends StatelessWidget {
     required this.username,
     required this.timeAgo,
     required this.title,
+    this.description = '',
     required this.imageUrl,
     required this.tags,
     this.commentCount = 0,
+    this.attachmentCount = 0,
+    this.onTap,
     this.onLike,
     this.onComment,
     this.onShare,
@@ -40,7 +46,9 @@ class ReportCard extends StatelessWidget {
         ? const Color(0xFF32417B)
         : const Color(0xFFE5E7EB);
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: cardColor,
@@ -125,6 +133,23 @@ class ReportCard extends StatelessWidget {
               textAlign: TextAlign.right,
             ),
           ),
+          const SizedBox(height: 8),
+          // Description (if provided)
+          if (description.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Text(
+                description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textDirection: TextDirection.rtl,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: secondaryText,
+                  height: 1.5,
+                ),
+              ),
+            ),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -134,11 +159,6 @@ class ReportCard extends StatelessWidget {
                 aspectRatio: 16 / 9,
                 child: Builder(
                   builder: (context) {
-                    if (imageUrl.trim().isEmpty) {
-                      print('[ReportCard] No image for report: $title');
-                    } else {
-                      print('[ReportCard] Loading image - $imageUrl');
-                    }
                     return CachedAppImage(
                       imagePath: imageUrl,
                       fit: BoxFit.cover,
@@ -148,11 +168,11 @@ class ReportCard extends StatelessWidget {
                             : Colors.grey[300],
                         child: Center(
                           child: Icon(
-                            Icons.image_not_supported,
+                            Icons.image_not_supported_outlined,
                             color: isDark
-                                ? AppColors.textPrimaryDark
+                                ? AppColors.textSecondaryDark
                                 : Colors.grey,
-                            size: 40,
+                            size: 36,
                           ),
                         ),
                       ),
@@ -180,6 +200,29 @@ class ReportCard extends StatelessWidget {
                   .toList(),
             ),
           ),
+          // Attachment count chip
+          if (attachmentCount > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  Icon(
+                    Icons.attach_file_rounded,
+                    size: 13,
+                    color: secondaryText,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$attachmentCount مرفق',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 8),
           Divider(height: 1, thickness: 1, color: dividerColor),
           Padding(
@@ -218,7 +261,8 @@ class ReportCard extends StatelessWidget {
           const SizedBox(height: 8),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 

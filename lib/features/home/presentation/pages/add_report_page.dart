@@ -1,34 +1,23 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../location/data/location_service.dart';
-import '../../../location/presentation/providers/location_providers.dart';
-import '../../../location/presentation/widgets/map_screen.dart';
-import '../../../notifications/presentation/providers/notifications_provider.dart';
-import '../providers/home_feed_provider.dart';
-import '../../../my_reports/presentation/providers/my_reports_provider.dart';
-import 'add_report_success_page.dart';
+import '../providers/categories_provider.dart';
+import '../providers/subcategories_provider.dart';
 import 'select_report_location_page.dart';
+import '../../../my_reports/presentation/providers/my_reports_provider.dart';
+import '../../../reports/presentation/providers/create_report_notifier.dart';
+import '../../../reports/presentation/providers/create_report_state.dart';
 
-class CategoryOption {
-  const CategoryOption({required this.name, required this.subCategories});
-
-  final String name;
-  final List<SubCategoryOption> subCategories;
-}
-
-class SubCategoryOption {
-  const SubCategoryOption({required this.id, required this.name});
-
-  final String id;
-  final String name;
-}
-
+/// 3-step report creation wizard.
+///
+/// Step 0: Basic information (title, description, category, subcategory, visibility)
+/// Step 1: Location (opens SelectReportLocationPage)
+/// Step 2: Media attachments
 class AddReportPage extends ConsumerStatefulWidget {
   const AddReportPage({super.key});
 
@@ -37,590 +26,749 @@ class AddReportPage extends ConsumerStatefulWidget {
 }
 
 class _AddReportPageState extends ConsumerState<AddReportPage> {
-  CategoryOption? _selectedCategory;
-  SubCategoryOption? _selectedSubCategory;
-  String? _visibility;
-  late final TextEditingController _titleController;
-  late final TextEditingController _descriptionController;
-  late final ImagePicker _imagePicker;
-  XFile? _selectedImage;
-  bool _isSubmitting = false;
-
-  final _categoryOptions = const [
-    CategoryOption(
-      name: 'الأمن',
-      subCategories: [
-        SubCategoryOption(
-          id: '4364b582-d500-4762-80fb-4ef7501a7ec6',
-          name: 'ﺳطو',
-        ),
-        SubCategoryOption(
-          id: '3087d4ea-352b-4c35-8f1f-e5f508b009fd',
-          name: 'ﺳرﻗﺔ',
-        ),
-      ],
-    ),
-    CategoryOption(
-      name: 'السلامة العامة',
-      subCategories: [
-        SubCategoryOption(
-          id: '0d7b168e-d6ea-48b9-b78f-6bdb70a7e1a1',
-          name: 'ﻣواد ﺧطرة',
-        ),
-        SubCategoryOption(
-          id: '59eb1e96-57be-4d3b-a131-520fdc5e69d7',
-          name: 'مشاكل المواصلات',
-        ),
-        SubCategoryOption(
-          id: '660e8400-e29b-41d4-a716-446655440000',
-          name: 'تلف الطرق',
-        ),
-      ],
-    ),
-    CategoryOption(
-      name: 'الحوادث المنزلية',
-      subCategories: [
-        SubCategoryOption(
-          id: 'b8c89a18-86cc-49f4-bd4d-a6e771625056',
-          name: 'حوادث داخل المنزل',
-        ),
-        SubCategoryOption(
-          id: 'd445ddd4-f37d-4866-a774-b26d7b481ca7',
-          name: 'إصابات منزلية',
-        ),
-        SubCategoryOption(
-          id: '1c556438-f145-4298-97e6-d9af5ad6ab17',
-          name: 'حرائق',
-        ),
-      ],
-    ),
-    CategoryOption(
-      name: 'المرافق العامة',
-      subCategories: [
-        SubCategoryOption(
-          id: 'fee18c42-a2a1-4db6-9be0-c3fd83886f6f',
-          name: 'انقطاع المياه',
-        ),
-        SubCategoryOption(
-          id: '034e5a26-4fd8-4f83-ac4f-c40d4c5f2364',
-          name: 'انقطاع الكهرباء',
-        ),
-        SubCategoryOption(
-          id: '8f5d66d4-6a48-4754-a2f0-cce8a48457ef',
-          name: 'مشاكل الصرف الصحي',
-        ),
-      ],
-    ),
-    CategoryOption(
-      name: 'مشاكل إلكترونية',
-      subCategories: [
-        SubCategoryOption(
-          id: '4379a043-16e7-4206-94fc-4d30097cd84d',
-          name: 'الاختراق',
-        ),
-        SubCategoryOption(
-          id: 'a69a3f06-152b-44a8-a6f7-34e7343dba5a',
-          name: 'التنمر الإلكتروني',
-        ),
-        SubCategoryOption(
-          id: '5a19f80f-f265-46cb-b53c-a0890c72ca58',
-          name: 'الاحتيال',
-        ),
-        SubCategoryOption(
-          id: 'd5f4f7c4-34c7-4fbf-a4ec-56f95ed9f1d4',
-          name: 'إساءة الاستخدام',
-        ),
-      ],
-    ),
-    CategoryOption(name: 'أخرى', subCategories: []),
-  ];
-  final _visibilityOptions = const ['عام', 'مجهول', 'سري'];
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController();
-    _descriptionController = TextEditingController();
-    _imagePicker = ImagePicker();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(reportLocationProvider.notifier).initialize();
-    });
-  }
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  final _picker = ImagePicker();
 
   @override
   void dispose() {
     _titleController.dispose();
-    _descriptionController.dispose();
+    _descController.dispose();
     super.dispose();
   }
 
+  // ─────────────────────────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final width = media.size.width;
-    ref.listen<ReportLocationState>(reportLocationProvider, (previous, next) {
-      final hasNewError =
-          next.errorMessage != null &&
-          next.errorMessage != previous?.errorMessage;
-      if (!hasNewError || !mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
-    });
-
-    final reportLocationState = ref.watch(reportLocationProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
-    final headerColor = isDark
-        ? const Color(0xFF121A5C)
-        : AppColors.primarySoft;
-    final headerTextColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final fieldBorderColor = isDark
-        ? AppColors.textPrimaryDark
-        : const Color(0xB3060C3A);
-    final fieldTextColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final hintColor = isDark
-        ? AppColors.textSecondaryDark
-        : const Color(0x80060C3A);
+    final s = ref.watch(createReportProvider);
 
     return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeader(
-                context,
-                headerColor: headerColor,
-                headerTextColor: headerTextColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: _buildAppBar(isDark, s),
+      body: Column(
+        children: [
+          _StepIndicator(currentStep: s.currentStep),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: KeyedSubtree(
+                key: ValueKey(s.currentStep),
+                child: _buildStep(s, isDark),
               ),
-              const SizedBox(height: 32),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 17),
+            ),
+          ),
+          // Upload progress bar
+          if (s.isSubmitting && s.uploadProgress != null)
+            _UploadProgressBar(progress: s.uploadProgress!),
+          _buildNavBar(s, isDark),
+        ],
+      ),
+    );
+  }
+
+  AppBar _buildAppBar(bool isDark, CreateReportState s) {
+    return AppBar(
+      backgroundColor: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
+      foregroundColor: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+      elevation: 0,
+      title: const Text(
+        'إضافة بلاغ',
+        textDirection: TextDirection.rtl,
+        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+      ),
+      centerTitle: true,
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+    );
+  }
+
+  Widget _buildStep(CreateReportState s, bool isDark) {
+    switch (s.currentStep) {
+      case 0:
+        return _Step1BasicInfo(
+          titleController: _titleController,
+          descController: _descController,
+          isDark: isDark,
+        );
+      case 1:
+        return _Step2Location(isDark: isDark);
+      case 2:
+        return _Step3Attachments(picker: _picker, isDark: isDark);
+      default:
+        return const SizedBox();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // Bottom navigation bar
+  // ─────────────────────────────────────────────────────────────────
+
+  Widget _buildNavBar(CreateReportState s, bool isDark) {
+    final isLastStep = s.currentStep == 2;
+    final canProceed = _canProceedFromStep(s);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        12 + MediaQuery.of(context).padding.bottom,
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF2A3580) : const Color(0xFFD1D9F0),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Back button
+          if (s.currentStep > 0)
+            OutlinedButton(
+              onPressed: s.isSubmitting
+                  ? null
+                  : () => ref.read(createReportProvider.notifier).prevStep(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                minimumSize: const Size(80, 48),
+              ),
+              child: const Text('السابق', textDirection: TextDirection.rtl),
+            ),
+          if (s.currentStep > 0) const SizedBox(width: 12),
+          // Next / Submit button
+          Expanded(
+            child: ElevatedButton(
+              onPressed: (!canProceed || s.isSubmitting)
+                  ? null
+                  : () => _onNextOrSubmit(s, isLastStep),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                minimumSize: const Size.fromHeight(48),
+                elevation: 0,
+              ),
+              child: s.isSubmitting
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      isLastStep ? 'إرسال البلاغ' : 'التالي',
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _canProceedFromStep(CreateReportState s) {
+    switch (s.currentStep) {
+      case 0:
+        return s.step1Valid;
+      case 1:
+        return s.hasLocation;
+      case 2:
+        return true; // attachments are optional
+      default:
+        return false;
+    }
+  }
+
+  Future<void> _onNextOrSubmit(CreateReportState s, bool isLastStep) async {
+    if (!isLastStep) {
+      ref.read(createReportProvider.notifier).nextStep();
+      return;
+    }
+
+    // Submit
+    final error = await ref.read(createReportProvider.notifier).submit();
+    if (!mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('فشل إرسال البلاغ: $error', textDirection: TextDirection.rtl),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
+    // Success — invalidate my reports and navigate
+    ref.invalidate(myReportsProvider);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تم إرسال البلاغ بنجاح ✓',
+            textDirection: TextDirection.rtl,
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.of(context).pop();
+    }
+  }
+}
+
+// =============================================================================
+// Step Indicator
+// =============================================================================
+
+class _StepIndicator extends StatelessWidget {
+  const _StepIndicator({required this.currentStep});
+  final int currentStep;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labels = ['المعلومات الأساسية', 'الموقع', 'المرفقات'];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
+      child: Column(
+        children: [
+          Row(
+            children: List.generate(3, (i) {
+              final isActive = i <= currentStep;
+              final isCurrent = i == currentStep;
+              return Expanded(
                 child: Row(
-                  textDirection: TextDirection.rtl,
                   children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 48,
-                        child: _buildCategoryDropdown(
-                          textColor: fieldTextColor,
-                          borderColor: fieldBorderColor,
+                    _StepDot(index: i + 1, isActive: isActive, isCurrent: isCurrent),
+                    if (i < 2)
+                      Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          height: 2,
+                          color: i < currentStep
+                              ? AppColors.primary
+                              : (isDark
+                                  ? const Color(0xFF2A3580)
+                                  : const Color(0xFFB8C4D9)),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: SizedBox(
-                        height: 48,
-                        child: _buildSubCategoryDropdown(
-                          textColor: fieldTextColor,
-                          borderColor: fieldBorderColor,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 17),
-                child: SizedBox(
-                  height: 48,
-                  child: _buildDropdown(
-                    value: _visibility,
-                    hint: 'الظهور',
-                    items: _visibilityOptions,
-                    textColor: fieldTextColor,
-                    borderColor: fieldBorderColor,
-                    onChanged: (value) => setState(() => _visibility = value),
-                  ),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(3, (i) {
+              final isCurrent = i == currentStep;
+              return Text(
+                labels[i],
+                textDirection: TextDirection.rtl,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
+                  color: isCurrent
+                      ? AppColors.primary
+                      : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 17),
-                child: _InputBox(
-                  height: 48,
-                  hint: 'عنوان البلاغ',
-                  borderColor: fieldBorderColor,
-                  hintColor: hintColor,
-                  textColor: fieldTextColor,
-                  controller: _titleController,
-                  maxLines: 1,
-                  onChanged: (_) => setState(() {}),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepDot extends StatelessWidget {
+  const _StepDot({
+    required this.index,
+    required this.isActive,
+    required this.isCurrent,
+  });
+
+  final int index;
+  final bool isActive;
+  final bool isCurrent;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: isCurrent ? 32 : 24,
+      height: isCurrent ? 32 : 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isActive ? AppColors.primary : const Color(0xFFB8C4D9),
+        border: isCurrent
+            ? Border.all(color: Colors.white, width: 2.5)
+            : null,
+        boxShadow: isCurrent
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.4),
+                  blurRadius: 8,
                 ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 17),
-                child: _InputBox(
-                  height: 116,
-                  hint: 'وصف البلاغ',
-                  borderColor: fieldBorderColor,
-                  hintColor: hintColor,
-                  textColor: fieldTextColor,
-                  controller: _descriptionController,
-                  maxLines: 5,
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 17),
-                child: Container(
-                  height: 144,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: fieldBorderColor, width: 1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: _selectedImage == null
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 16),
-                                child: Text(
-                                  'قم بتحميل أو التقاط صورة تعبر عن البلاغ',
-                                  textDirection: TextDirection.rtl,
-                                  textAlign: TextAlign.start,
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    color: hintColor,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              textDirection: TextDirection.rtl,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _UploadActionBox(
-                                  icon: Icons.photo_camera_outlined,
-                                  label: 'التقاط صورة',
-                                  borderColor: hintColor,
-                                  textColor: hintColor,
-                                  onTap: () => _pickImage(ImageSource.camera),
-                                ),
-                                const SizedBox(width: 46),
-                                _UploadActionBox(
-                                  icon: Icons.file_upload_outlined,
-                                  label: 'تحميل صورة',
-                                  borderColor: hintColor,
-                                  textColor: hintColor,
-                                  onTap: () => _pickImage(ImageSource.gallery),
-                                ),
-                              ],
-                            ),
-                          ],
-                        )
-                      : Stack(
-                          children: [
-                            Positioned.fill(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.file(
-                                  File(_selectedImage!.path),
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              left: 8,
-                              child: GestureDetector(
-                                onTap: () =>
-                                    setState(() => _selectedImage = null),
-                                child: Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.35),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.close,
-                                    size: 18,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildLocationSelector(
-                locationState: reportLocationState,
-                borderColor: fieldBorderColor,
-              ),
-              const SizedBox(height: 36),
-              Align(
-                child: Container(
-                  width: width < 330 ? width - 40 : 300,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0xFF0099FF), Color(0xFF66C8FF)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: TextButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () async {
-                            if (!_isFormValid) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'يرجى تعبئة جميع الحقول المطلوبة',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            final location = ref
-                                .read(reportLocationProvider)
-                                .selectedLatLng;
-                            if (location == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'يرجى اختيار موقع البلاغ على الخريطة',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            final address = ref
-                                .read(reportLocationProvider)
-                                .selectedAddress;
-
-                            final category = _selectedCategory!;
-                            final subCategory = _resolveSubCategory();
-                            final subCategoryId = _resolveSubCategoryId();
-                            final hasSubCategories =
-                                (category.subCategories).isNotEmpty;
-
-                            if (subCategory == null || subCategory.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'يرجى اختيار التصنيف الفرعي قبل الإرسال',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            if (hasSubCategories &&
-                                (subCategoryId == null ||
-                                    subCategoryId.isEmpty)) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'تعذر تحديد معرف التصنيف الفرعي، يرجى إعادة الاختيار',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            final reportType = subCategory;
-                            final apiVisibility = _mapVisibilityToApi(
-                              _visibility!,
-                            );
-
-                            // Show loading state
-                            if (!mounted) return;
-                            setState(() => _isSubmitting = true);
-
-                            try {
-                              // Add report locally
-                              await ref
-                                  .read(myReportsProvider.notifier)
-                                  .addReportFromSubmission(
-                                    title: _titleController.text.trim(),
-                                    description: _descriptionController.text
-                                        .trim(),
-                                    categoryName: category.name,
-                                    subCategoryName: reportType,
-                                    subCategoryId: subCategoryId ?? '',
-                                    latitude: location.latitude,
-                                    longitude: location.longitude,
-                                    locationAddress: address,
-                                    visibility: apiVisibility,
-                                    imagePath: _selectedImage?.path,
-                                  );
-
-                              // Refresh feed from API
-                              await ref
-                                  .read(homeFeedProvider.notifier)
-                                  .refreshReportsFromApi();
-
-                              // Send notification
-                              await ref
-                                  .read(notificationsProvider.notifier)
-                                  .notifyReportSubmitted(
-                                    reportTitle: _titleController.text.trim(),
-                                    reportType: reportType,
-                                  );
-
-                              if (!mounted) return;
-                              setState(() => _isSubmitting = false);
-
-                              // Navigate to success page
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const AddReportSuccessPage(),
-                                ),
-                              );
-                            } catch (e) {
-                              if (!mounted) return;
-                              setState(() => _isSubmitting = false);
-
-                              // Show error message
-                              final errorMessage = _extractErrorMessage(e);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'حدث خطأ أثناء إرسال البلاغ: $errorMessage',
-                                    textDirection: TextDirection.rtl,
-                                  ),
-                                  backgroundColor: Colors.red,
-                                  duration: const Duration(seconds: 4),
-                                ),
-                              );
-                            }
-                          },
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFF3F6F9),
-                      disabledForegroundColor: const Color(0xFFF3F6F9),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFFF3F6F9),
-                              ),
-                            ),
-                          )
-                        : const Text(
-                            'إرسال',
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
+              ]
+            : null,
+      ),
+      child: Center(
+        child: Text(
+          '$index',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
     );
   }
+}
 
-  bool get _isFormValid {
-    final selectedLocation = ref.read(reportLocationProvider).selectedLatLng;
-    final hasSubCategory = _resolveSubCategory()?.trim().isNotEmpty == true;
-    final hasSubCategoryId =
-        (_selectedCategory?.subCategories ?? []).isEmpty ||
-        _resolveSubCategoryId() != null;
+// =============================================================================
+// Upload progress
+// =============================================================================
 
-    return _selectedCategory != null &&
-        hasSubCategory &&
-        hasSubCategoryId &&
-        _visibility != null &&
-        _titleController.text.trim().isNotEmpty &&
-        _descriptionController.text.trim().isNotEmpty &&
-        selectedLocation != null;
-  }
+class _UploadProgressBar extends StatelessWidget {
+  const _UploadProgressBar({required this.progress});
+  final double progress;
 
-  String _mapVisibilityToApi(String value) {
-    switch (value) {
-      case 'عام':
-        return 'Public';
-      case 'مجهول':
-        return 'Anonymous';
-      case 'سري':
-        return 'Confidential';
-      default:
-        return 'Public';
-    }
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    final picked = await _imagePicker.pickImage(
-      source: source,
-      imageQuality: 80,
-      maxWidth: 1440,
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        LinearProgressIndicator(
+          value: progress,
+          backgroundColor: const Color(0xFFD1D9F0),
+          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+          minHeight: 4,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'جاري الرفع... ${(progress * 100).toStringAsFixed(0)}%',
+                textDirection: TextDirection.rtl,
+                style: const TextStyle(fontSize: 12, color: AppColors.primary),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
-    if (!mounted || picked == null) return;
-    setState(() {
-      _selectedImage = picked;
-    });
+  }
+}
+
+// =============================================================================
+// Step 1 — Basic Information
+// =============================================================================
+
+class _Step1BasicInfo extends ConsumerWidget {
+  const _Step1BasicInfo({
+    required this.titleController,
+    required this.descController,
+    required this.isDark,
+  });
+
+  final TextEditingController titleController;
+  final TextEditingController descController;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(createReportProvider);
+    final n = ref.read(createReportProvider.notifier);
+
+    final borderColor =
+        isDark ? AppColors.textPrimaryDark : const Color(0xB3060C3A);
+    final textColor =
+        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final hintColor =
+        isDark ? AppColors.textSecondaryDark : const Color(0x80060C3A);
+
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final subcategoriesAsync = s.categoryId.isNotEmpty
+        ? ref.watch(subcategoriesProvider(s.categoryId))
+        : null;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Title ──
+          _SectionLabel(label: 'عنوان البلاغ *', isDark: isDark),
+          const SizedBox(height: 8),
+          TextField(
+            controller: titleController,
+            textDirection: TextDirection.rtl,
+            maxLength: 200,
+            inputFormatters: [LengthLimitingTextInputFormatter(200)],
+            decoration: _inputDecoration(
+              hint: 'أدخل عنواناً واضحاً للبلاغ',
+              borderColor: borderColor,
+              hintColor: hintColor,
+              textColor: textColor,
+            ),
+            style: TextStyle(color: textColor),
+            onChanged: (v) => n.setTitle(v),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Description ──
+          _SectionLabel(label: 'وصف البلاغ *', isDark: isDark),
+          const SizedBox(height: 8),
+          TextField(
+            controller: descController,
+            textDirection: TextDirection.rtl,
+            maxLines: 5,
+            maxLength: 2000,
+            inputFormatters: [LengthLimitingTextInputFormatter(2000)],
+            decoration: _inputDecoration(
+              hint: 'صف الحادثة أو المشكلة بتفصيل',
+              borderColor: borderColor,
+              hintColor: hintColor,
+              textColor: textColor,
+            ),
+            style: TextStyle(color: textColor),
+            onChanged: (v) => n.setDescription(v),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Category ──
+          _SectionLabel(label: 'التصنيف الرئيسي *', isDark: isDark),
+          const SizedBox(height: 8),
+          categoriesAsync.when(
+            loading: () => const LinearProgressIndicator(),
+            error: (e, _) => Text(
+              'فشل تحميل التصنيفات',
+              style: TextStyle(color: Colors.red.shade400),
+            ),
+            data: (cats) => _StyledDropdown<String>(
+              value: s.categoryId.isEmpty ? null : s.categoryId,
+              hint: 'اختر التصنيف',
+              borderColor: borderColor,
+              textColor: textColor,
+              items: cats
+                  .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name, textDirection: TextDirection.rtl)))
+                  .toList(),
+              onChanged: (id) {
+                if (id == null) return;
+                final cat = cats.firstWhere((c) => c.id == id);
+                n.setCategory(id: id, name: cat.name);
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Subcategory ──
+          _SectionLabel(label: 'التصنيف الفرعي *', isDark: isDark),
+          const SizedBox(height: 8),
+          if (s.categoryId.isEmpty)
+            _StyledDropdown<String>(
+              value: null,
+              hint: 'اختر التصنيف الرئيسي أولاً',
+              borderColor: borderColor,
+              textColor: hintColor,
+              items: const [],
+              onChanged: null,
+            )
+          else
+            subcategoriesAsync!.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text(
+                'فشل تحميل التصنيفات الفرعية',
+                style: TextStyle(color: Colors.red.shade400),
+              ),
+              data: (subs) => _StyledDropdown<String>(
+                value: s.subcategoryId.isEmpty ? null : s.subcategoryId,
+                hint: subs.isEmpty ? 'لا يوجد تصنيف فرعي' : 'اختر التصنيف الفرعي',
+                borderColor: borderColor,
+                textColor: textColor,
+                items: subs
+                    .map((sub) => DropdownMenuItem(value: sub.id, child: Text(sub.name, textDirection: TextDirection.rtl)))
+                    .toList(),
+                onChanged: subs.isEmpty
+                    ? null
+                    : (id) {
+                        if (id == null) return;
+                        final sub = subs.firstWhere((s) => s.id == id);
+                        n.setSubcategory(id: id, name: sub.name);
+                      },
+              ),
+            ),
+          const SizedBox(height: 24),
+
+          // ── Visibility ──
+          _SectionLabel(label: 'مستوى الظهور', isDark: isDark),
+          const SizedBox(height: 8),
+          _VisibilitySelector(
+            selected: s.visibility,
+            onSelected: n.setVisibility,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
   }
 
-  Widget _buildHeader(
-    BuildContext context, {
-    required Color headerColor,
-    required Color headerTextColor,
+  InputDecoration _inputDecoration({
+    required String hint,
+    required Color borderColor,
+    required Color hintColor,
+    required Color textColor,
   }) {
-    return Container(
-      height: 100,
-      color: headerColor,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 16,
-            top: 52,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Icon(
-                Icons.arrow_forward_ios,
-                color: headerTextColor,
-                size: 24,
+    final border = OutlineInputBorder(
+      borderSide: BorderSide(color: borderColor),
+      borderRadius: BorderRadius.circular(10),
+    );
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: hintColor),
+      hintTextDirection: TextDirection.rtl,
+      border: border,
+      enabledBorder: border,
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    );
+  }
+}
+
+class _VisibilitySelector extends StatelessWidget {
+  const _VisibilitySelector({
+    required this.selected,
+    required this.onSelected,
+    required this.isDark,
+  });
+
+  final ReportVisibility selected;
+  final void Function(ReportVisibility) onSelected;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      textDirection: TextDirection.rtl,
+      children: ReportVisibility.values.map((v) {
+        final isSelected = v == selected;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onSelected(v),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary
+                    : (isDark ? const Color(0xFF1A2070) : const Color(0xFFF0F4FF)),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : const Color(0xFFB8C4D9),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    _iconFor(v),
+                    size: 20,
+                    color: isSelected ? Colors.white : AppColors.primary,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    v.label,
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment(0, 0.32),
-              child: Text(
-                'إضافة بلاغ',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 40 * 0.525,
-                  fontWeight: FontWeight.w600,
-                  color: headerTextColor,
+        );
+      }).toList(),
+    );
+  }
+
+  IconData _iconFor(ReportVisibility v) {
+    return switch (v) {
+      ReportVisibility.public => Icons.public_rounded,
+      ReportVisibility.confidential => Icons.lock_outline_rounded,
+      ReportVisibility.anonymous => Icons.person_off_outlined,
+    };
+  }
+}
+
+// =============================================================================
+// Step 2 — Location
+// =============================================================================
+
+class _Step2Location extends ConsumerWidget {
+  const _Step2Location({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(createReportProvider);
+    final n = ref.read(createReportProvider.notifier);
+    final hasLocation = s.hasLocation;
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Location display card
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: hasLocation
+                  ? AppColors.primary.withValues(alpha: 0.08)
+                  : (isDark
+                      ? const Color(0xFF1A2070)
+                      : const Color(0xFFF0F4FF)),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: hasLocation
+                    ? AppColors.primary
+                    : (isDark
+                        ? const Color(0xFF2A3580)
+                        : const Color(0xFFD1D9F0)),
+                width: 1.5,
+              ),
+            ),
+            child: hasLocation
+                ? Column(
+                    children: [
+                      const Icon(
+                        Icons.location_on_rounded,
+                        color: AppColors.primary,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        s.locationName.isNotEmpty ? s.locationName : 'تم تحديد الموقع',
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${s.latitude.toStringAsFixed(5)}, ${s.longitude.toStringAsFixed(5)}',
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.primary,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Icon(
+                        Icons.add_location_alt_outlined,
+                        size: 64,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : const Color(0xFFB8C4D9),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'لم يتم تحديد الموقع بعد',
+                        textDirection: TextDirection.rtl,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : const Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'اضغط على الزر أدناه لفتح الخريطة وتحديد موقع البلاغ',
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : const Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () => _openLocationPicker(context, ref, n),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
+                elevation: 0,
+              ),
+              icon: Icon(
+                hasLocation ? Icons.edit_location_alt_outlined : Icons.map_outlined,
+              ),
+              label: Text(
+                hasLocation ? 'تغيير الموقع' : 'تحديد الموقع على الخريطة',
+                textDirection: TextDirection.rtl,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -629,505 +777,407 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
     );
   }
 
-  Widget _buildDropdown({
-    required String? value,
-    required String hint,
-    required List<String> items,
-    required Color borderColor,
-    required Color textColor,
-    required ValueChanged<String?> onChanged,
-  }) {
+  Future<void> _openLocationPicker(
+    BuildContext context,
+    WidgetRef ref,
+    CreateReportNotifier n,
+  ) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute<dynamic>(
+        builder: (_) => const SelectReportLocationPage(),
+      ),
+    );
+
+    if (result == null) return;
+
+    // SelectReportLocationPage returns a LatLng or a Map with lat/lng/address
+    double lat, lng;
+    String address = '';
+
+    if (result is Map) {
+      lat = (result['latitude'] as num?)?.toDouble() ?? 0.0;
+      lng = (result['longitude'] as num?)?.toDouble() ?? 0.0;
+      address = result['address']?.toString() ?? '';
+    } else {
+      // LatLng from google_maps_flutter
+      try {
+        lat = (result.latitude as num).toDouble();
+        lng = (result.longitude as num).toDouble();
+      } catch (_) {
+        return;
+      }
+    }
+
+    n.setLocation(latitude: lat, longitude: lng, locationName: address);
+  }
+}
+
+// =============================================================================
+// Step 3 — Attachments
+// =============================================================================
+
+class _Step3Attachments extends ConsumerStatefulWidget {
+  const _Step3Attachments({required this.picker, required this.isDark});
+  final ImagePicker picker;
+  final bool isDark;
+
+  @override
+  ConsumerState<_Step3Attachments> createState() => _Step3AttachmentsState();
+}
+
+class _Step3AttachmentsState extends ConsumerState<_Step3Attachments> {
+  bool _isPickingMedia = false;
+
+  void _showErrors(List<String> errors) {
+    if (errors.isEmpty || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          errors.join('\n'),
+          textDirection: TextDirection.rtl,
+        ),
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Future<void> _pickFromCamera({bool video = false}) async {
+    if (_isPickingMedia) return;
+    setState(() => _isPickingMedia = true);
+    try {
+      final XFile? file = video
+          ? await widget.picker.pickVideo(source: ImageSource.camera)
+          : await widget.picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+      if (file != null && mounted) {
+        final errors = await ref
+            .read(createReportProvider.notifier)
+            .addAttachments([file]);
+        _showErrors(errors);
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingMedia = false);
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    if (_isPickingMedia) return;
+    setState(() => _isPickingMedia = true);
+    try {
+      final files = await widget.picker.pickMultiImage(imageQuality: 85);
+      if (files.isNotEmpty && mounted) {
+        final errors = await ref
+            .read(createReportProvider.notifier)
+            .addAttachments(files);
+        _showErrors(errors);
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingMedia = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(createReportProvider);
+    final n = ref.read(createReportProvider.notifier);
+    final attachments = s.attachments;
+
+    return Column(
+      children: [
+        // Attachment actions
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              Expanded(
+                child: _AttachActionButton(
+                  icon: Icons.camera_alt_outlined,
+                  label: 'التقاط صورة',
+                  onTap: n.canAddMore ? () => _pickFromCamera() : null,
+                  isDark: widget.isDark,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _AttachActionButton(
+                  icon: Icons.videocam_outlined,
+                  label: 'تسجيل فيديو',
+                  onTap: n.canAddMore ? () => _pickFromCamera(video: true) : null,
+                  isDark: widget.isDark,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _AttachActionButton(
+                  icon: Icons.photo_library_outlined,
+                  label: 'من المعرض',
+                  onTap: n.canAddMore ? () => _pickFromGallery() : null,
+                  isDark: widget.isDark,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Counter
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                '${attachments.length} / $kMaxAttachments مرفق',
+                textDirection: TextDirection.rtl,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: attachments.length >= kMaxAttachments
+                      ? Colors.redAccent
+                      : (widget.isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Grid
+        Expanded(
+          child: attachments.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.attach_file_rounded,
+                        size: 64,
+                        color: widget.isDark
+                            ? AppColors.textSecondaryDark
+                            : const Color(0xFFB8C4D9),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'لا توجد مرفقات (اختياري)',
+                        textDirection: TextDirection.rtl,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: widget.isDark
+                              ? AppColors.textSecondaryDark
+                              : const Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: attachments.length,
+                  itemBuilder: (context, index) {
+                    final file = attachments[index];
+                    final thumbPath = s.videoThumbnails[file.path];
+                    final isVideo = thumbPath != null;
+                    return _AttachmentThumbnail(
+                      filePath: isVideo ? thumbPath : file.path,
+                      isVideo: isVideo,
+                      onRemove: () => n.removeAttachment(index),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// Helper widgets
+// =============================================================================
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label, required this.isDark});
+  final String label;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      textDirection: TextDirection.rtl,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+      ),
+    );
+  }
+}
+
+class _StyledDropdown<T> extends StatelessWidget {
+  const _StyledDropdown({
+    required this.value,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+    required this.borderColor,
+    required this.textColor,
+  });
+
+  final T? value;
+  final String hint;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+  final Color borderColor;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        border: Border.all(color: borderColor, width: 1),
+        border: Border.all(color: borderColor),
         borderRadius: BorderRadius.circular(10),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
+        child: DropdownButton<T>(
           value: value,
           isExpanded: true,
-          dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+          dropdownColor:
+              isDark ? const Color(0xFF1A2070) : Colors.white,
           icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor),
-          style: TextStyle(
-            fontSize: 17,
-            color: textColor,
-            fontWeight: FontWeight.w400,
-          ),
           hint: Align(
             alignment: Alignment.centerRight,
             child: Text(
               hint,
               textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 17,
-                color: textColor,
-                fontWeight: FontWeight.w400,
-              ),
+              style: TextStyle(color: textColor, fontSize: 15),
             ),
           ),
+          items: items,
           onChanged: onChanged,
-          items: items
-              .map(
-                (item) => DropdownMenuItem<String>(
-                  value: item,
-                  alignment: Alignment.centerRight,
-                  child: Text(item, textDirection: TextDirection.rtl),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryDropdown({
-    required Color borderColor,
-    required Color textColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor, width: 1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<CategoryOption>(
-          value: _selectedCategory,
-          isExpanded: true,
-          dropdownColor: Theme.of(context).scaffoldBackgroundColor,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor),
-          style: TextStyle(
-            fontSize: 17,
-            color: textColor,
-            fontWeight: FontWeight.w400,
-          ),
-          hint: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'التصنيف الرئيسي',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 17,
-                color: textColor,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ),
-          onChanged: (value) {
-            setState(() {
-              _selectedCategory = value;
-              _selectedSubCategory = null;
-            });
-          },
-          items: _categoryOptions
-              .map(
-                (option) => DropdownMenuItem<CategoryOption>(
-                  value: option,
-                  alignment: Alignment.centerRight,
-                  child: Text(option.name, textDirection: TextDirection.rtl),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSubCategoryDropdown({
-    required Color borderColor,
-    required Color textColor,
-  }) {
-    final subCategories =
-        _selectedCategory?.subCategories ?? const <SubCategoryOption>[];
-    final hasSubCategories = subCategories.isNotEmpty;
-    final hasCategory = _selectedCategory != null;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor, width: 1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<SubCategoryOption>(
-          value: _selectedSubCategory,
-          isExpanded: true,
-          dropdownColor: Theme.of(context).scaffoldBackgroundColor,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor),
-          style: TextStyle(
-            fontSize: 17,
-            color: textColor,
-            fontWeight: FontWeight.w400,
-          ),
-          hint: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              hasCategory
-                  ? (hasSubCategories ? 'التصنيف الفرعي' : 'لا يوجد تصنيف فرعي')
-                  : 'التصنيف الفرعي',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 17,
-                color: textColor,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ),
-          onChanged: hasSubCategories
-              ? (value) => setState(() => _selectedSubCategory = value)
-              : null,
-          items: subCategories
-              .map(
-                (option) => DropdownMenuItem<SubCategoryOption>(
-                  value: option,
-                  alignment: Alignment.centerRight,
-                  child: Text(option.name, textDirection: TextDirection.rtl),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-
-  String? _resolveSubCategory() {
-    final category = _selectedCategory;
-    if (category == null) return null;
-    if (category.subCategories.isEmpty) return category.name;
-    return _selectedSubCategory?.name;
-  }
-
-  String? _resolveSubCategoryId() {
-    final category = _selectedCategory;
-    if (category == null || category.subCategories.isEmpty) return null;
-    return _selectedSubCategory?.id;
-  }
-
-  Widget _buildLocationSelector({
-    required ReportLocationState locationState,
-    required Color borderColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 17),
-      child: GestureDetector(
-        onTap: () => _handleLocationSelectorTap(locationState),
-        child: Container(
-          height: 190,
-          decoration: BoxDecoration(
-            border: Border.all(color: borderColor, width: 1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Stack(
-              children: [
-                Positioned.fill(child: _buildLocationPreview(locationState)),
-                Positioned(
-                  right: 10,
-                  left: 10,
-                  bottom: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _locationCaption(locationState),
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.right,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.map_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('اختيار من الخريطة'),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationPreview(ReportLocationState locationState) {
-    if (locationState.isLoading) {
-      return Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        alignment: Alignment.center,
-        child: const CircularProgressIndicator(),
-      );
-    }
-
-    if (!locationState.canShowMap) {
-      return Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.location_disabled_outlined, size: 40),
-            const SizedBox(height: 8),
-            Text(
-              _accessStatusHint(locationState.accessStatus),
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (locationState.canShowMap && locationState.selectedLatLng != null) {
-      final selected = locationState.selectedLatLng!;
-
-      return IgnorePointer(
-        child: MapScreen(
-          initialTarget: selected,
-          initialZoom: 15,
-          myLocationEnabled: true,
-          myLocationButtonEnabled: false,
-          markers: {
-            Marker(
-              markerId: const MarkerId('selected-report-location-preview'),
-              position: selected,
-            ),
-          },
-        ),
-      );
-    }
-
-    return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      alignment: Alignment.center,
-      child: const Icon(Icons.location_on_outlined, size: 42),
-    );
-  }
-
-  String _locationCaption(ReportLocationState state) {
-    if (!state.canShowMap) {
-      return _accessStatusHint(state.accessStatus);
-    }
-
-    if (state.selectedLatLng == null) {
-      if (state.isLoading) {
-        return 'جاري تحديد موقعك الحالي...';
-      }
-      return 'اضغط لاختيار موقع البلاغ من الخريطة';
-    }
-
-    final position = state.selectedLatLng!;
-    final fallback =
-        'Lat: ${position.latitude.toStringAsFixed(5)} - Lng: ${position.longitude.toStringAsFixed(5)}';
-
-    if (state.isResolvingAddress) {
-      return 'جاري جلب العنوان... $fallback';
-    }
-
-    if (state.selectedAddress != null && state.selectedAddress!.isNotEmpty) {
-      return state.selectedAddress!;
-    }
-
-    return fallback;
-  }
-
-  String _accessStatusHint(LocationAccessStatus status) {
-    return switch (status) {
-      LocationAccessStatus.serviceDisabled =>
-        'خدمة الموقع متوقفة. اضغط لفتح إعدادات الموقع',
-      LocationAccessStatus.permanentlyDenied =>
-        'إذن الموقع مرفوض نهائيا. اضغط لفتح إعدادات التطبيق',
-      LocationAccessStatus.denied =>
-        'يرجى السماح بإذن الموقع لاختيار موقع البلاغ',
-      LocationAccessStatus.granted => 'اضغط لاختيار موقع البلاغ من الخريطة',
-    };
-  }
-
-  Future<void> _handleLocationSelectorTap(
-    ReportLocationState locationState,
-  ) async {
-    final notifier = ref.read(reportLocationProvider.notifier);
-
-    if (!locationState.canShowMap) {
-      switch (locationState.accessStatus) {
-        case LocationAccessStatus.serviceDisabled:
-          await notifier.openDeviceLocationSettings();
-          break;
-        case LocationAccessStatus.permanentlyDenied:
-          await notifier.openPermissionSettings();
-          break;
-        case LocationAccessStatus.denied:
-          break;
-        case LocationAccessStatus.granted:
-          break;
-      }
-
-      await notifier.initialize();
-      return;
-    }
-
-    final selectedLocation = await Navigator.of(context).push<LatLng>(
-      MaterialPageRoute(builder: (_) => const SelectReportLocationPage()),
-    );
-
-    if (!mounted || selectedLocation == null) return;
-    await notifier.selectLocation(selectedLocation);
-  }
-
-  String _extractErrorMessage(Object error) {
-    if (error is Exception) {
-      final message = error.toString();
-      if (message.contains('Missing auth token')) {
-        return 'يرجى تسجيل الدخول أولا';
-      } else if (message.contains('Missing sub category id')) {
-        return 'يرجى اختيار التصنيف الفرعي';
-      } else if (message.contains('ApiException')) {
-        return 'فشل الاتصال بالخادم. يرجى المحاولة لاحقا';
-      } else if (message.contains('SocketException')) {
-        return 'لا يوجد اتصال بالإنترنت';
-      }
-      return message.replaceAll('Exception: ', '');
-    }
-    return 'حدث خطأ غير متوقع';
-  }
-}
-
-class _InputBox extends StatelessWidget {
-  final double height;
-  final String hint;
-  final Color borderColor;
-  final Color hintColor;
-  final Color textColor;
-  final TextEditingController controller;
-  final int maxLines;
-  final ValueChanged<String>? onChanged;
-
-  const _InputBox({
-    required this.height,
-    required this.hint,
-    required this.borderColor,
-    required this.hintColor,
-    required this.textColor,
-    required this.controller,
-    required this.maxLines,
-    this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor, width: 1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        textDirection: TextDirection.rtl,
-        textAlign: TextAlign.right,
-        style: TextStyle(color: textColor),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintTextDirection: TextDirection.rtl,
-          hintStyle: TextStyle(
-            fontSize: 17,
-            color: hintColor,
-            fontWeight: FontWeight.w400,
-          ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.only(
-            top: 9,
-            right: 10,
-            left: 10,
-            bottom: 9,
-          ),
+          style: TextStyle(fontSize: 15, color: textColor),
         ),
       ),
     );
   }
 }
 
-class _UploadActionBox extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color borderColor;
-  final Color textColor;
-  final VoidCallback onTap;
-
-  const _UploadActionBox({
+class _AttachActionButton extends StatelessWidget {
+  const _AttachActionButton({
     required this.icon,
     required this.label,
-    required this.borderColor,
-    required this.textColor,
     required this.onTap,
+    required this.isDark,
   });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 104,
-        height: 80,
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: borderColor,
-            width: 1,
-            style: BorderStyle.solid,
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Icon(icon, color: textColor, size: 40),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 17,
-                color: textColor,
-                fontWeight: FontWeight.w400,
-              ),
+      child: AnimatedOpacity(
+        opacity: enabled ? 1.0 : 0.4,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A2070) : const Color(0xFFF0F4FF),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? const Color(0xFF2A3580) : const Color(0xFFD1D9F0),
             ),
-          ],
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 24),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textDirection: TextDirection.rtl,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _AttachmentThumbnail extends StatelessWidget {
+  const _AttachmentThumbnail({
+    required this.filePath,
+    required this.isVideo,
+    required this.onRemove,
+  });
+
+  final String filePath;
+  final bool isVideo;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.file(
+              File(filePath),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stack) => Container(
+                color: const Color(0xFF1A2070),
+                child: const Icon(
+                  Icons.broken_image_outlined,
+                  color: Colors.white54,
+                  size: 32,
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (isVideo)
+          const Positioned.fill(
+            child: Center(
+              child: Icon(
+                Icons.play_circle_filled_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+          ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 14),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Test_Ain_Graduation_Project",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "Test_Ain_Graduation_Project (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "Test_Ain_Graduation_Project (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}

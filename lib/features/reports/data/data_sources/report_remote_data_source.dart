@@ -87,11 +87,27 @@ class ReportRemoteDataSource {
 
   Future<List<ReportModel>> fetchPublicReports({
     int pageNumber = 1,
-    int pageSize = 20,
+    int pageSize = 10,
+    String? categoryId,
+    String? status,
+    String? search,
   }) async {
+    final query = <String, dynamic>{
+      'page': pageNumber,
+      'pageSize': pageSize,
+    };
+    if (categoryId != null && categoryId.isNotEmpty) {
+      query['categoryId'] = categoryId;
+    }
+    if (status != null && status.isNotEmpty) {
+      query['status'] = status;
+    }
+    if (search != null && search.isNotEmpty) {
+      query['search'] = search;
+    }
     final response = await _client.getJson(
       ApiEndpoints.reportsPublic,
-      query: {'pageNumber': pageNumber, 'pageSize': pageSize},
+      query: query,
     );
     return _parseReportList(response);
   }
@@ -114,10 +130,121 @@ class ReportRemoteDataSource {
   }
 
   Future<ReportModel?> fetchReportById(String id) async {
-    final response = await _client.getJson(ApiEndpoints.reportById(id));
+    final token = await readToken();
+    final response = await _client.getJson(
+      ApiEndpoints.reportById(id),
+      token: token, // send token if available (for own/confidential reports)
+    );
     final map = _extractMap(response);
     if (map == null) return null;
     return ReportModel.fromApiJson(map);
+  }
+
+  /// Update a report's visibility. Requires auth.
+  Future<void> updateVisibility(String id, String visibility) async {
+    final token = await readToken();
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Missing auth token');
+    }
+    await _client.putJson(
+      ApiEndpoints.reportVisibility(id),
+      token: token,
+      body: {'visibility': visibility},
+    );
+  }
+
+  /// Delete a report. Requires auth. Expects 204 on success.
+  Future<void> deleteReport(String id) async {
+    final token = await readToken();
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Missing auth token');
+    }
+    await _client.deleteJson(ApiEndpoints.reportDelete(id), token: token);
+  }
+
+  /// Fetch the authenticated user's own reports.
+  ///
+  /// Supports optional [statusFilter] (e.g. `"UnderReview"`, `"Resolved"`)
+  /// and standard pagination via [pageNumber] / [pageSize].
+  Future<List<ReportModel>> fetchMyReports({
+    int pageNumber = 1,
+    int pageSize = 10,
+    String? statusFilter,
+  }) async {
+    final token = await readToken();
+    if (token == null || token.trim().isEmpty) return const [];
+
+    final query = <String, dynamic>{
+      'pageNumber': pageNumber,
+      'pageSize': pageSize,
+    };
+    if (statusFilter != null && statusFilter.isNotEmpty) {
+      query['status'] = statusFilter;
+    }
+
+    final response = await _client.getJson(
+      ApiEndpoints.myReports,
+      token: token,
+      query: query,
+    );
+    return _parseReportList(response);
+  }
+
+  /// Submit a new report and report upload progress.
+  ///
+  /// [onProgress] is called with values in [0.0, 1.0].
+  /// Pass [attachmentPaths] explicitly to include multiple local files;
+  /// falls back to [_buildAttachmentPaths] for legacy single-image reports.
+  Future<ReportModel> submitReportWithProgress(
+    ReportModel report, {
+    void Function(double)? onProgress,
+    List<String>? attachmentPaths,
+  }) async {
+    final token = await readToken();
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Missing auth token');
+    }
+
+    final subCategoryId = report.subCategoryId?.trim();
+    if (subCategoryId == null || subCategoryId.isEmpty) {
+      throw Exception('Missing sub category id');
+    }
+
+    final fields = <String, String>{
+      'Title': report.title,
+      'Description': report.description,
+      'SubCategoryId': subCategoryId,
+      'Latitude': report.latitude.toString(),
+      'Longitude': report.longitude.toString(),
+      'Visibility': report.visibility ?? 'Public',
+    };
+
+    final paths = attachmentPaths ?? _buildAttachmentPaths(report);
+
+    final response = await _client.postMultipartWithProgress(
+      ApiEndpoints.reports,
+      token: token,
+      fields: fields,
+      multiFilePaths: paths.isNotEmpty ? {'Attachments': paths} : null,
+      onProgress: onProgress,
+    );
+
+    if (response is Map) {
+      final responseMap = Map<String, dynamic>.from(response);
+      final rawAttachments = responseMap['attachments'];
+      if (rawAttachments is List && rawAttachments.isNotEmpty) {
+        final attachments = rawAttachments
+            .whereType<Map>()
+            .map(
+              (a) => AttachmentModel.fromApiJson(
+                Map<String, dynamic>.from(a),
+              ),
+            )
+            .toList();
+        return report.copyWith(attachments: attachments, isSynced: true);
+      }
+    }
+    return report.copyWith(isSynced: true);
   }
 
   List<ReportModel> _parseReportList(dynamic response) {

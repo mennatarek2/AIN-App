@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/connectivity_service.dart';
 import '../../../../core/network/api_providers.dart';
+import '../../../../core/network/api_endpoints.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/state/auth_state_simple.dart';
 import '../../data/data_sources/profile_local_data_source.dart';
@@ -12,13 +13,112 @@ import '../../domain/profile_model.dart';
 import '../../domain/repositories/profile_repository.dart';
 import '../../domain/use_cases/use_cases.dart';
 
+// ─── Trust badge ──────────────────────────────────────────────────────────────
+
+enum TrustBadge {
+  newcomer,    // 0–19   🌱 gray
+  contributor, // 20–49  ⭐ blue
+  trusted,     // 50–99  🛡️ emerald
+  guardian;    // 100+   👑 gold
+
+  static TrustBadge fromPoints(int points) {
+    if (points >= 100) return TrustBadge.guardian;
+    if (points >= 50)  return TrustBadge.trusted;
+    if (points >= 20)  return TrustBadge.contributor;
+    return TrustBadge.newcomer;
+  }
+
+  static TrustBadge fromString(String? raw) {
+    return switch ((raw ?? '').toLowerCase()) {
+      'guardian'    => TrustBadge.guardian,
+      'trusted'     => TrustBadge.trusted,
+      'contributor' => TrustBadge.contributor,
+      _             => TrustBadge.newcomer,
+    };
+  }
+
+  String get label => switch (this) {
+    TrustBadge.newcomer    => 'مستخدم جديد',
+    TrustBadge.contributor => 'مساهم',
+    TrustBadge.trusted     => 'موثوق',
+    TrustBadge.guardian    => 'حارس',
+  };
+
+  String get emoji => switch (this) {
+    TrustBadge.newcomer    => '🌱',
+    TrustBadge.contributor => '⭐',
+    TrustBadge.trusted     => '🛡️',
+    TrustBadge.guardian    => '👑',
+  };
+
+  Color get color => switch (this) {
+    TrustBadge.newcomer    => const Color(0xFF697184),
+    TrustBadge.contributor => const Color(0xFF3B82F6),
+    TrustBadge.trusted     => const Color(0xFF10B981),
+    TrustBadge.guardian    => const Color(0xFFF59E0B),
+  };
+
+  /// Progress within current tier [0.0 – 1.0]
+  double progressFor(int points) {
+    return switch (this) {
+      TrustBadge.newcomer    => (points.clamp(0, 19) / 19).toDouble(),
+      TrustBadge.contributor => ((points - 20).clamp(0, 29) / 29).toDouble(),
+      TrustBadge.trusted     => ((points - 50).clamp(0, 49) / 49).toDouble(),
+      TrustBadge.guardian    => 1.0,
+    };
+  }
+
+  int pointsToNext(int points) => switch (this) {
+    TrustBadge.newcomer    => (20 - points).clamp(0, 20),
+    TrustBadge.contributor => (50 - points).clamp(0, 50),
+    TrustBadge.trusted     => (100 - points).clamp(0, 100),
+    TrustBadge.guardian    => 0,
+  };
+}
+
+// ─── TrustInfo (from GET /api/social/me/trust) ───────────────────────────────
+
+class TrustInfo {
+  const TrustInfo({
+    this.trustPoints = 0,
+    this.badge = TrustBadge.newcomer,
+    this.totalReports = 0,
+    this.resolvedReports = 0,
+    this.pendingReports = 0,
+  });
+
+  final int trustPoints;
+  final TrustBadge badge;
+  final int totalReports;
+  final int resolvedReports;
+  final int pendingReports;
+
+  factory TrustInfo.fromJson(Map<String, dynamic> json) {
+    final points = _parseInt(json['trustPoints'] ?? json['points'] ?? json['trust'] ?? 0);
+    final badge  = TrustBadge.fromString(json['badge']?.toString()) ;
+    final total    = _parseInt(json['totalReports'] ?? json['total'] ?? 0);
+    final resolved = _parseInt(json['resolvedReports'] ?? json['resolved'] ?? 0);
+    final pending  = _parseInt(json['pendingReports'] ?? json['pending'] ?? json['underReview'] ?? 0);
+    return TrustInfo(
+      trustPoints:    points,
+      badge:          badge,
+      totalReports:   total,
+      resolvedReports: resolved,
+      pendingReports: pending,
+    );
+  }
+
+  static int _parseInt(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    return int.tryParse(v.toString()) ?? 0;
+  }
+}
+
+
 /// UI representation of user profile
 ///
 /// Contains all user profile information needed for the UI.
-///
-/// Default values for new accounts:
-/// - trustPoints: 50
-/// - level: 1
 class UserProfile {
   const UserProfile({
     required this.id,
@@ -28,6 +128,7 @@ class UserProfile {
     required this.username,
     required this.isVerified,
     required this.points,
+    this.badge = 'Newcomer',
     this.profilePhotoUrl,
   });
 
@@ -39,7 +140,8 @@ class UserProfile {
       phone: model.phoneNumber,
       username: model.userName,
       isVerified: model.isVerified,
-      points: model.points,
+      points: model.trustPoints,
+      badge: model.badge,
       profilePhotoUrl: model.profilePhotoUrl,
     );
   }
@@ -51,30 +153,33 @@ class UserProfile {
   final String username;
   final bool isVerified;
   final int points;
-
-  /// The profile photo URL from the API (absolute URL or null)
+  /// Badge from API: 'Newcomer' | 'Contributor' | 'Trusted' | 'Guardian'
+  final String badge;
   final String? profilePhotoUrl;
 
   int get pointsToNextLevel {
+    if (points < 20)  return 20 - points;
+    if (points < 50)  return 50 - points;
     if (points < 100) return 100 - points;
-    if (points < 200) return 200 - points;
-    if (points < 300) return 300 - points;
     return 0;
   }
 
-  // Calculate level dynamically based on points
   String get level {
-    if (points < 100) return 'مستخدم جديد';
-    if (points < 200) return 'مساهم';
-    if (points < 300) return 'موثق';
-    return 'متميز';
+    return switch (badge.toLowerCase()) {
+      'guardian'    => 'حارس',
+      'trusted'     => 'موثوق',
+      'contributor' => 'مساهم',
+      _             => 'مستخدم جديد',
+    };
   }
 
   Color get levelDotColor {
-    if (points < 100) return const Color(0xFF697184);
-    if (points < 200) return const Color(0xFF498EF4);
-    if (points < 300) return const Color(0xFF14B57A);
-    return const Color(0xFFF59E0B);
+    return switch (badge.toLowerCase()) {
+      'guardian'    => const Color(0xFFF59E0B),
+      'trusted'     => const Color(0xFF10B981),
+      'contributor' => const Color(0xFF3B82F6),
+      _             => const Color(0xFF697184),
+    };
   }
 
   UserProfile copyWith({
@@ -85,6 +190,7 @@ class UserProfile {
     String? username,
     bool? isVerified,
     int? points,
+    String? badge,
     String? profilePhotoUrl,
     bool clearPhoto = false,
   }) {
@@ -96,6 +202,7 @@ class UserProfile {
       username: username ?? this.username,
       isVerified: isVerified ?? this.isVerified,
       points: points ?? this.points,
+      badge: badge ?? this.badge,
       profilePhotoUrl:
           clearPhoto ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
     );
@@ -103,7 +210,7 @@ class UserProfile {
 
   @override
   String toString() =>
-      'UserProfile(id: $id, name: $name, points: $points, photoUrl: $profilePhotoUrl)';
+      'UserProfile(id: $id, name: $name, points: $points, badge: $badge, photoUrl: $profilePhotoUrl)';
 }
 
 /// Notifier for managing profile state
@@ -428,5 +535,37 @@ final profileErrorProvider = Provider<String?>((ref) {
   return async.maybeWhen(
     error: (error, st) => error.toString(),
     orElse: () => null,
+  );
+});
+
+// ─── Trust info provider (GET /api/social/me/trust) ─────────────────────────
+
+/// Fetches accurate trust data including badge, totalReports, resolvedReports.
+/// Falls back gracefully — a 404 means the endpoint isn't deployed yet.
+final myTrustProvider = FutureProvider.autoDispose<TrustInfo>((ref) async {
+  final dataSource = ref.watch(profileRemoteDataSourceProvider);
+  final token = await dataSource.readToken();
+  if (token == null || token.isEmpty) return const TrustInfo();
+
+  final client = ref.watch(apiClientProvider);
+  try {
+    final response = await client.getJson(ApiEndpoints.myTrust, token: token);
+    if (response is Map<String, dynamic>) {
+      return TrustInfo.fromJson(response);
+    }
+    if (response is Map) {
+      return TrustInfo.fromJson(Map<String, dynamic>.from(response));
+    }
+  } catch (e) {
+    // Endpoint may not be available yet — fall back to profile points
+    print('[TrustProvider] /api/social/me/trust failed: $e — using profile fallback');
+  }
+
+  // Fallback: derive from profile points
+  final profile = ref.read(profileProvider);
+  final pts = profile?.points ?? 0;
+  return TrustInfo(
+    trustPoints: pts,
+    badge: TrustBadge.fromPoints(pts),
   );
 });

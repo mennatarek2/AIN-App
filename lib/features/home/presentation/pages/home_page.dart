@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../config/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
+import '../../../reports/domain/report_model.dart';
+import '../../../reports/presentation/pages/report_detail_page.dart';
 import '../providers/home_feed_provider.dart';
 import '../providers/home_navigation_provider.dart';
-import '../widgets/report_card.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../widgets/comments_bottom_sheet.dart';
+import '../widgets/category_filter_row.dart';
+import '../widgets/filter_bottom_sheet.dart';
+import '../widgets/report_card.dart';
+import '../widgets/shimmer_report_card.dart';
 import 'add_report_page.dart';
 import 'your_location_page.dart';
+import '../../../community/presentation/pages/community_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -18,9 +26,39 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  bool _searchVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final current = _scrollController.offset;
+    // Trigger load more at 80% scroll depth
+    if (current >= maxScroll * 0.80) {
+      ref.read(publicFeedProvider.notifier).loadMore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedNavIndex = ref.watch(homeNavigationProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
       canPop: false,
@@ -28,109 +66,157 @@ class _HomePageState extends ConsumerState<HomePage> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Column(
           children: [
-            _buildHeader(),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  // Location button
-                  _buildLocationBar(),
-                  // Latest reports title
-                  _buildSectionTitle(),
-                  // Search bar with filter
-                  _buildSearchBar(),
-                  // Reports feed
-                  ..._buildReportsList(),
-                  const SizedBox(height: 100), // Space for FAB and nav bar
-                ],
-              ),
-            ),
+            _buildAppBar(isDark),
+            // Location quick-access
+            _buildLocationBar(isDark),
+            // Category filter row
+            const SizedBox(height: 12),
+            const CategoryFilterRow(),
+            const SizedBox(height: 8),
+            // Feed
+            Expanded(child: _buildFeed()),
           ],
         ),
-        floatingActionButton: _buildFAB(),
-        floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
         bottomNavigationBar: BottomNavBar(
           selectedIndex: selectedNavIndex,
+          onReportTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AddReportPage()),
+            );
+          },
           onTap: (index) {
+            if (index == 2) return; // handled by onReportTap
             ref.read(homeNavigationProvider.notifier).setSelectedIndex(index);
-            if (index == 0) {
-              return;
-            }
-            navigateFromBottomNav(context, index);
+            _navigateToTab(index);
           },
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  // ---------------------------------------------------------------------------
+  // App bar
+  // ---------------------------------------------------------------------------
+  Widget _buildAppBar(bool isDark) {
     return Container(
-      width: double.infinity,
-      height: 100,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      alignment: Alignment.bottomCenter,
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
+      padding: EdgeInsets.fromLTRB(
+        16,
+        MediaQuery.of(context).padding.top + 8,
+        16,
+        12,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0D1230) : AppColors.primarySoft,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         textDirection: TextDirection.rtl,
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // User avatar button (clickable to profile)
-          GestureDetector(
-            onTap: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const ProfilePage()));
-            },
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: isDark ? const Color(0xFFC4CCDB) : Colors.white,
-              child: const Icon(
-                Icons.person,
-                color: AppColors.primary,
-                size: 18,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Greeting text
+          // Title
           Expanded(
-            child: Text(
-              'أهلاً بك',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w400,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimaryLight,
-              ),
-              textDirection: TextDirection.rtl,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: _searchVisible
+                  ? TextField(
+                      key: const ValueKey('search-field'),
+                      controller: _searchController,
+                      textDirection: TextDirection.rtl,
+                      autofocus: true,
+                      onChanged: (v) {
+                        ref
+                            .read(publicFeedProvider.notifier)
+                            .setSearch(v);
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'ابحث في البلاغات...',
+                        hintTextDirection: TextDirection.rtl,
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimaryLight,
+                        fontSize: 15,
+                      ),
+                    )
+                  : Text(
+                      'الرئيسية',
+                      key: const ValueKey('home-title'),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimaryLight,
+                      ),
+                      textDirection: TextDirection.rtl,
+                    ),
             ),
           ),
+          // Search toggle
+          IconButton(
+            icon: Icon(
+              _searchVisible ? Icons.close_rounded : Icons.search_rounded,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
+            ),
+            onPressed: () {
+              setState(() => _searchVisible = !_searchVisible);
+              if (!_searchVisible) {
+                _searchController.clear();
+                ref.read(publicFeedProvider.notifier).setSearch('');
+              }
+            },
+          ),
+          // Filter
+          IconButton(
+            icon: Icon(
+              Icons.tune_rounded,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
+            ),
+            onPressed: () => showFilterBottomSheet(context),
+          ),
+          // Notifications bell with live unread badge
+          _NotificationBell(isDark: isDark),
         ],
       ),
     );
   }
 
-  Widget _buildLocationBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  // ---------------------------------------------------------------------------
+  // Location bar
+  // ---------------------------------------------------------------------------
+  Widget _buildLocationBar(bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Align(
-        alignment: Alignment.centerLeft,
+        alignment: AlignmentDirectional.centerEnd,
         child: GestureDetector(
-          onTap: () {
-            Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const YourLocationPage()));
-          },
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const YourLocationPage()),
+          ),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
               color: AppColors.primarySoft.withValues(
-                alpha: isDark ? 0.2 : 0.35,
+                alpha: isDark ? 0.18 : 0.30,
               ),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -140,17 +226,16 @@ class _HomePageState extends ConsumerState<HomePage> {
               children: [
                 Icon(
                   Icons.location_on_outlined,
-                  size: 16,
+                  size: 15,
                   color: isDark
                       ? AppColors.textPrimaryDark
                       : AppColors.textPrimaryLight,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 5),
                 Text(
-                  'موقعك',
+                  'موقعك الحالي',
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
                     color: isDark
                         ? AppColors.textPrimaryDark
                         : AppColors.textPrimaryLight,
@@ -164,194 +249,271 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildSectionTitle() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  // ---------------------------------------------------------------------------
+  // Feed
+  // ---------------------------------------------------------------------------
+  Widget _buildFeed() {
+    final feedAsync = ref.watch(publicFeedProvider);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        textDirection: TextDirection.rtl,
-        children: [
-          Text(
-            'أحدث البلاغات',
-            style: TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w600,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
-            ),
-            textDirection: TextDirection.rtl,
-          ),
-        ],
+    return feedAsync.when(
+      loading: () => ListView.builder(
+        padding: const EdgeInsets.only(top: 4, bottom: 16),
+        itemCount: 5,
+        itemBuilder: (context, index) => const ShimmerReportCard(),
       ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final feedState = ref.watch(homeFeedProvider);
-    final fieldTextColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final hintColor = isDark
-        ? AppColors.textSecondaryDark
-        : AppColors.textSecondaryLight;
-    final fieldBorderColor = isDark
-        ? AppColors.textPrimaryDark
-        : const Color(0xFFE5E7EB);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
-        textDirection: TextDirection.rtl,
-        children: [
-          // Search field
-          Expanded(
-            child: TextField(
-              onChanged: (value) {
-                ref.read(homeFeedProvider.notifier).setSearchQuery(value);
-              },
-              textDirection: TextDirection.rtl,
-              decoration: InputDecoration(
-                hintText: 'البحث',
-                hintTextDirection: TextDirection.rtl,
-                hintStyle: TextStyle(color: hintColor, fontSize: 17),
-                suffixIcon: Icon(Icons.search, color: fieldTextColor, size: 30),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: fieldBorderColor),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: fieldBorderColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 1.5,
-                  ),
-                ),
-                filled: true,
-                fillColor: isDark ? AppColors.backgroundDark : Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+      error: (err, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                size: 56,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'تعذّر تحميل البلاغات',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                 ),
               ),
-            ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () =>
+                    ref.read(publicFeedProvider.notifier).refresh(),
+                icon: const Icon(Icons.refresh_rounded,
+                    color: AppColors.primary),
+                label: const Text(
+                  'إعادة المحاولة',
+                  style: TextStyle(color: AppColors.primary),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Transform.rotate(
-            angle: 1.5708,
-            child: IconButton(
-              icon: const Icon(Icons.tune_rounded),
-              iconSize: 24,
-              color: fieldTextColor,
-              onPressed: () {
-                ref.read(homeFeedProvider.notifier).toggleFilter();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      feedState.filterEnabled
-                          ? 'تم إيقاف الفلترة'
-                          : 'تم تفعيل الفلترة',
-                    ),
-                  ),
-                );
-              },
-              padding: EdgeInsets.zero,
-            ),
-          ),
-        ],
+        ),
+      ),
+      data: (feedState) => RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () =>
+            ref.read(publicFeedProvider.notifier).refresh(),
+        child: feedState.reports.isEmpty && !feedState.isRefreshing
+            ? _buildEmptyState()
+            : ListView.builder(
+                controller: _scrollController,
+                padding:
+                    const EdgeInsets.only(top: 4, bottom: 100),
+                itemCount:
+                    feedState.reports.length +
+                    (feedState.isLoadingMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == feedState.reports.length) {
+                    // Load-more spinner
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                    );
+                  }
+
+                  final report = feedState.reports[index];
+                  return _buildReportCard(report);
+                },
+              ),
       ),
     );
   }
 
-  List<Widget> _buildReportsList() {
-    final reports = ref.watch(filteredHomeReportsProvider);
-    final commentsByReport = ref.watch(homeFeedProvider).commentsByReport;
+  // ---------------------------------------------------------------------------
+  // Report card
+  // ---------------------------------------------------------------------------
+  Widget _buildReportCard(ReportModel report) {
+    // Build tags: category → status → location
+    final tags = <ReportTag>[
+      ReportTag(
+        label: report.categoryName ?? report.subCategoryName ?? 'بلاغ',
+        dotColor: Colors.grey,
+        showDot: false,
+      ),
+      ReportTag(
+        label: report.statusLabel,
+        dotColor: report.statusColor,
+      ),
+      if (report.locationAddress != null &&
+          report.locationAddress!.isNotEmpty)
+        ReportTag(
+          label: report.locationAddress!.length > 25
+              ? '${report.locationAddress!.substring(0, 25)}...'
+              : report.locationAddress!,
+          dotColor: Colors.red,
+          showPin: true,
+        ),
+    ];
 
-    return reports
-        .map(
-          (report) => ReportCard(
-            username: report.username,
-            timeAgo: report.timeAgo,
-            title: report.title,
-            imageUrl: report.imageUrl,
-            tags: report.tags,
-            commentCount: commentsByReport[report.id]?.length ?? 0,
-            onLike: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Liked!')));
-            },
-            onComment: () {
-              _openCommentsSheet(report);
-            },
-            onShare: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share not yet implemented')),
-              );
-            },
+    final username = () {
+      final vis = report.visibility?.toLowerCase();
+      if (vis == 'anonymous') return 'مجهول';
+      if (report.createdByName != null &&
+          report.createdByName!.trim().isNotEmpty) {
+        return report.createdByName!;
+      }
+      return 'مستخدم';
+    }();
+
+    return ReportCard(
+      username: username,
+      timeAgo: report.submittedAgo.isNotEmpty ? report.submittedAgo : 'الآن',
+      title: report.title,
+      description: report.description,
+      imageUrl: report.imagePath,
+      tags: tags,
+      attachmentCount: report.attachments.length,
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ReportDetailPage(reportId: report.id),
           ),
-        )
-        .toList();
-  }
-
-  void _openCommentsSheet(HomeReport report) {
-    final reportId = report.id;
-    final comments = ref
-        .read(homeFeedProvider.notifier)
-        .commentsForReport(reportId);
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return CommentsBottomSheet(
-          comments: comments,
-          onLikeComment: (commentId) {
-            ref.read(homeFeedProvider.notifier).toggleLike(reportId, commentId);
-          },
-          onSendComment: (text) {
-            ref.read(homeFeedProvider.notifier).addComment(reportId, text);
-          },
         );
       },
     );
   }
 
-  Widget _buildFAB() {
+  // ---------------------------------------------------------------------------
+  // Empty state
+  // ---------------------------------------------------------------------------
+  Widget _buildEmptyState() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final feedState = ref.watch(publicFeedProvider).valueOrNull;
+    final hasFilter = feedState?.filter.categoryId != null ||
+        feedState?.filter.status != null ||
+        (feedState?.filter.search?.isNotEmpty ?? false);
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const AddReportPage()));
-      },
-      child: Container(
-        margin: const EdgeInsets.only(left: 16, bottom: 12),
-        height: 60,
-        width: 112,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121A5C) : AppColors.primary,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Center(
-          child: Text(
-            'إضافة بلاغ',
-            style: TextStyle(
-              color: isDark ? AppColors.textPrimaryDark : Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 21,
+    return CustomScrollView(
+      slivers: [
+        SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  hasFilter
+                      ? Icons.filter_list_off_rounded
+                      : Icons.inbox_rounded,
+                  size: 72,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  hasFilter
+                      ? 'لا توجد بلاغات تطابق الفلتر'
+                      : 'لا توجد بلاغات حالياً',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+                if (hasFilter)
+                  TextButton(
+                    onPressed: () => ref
+                        .read(publicFeedProvider.notifier)
+                        .applyFilter(const FeedFilter()),
+                    child: const Text(
+                      'مسح الفلاتر',
+                      style: TextStyle(color: AppColors.primary),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
-      ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tab navigation
+  // ---------------------------------------------------------------------------
+  void _navigateToTab(int index) {
+    switch (index) {
+      case 1:
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CommunityPage()),
+        );
+      case 3:
+        Navigator.of(context).pushNamed(AppRoutes.sos);
+      case 4:
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProfilePage()),
+        );
+      default:
+        break;
+    }
+  }
+}
+
+// ─── Notification bell with live badge ───────────────────────────────────────
+
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(unreadNotificationCountProvider);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: Icon(
+            unread > 0
+                ? Icons.notifications_rounded
+                : Icons.notifications_outlined,
+            color: isDark
+                ? AppColors.textPrimaryDark
+                : AppColors.textPrimaryLight,
+          ),
+          onPressed: () => Navigator.of(context).pushNamed('/notifications'),
+        ),
+        if (unread > 0)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              child: Text(
+                unread > 9 ? '9+' : unread.toString(),
+                style: const TextStyle(
+                  fontSize: 9,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

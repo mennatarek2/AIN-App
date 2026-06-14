@@ -35,7 +35,7 @@ class CommunityNotificationPage extends StatelessWidget {
                 final item = _notifications[index];
                 return _NotificationCard(item: item);
               },
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (context, i) => const SizedBox(height: 12),
               itemCount: _notifications.length,
             ),
           ),

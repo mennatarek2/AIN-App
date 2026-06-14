@@ -27,6 +27,7 @@ class FcmNotificationService implements PushNotificationService {
   Future<void> showReportNotification({
     required String title,
     required String body,
+    String? reportId,
   }) async {
     await initialize();
 

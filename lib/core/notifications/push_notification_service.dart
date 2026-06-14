@@ -6,5 +6,6 @@ abstract class PushNotificationService {
   Future<void> showReportNotification({
     required String title,
     required String body,
+    String? reportId,
   });
 }

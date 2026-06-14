@@ -1,8 +1,13 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 
 import 'push_notification_service.dart';
+
+// ─── Global navigator key ─────────────────────────────────────────────────────
+/// Used to navigate from notification tap callbacks, which execute outside the
+/// normal widget tree lifecycle.
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 class LocalNotificationService implements PushNotificationService {
   LocalNotificationService();
@@ -13,6 +18,8 @@ class LocalNotificationService implements PushNotificationService {
   bool _isInitialized = false;
   bool _isAvailable = true;
 
+  // ── Channels ──────────────────────────────────────────────────────────────
+
   static const AndroidNotificationChannel _reportsChannel =
       AndroidNotificationChannel(
         'reports_updates',
@@ -20,6 +27,18 @@ class LocalNotificationService implements PushNotificationService {
         description: 'Notifications for report submission and status updates',
         importance: Importance.high,
       );
+
+  static const AndroidNotificationChannel _sosChannel =
+      AndroidNotificationChannel(
+        'sos_alerts',
+        'نداء طوارئ',
+        description: 'Notifications for active SOS alerts in your communities',
+        importance: Importance.max,
+        enableVibration: true,
+        playSound: true,
+      );
+
+  // ── Initialize ────────────────────────────────────────────────────────────
 
   @override
   Future<void> initialize() async {
@@ -35,13 +54,17 @@ class LocalNotificationService implements PushNotificationService {
     );
 
     try {
-      await _plugin.initialize(settings);
+      await _plugin.initialize(
+        settings,
+        onDidReceiveNotificationResponse: _onNotificationTap,
+      );
 
       final androidImpl = _plugin
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
           >();
       await androidImpl?.createNotificationChannel(_reportsChannel);
+      await androidImpl?.createNotificationChannel(_sosChannel);
 
       await requestPermissions();
       _isInitialized = true;
@@ -53,6 +76,25 @@ class LocalNotificationService implements PushNotificationService {
       );
     }
   }
+
+  // ── Tap handler ───────────────────────────────────────────────────────────
+
+  void _onNotificationTap(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+
+    if (payload.startsWith('sos:')) {
+      nav.pushNamed('/sos');
+    } else if (payload.startsWith('report:')) {
+      final reportId = payload.substring(7);
+      nav.pushNamed('/report', arguments: reportId);
+    }
+  }
+
+  // ── Permissions ───────────────────────────────────────────────────────────
 
   @override
   Future<void> requestPermissions() async {
@@ -77,10 +119,13 @@ class LocalNotificationService implements PushNotificationService {
     await macosImpl?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
+  // ── Report notifications ──────────────────────────────────────────────────
+
   @override
   Future<void> showReportNotification({
     required String title,
     required String body,
+    String? reportId,
   }) async {
     await initialize();
     if (!_isAvailable) return;
@@ -102,13 +147,118 @@ class LocalNotificationService implements PushNotificationService {
 
     final id = DateTime.now().millisecondsSinceEpoch.remainder(2147483647);
     try {
-      await _plugin.show(id, title, body, details);
+      await _plugin.show(
+        id,
+        title,
+        body,
+        details,
+        payload: reportId != null ? 'report:$reportId' : null,
+      );
     } on MissingPluginException catch (_) {
       _isAvailable = false;
-      debugPrint(
-        'Local notifications plugin is unavailable during show(). '
-        'Run a full app restart after adding the plugin.',
-      );
     }
+  }
+
+  // ── SOS notifications ─────────────────────────────────────────────────────
+
+  Future<void> showSOSAlert({
+    required String sosId,
+    required String severity,
+    String? message,
+    String? communityName,
+  }) async {
+    await initialize();
+    if (!_isAvailable) return;
+
+    final severityLabel = _severityLabel(severity);
+    final body = message?.isNotEmpty == true
+        ? '$severityLabel — $message'
+        : severityLabel;
+
+    final androidDetails = AndroidNotificationDetails(
+      'sos_alerts',
+      'نداء طوارئ',
+      channelDescription:
+          'Notifications for active SOS alerts in your communities',
+      importance: Importance.max,
+      priority: Priority.high,
+      color: const Color(0xFFEF4444),
+      enableVibration: true,
+      playSound: true,
+      ticker: 'نداء طوارئ',
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final id = sosId.hashCode.abs() % 2147483647;
+    try {
+      await _plugin.show(
+        id,
+        '🚨 نداء طوارئ جديد',
+        body,
+        details,
+        payload: 'sos:$sosId',
+      );
+    } on MissingPluginException catch (_) {
+      _isAvailable = false;
+    }
+  }
+
+  Future<void> showSOSResolved({
+    required String sosId,
+    required String resolvedBy,
+  }) async {
+    await initialize();
+    if (!_isAvailable) return;
+
+    const androidDetails = AndroidNotificationDetails(
+      'sos_alerts',
+      'نداء طوارئ',
+      importance: Importance.high,
+      priority: Priority.high,
+      color: Color(0xFF22C55E),
+    );
+    const iosDetails = DarwinNotificationDetails();
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final id = (sosId.hashCode.abs() + 1) % 2147483647;
+    try {
+      await _plugin.show(
+        id,
+        '✅ تم حل نداء الطوارئ',
+        'تم الحل بواسطة: $resolvedBy',
+        details,
+        payload: 'sos:$sosId',
+      );
+    } on MissingPluginException catch (_) {
+      _isAvailable = false;
+    }
+  }
+
+  Future<void> cancelNotification(int id) async {
+    if (!_isAvailable) return;
+    try {
+      await _plugin.cancel(id);
+    } catch (_) {}
+  }
+
+  String _severityLabel(String severity) {
+    return switch (severity.toLowerCase()) {
+      'high' => 'مستوى عالٍ',
+      'critical' => 'حرج',
+      _ => 'عادي',
+    };
   }
 }

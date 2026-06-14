@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show sqrt;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,39 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../location/data/location_service.dart';
 import '../../../location/presentation/providers/location_providers.dart';
 import '../../../location/presentation/widgets/map_screen.dart';
+import '../../../reports/presentation/pages/report_detail_page.dart';
+import '../../domain/report_map_pin.dart';
+import '../providers/map_notifier.dart';
+import 'map_page.dart';
+
+// ─── Provider: nearby pins ────────────────────────────────────────────────────
+
+/// Returns pins within ~5 km of user's current location, sorted by distance.
+final nearbyPinsProvider = Provider<List<ReportMapPin>>((ref) {
+  final mapState = ref.watch(mapProvider);
+  final locState = ref.watch(liveLocationProvider);
+
+  final pos = locState.currentPosition;
+  if (pos == null) return mapState.pins.take(10).toList();
+
+  const maxDistKm = 5.0;
+
+  double distKm(ReportMapPin pin) {
+    // Flat-earth approximation (good enough for small distances)
+    const latDeg = 111.0;
+    const lonDeg = 111.320;
+    final dlat = (pin.latitude - pos.latitude) * latDeg;
+    final dlon = (pin.longitude - pos.longitude) * lonDeg;
+    return sqrt(dlat * dlat + dlon * dlon);
+  }
+
+  return mapState.pins
+      .where((p) => distKm(p) <= maxDistKm)
+      .toList()
+    ..sort((a, b) => distKm(a).compareTo(distKm(b)));
+});
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 class YourLocationPage extends ConsumerStatefulWidget {
   const YourLocationPage({super.key});
@@ -23,38 +57,13 @@ class _YourLocationPageState extends ConsumerState<YourLocationPage> {
   GoogleMapController? _mapController;
   Timer? _cameraUpdateTimer;
 
-  static const List<_LocationCardData> _cards = [
-    _LocationCardData(
-      top: 376,
-      title: 'حادث سير',
-      subtitle: 'حادث اصطدام سيارة ملاكي بعمود إنارة...',
-      status: 'تم الحل',
-      statusColor: Color(0xFF35A933),
-      imageUrl: 'assets/images/report_image.png',
-    ),
-    _LocationCardData(
-      top: 480,
-      title: 'حريق',
-      subtitle: 'يوجد حريق في الشارع، مع وجود نيران...',
-      status: 'قيد المعالجة',
-      statusColor: Color(0xFF33A3F0),
-      imageUrl: 'assets/images/report_image.png',
-    ),
-    _LocationCardData(
-      top: 584,
-      title: 'تلف إشارة مرور',
-      subtitle: 'توجد إشارة مرور تالفة ولا تعمل بشكل...',
-      status: 'قيد المراجعة',
-      statusColor: Color(0xFFF0BE33),
-      imageUrl: 'assets/images/report_image.png',
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(liveLocationProvider.notifier).startTracking();
+      // Also load map pins if not already loaded
+      ref.read(mapProvider.notifier).loadPins();
     });
   }
 
@@ -68,154 +77,340 @@ class _YourLocationPageState extends ConsumerState<YourLocationPage> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final state = ref.watch(liveLocationProvider);
+    final locState = ref.watch(liveLocationProvider);
+    final nearbyPins = ref.watch(nearbyPinsProvider);
+    final mapState = ref.watch(mapProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final panelColor = isDark
-        ? AppColors.backgroundDark
-        : AppColors.backgroundLight;
-    final titleColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final backIconColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
+    final panelColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final titleColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final cardBg = isDark ? const Color(0xFF0D1445) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF1E2D6B) : const Color(0xFFE2E8F0);
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    _tryAnimateCamera(state);
+    _tryAnimateCamera(locState);
+
+    final scale = MediaQuery.of(context).size.width / YourLocationPage.designW;
+
+    double sx(double v) => v * scale;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final scale = constraints.maxWidth / YourLocationPage.designW;
-          final designHeight = YourLocationPage.designH * scale;
-          final canvasHeight = designHeight > constraints.maxHeight
-              ? designHeight
-              : constraints.maxHeight;
-
-          double sx(double value) => value * scale;
-
-          return SingleChildScrollView(
+      body: Stack(
+        children: [
+          // ── Full-height scrollable body ──────────────────────────────────
+          SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
-            child: SizedBox(
-              width: constraints.maxWidth,
-              height: canvasHeight,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    right: 0,
-                    height: sx(340),
-                    child: _buildTopMap(state),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Mini map (clickable → full MapPage) ──────────────────
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MapPage()),
                   ),
-                  Positioned(
-                    left: sx(16),
-                    top: media.padding.top + sx(4),
-                    width: sx(24),
-                    height: sx(24),
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Icon(
-                        Icons.arrow_forward_ios,
-                        size: sx(20),
-                        color: backIconColor,
-                      ),
+                  child: SizedBox(
+                    height: sx(320),
+                    child: Stack(
+                      children: [
+                        _buildTopMap(locState, nearbyPins),
+                        // Tap-to-expand overlay label
+                        Positioned(
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.open_in_full_rounded,
+                                      color: Colors.white, size: 13),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'افتح الخريطة الكاملة',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Positioned(
-                    left: 0,
-                    top: sx(316),
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: panelColor,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(sx(30)),
-                          topRight: Radius.circular(sx(30)),
+                ),
+
+                // ── White rounded panel ──────────────────────────────────
+                Container(
+                  decoration: BoxDecoration(
+                    color: panelColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Back button row
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          media.padding.top + 12,
+                          16,
+                          0,
+                        ),
+                        child: Align(
+                          alignment: Alignment.topLeft,
+                          child: GestureDetector(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? const Color(0xFF1E2D6B)
+                                    : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 16,
+                                color: titleColor,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  Positioned(
-                    left: sx(16),
-                    top: sx(328),
-                    width: constraints.maxWidth - sx(32),
-                    child: Text(
-                      'في هذه المنطقة',
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.start,
-                      textScaler: TextScaler.noScaling,
-                      style: TextStyle(
-                        fontSize: sx(19),
-                        fontWeight: FontWeight.w400,
-                        color: titleColor,
-                        height: 1,
+
+                      const SizedBox(height: 20),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          children: [
+                            Icon(Icons.place_rounded,
+                                color: AppColors.primary, size: 22),
+                            const SizedBox(width: 8),
+                            Text(
+                              'في هذه المنطقة',
+                              textDirection: TextDirection.rtl,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: titleColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (mapState.isLoading)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              TextButton.icon(
+                                onPressed: () =>
+                                    ref.read(mapProvider.notifier).refresh(),
+                                icon: const Icon(Icons.refresh_rounded,
+                                    size: 14, color: AppColors.primary),
+                                label: const Text(
+                                  'تحديث',
+                                  style: TextStyle(
+                                      color: AppColors.primary, fontSize: 12),
+                                ),
+                                style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
+
+                      const SizedBox(height: 4),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          locState.currentPosition != null
+                              ? 'أقرب ${nearbyPins.length} بلاغ في نطاق ٥ كم'
+                              : 'تفعيل الموقع لعرض البلاغات القريبة',
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: textSecondary,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ── Reports list ────────────────────────────────
+                      if (mapState.isLoading && nearbyPins.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (nearbyPins.isEmpty)
+                        _EmptyNearby(isDark: isDark, textSecondary: textSecondary)
+                      else
+                        ...nearbyPins.take(15).map(
+                              (pin) => Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                child: _PinReportCard(
+                                  pin: pin,
+                                  cardBg: cardBg,
+                                  cardBorder: cardBorder,
+                                  textSecondary: textSecondary,
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          ReportDetailPage(reportId: pin.id),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                      const SizedBox(height: 32),
+                    ],
                   ),
-                  for (final card in _cards)
-                    Positioned(
-                      left: sx(16),
-                      top: sx(card.top),
-                      width: sx(398),
-                      height: sx(92),
-                      child: _LocationReportCard(card: card, scale: scale),
-                    ),
-                ],
+                ),
+              ],
+            ),
+          ),
+
+          // ── Floating back button on top of map ──────────────────────────
+          Positioned(
+            top: media.padding.top + 12,
+            left: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.50),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTopMap(LiveLocationState state) {
+  // ── Map widget ────────────────────────────────────────────────────────────
+
+  Widget _buildTopMap(LiveLocationState state, List<ReportMapPin> nearbyPins) {
     if (state.canShowMap && state.currentPosition != null) {
       final currentLatLng = LatLng(
         state.currentPosition!.latitude,
         state.currentPosition!.longitude,
       );
 
-      return MapScreen(
-        initialTarget: currentLatLng,
-        initialZoom: 16,
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-        markers: {
-          Marker(
-            markerId: const MarkerId('your-location-live-marker'),
-            position: currentLatLng,
-            infoWindow: const InfoWindow(title: 'موقعك الحالي'),
+      // Build markers: user position + nearby report pins
+      final markers = <Marker>{
+        Marker(
+          markerId: const MarkerId('your-location-live-marker'),
+          position: currentLatLng,
+          infoWindow: const InfoWindow(title: 'موقعك الحالي'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        ),
+        ...nearbyPins.map(
+          (pin) => Marker(
+            markerId: MarkerId('pin-${pin.id}'),
+            position: LatLng(pin.latitude, pin.longitude),
+            infoWindow: InfoWindow(title: pin.title),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              _pinHue(pin.status),
+            ),
           ),
-        },
-        onMapCreated: (controller) {
-          _mapController = controller;
-        },
+        ),
+      };
+
+      return AbsorbPointer(
+        child: MapScreen(
+          initialTarget: currentLatLng,
+          initialZoom: 14,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false,
+          markers: markers,
+          onMapCreated: (controller) {
+            _mapController = controller;
+          },
+        ),
       );
     }
 
     if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        color: const Color(0xFF0D1230),
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
     }
 
     return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: const Color(0xFF0D1230),
       child: Center(
-        child: Text(
-          state.accessStatus == LocationAccessStatus.serviceDisabled
-              ? 'يرجى تشغيل GPS'
-              : 'تعذر تحميل الموقع',
-          textDirection: TextDirection.rtl,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_off_outlined,
+                color: Colors.white60, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              state.accessStatus == LocationAccessStatus.serviceDisabled
+                  ? 'يرجى تشغيل GPS لعرض الخريطة'
+                  : 'تعذر تحميل الموقع',
+              textDirection: TextDirection.rtl,
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () => ref
+                  .read(liveLocationProvider.notifier)
+                  .startTracking(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  double _pinHue(String status) {
+    return switch (status.toLowerCase()) {
+      'underreview' => BitmapDescriptor.hueYellow,
+      'dispatched' => BitmapDescriptor.hueBlue,
+      'resolved' => BitmapDescriptor.hueGreen,
+      'rejected' => BitmapDescriptor.hueRed,
+      _ => BitmapDescriptor.hueOrange,
+    };
+  }
+
   void _tryAnimateCamera(LiveLocationState state) {
     if (_mapController == null || state.currentPosition == null) return;
-
     _cameraUpdateTimer ??= Timer(const Duration(milliseconds: 500), () {
       _cameraUpdateTimer = null;
       final latLng = LatLng(
@@ -227,146 +422,220 @@ class _YourLocationPageState extends ConsumerState<YourLocationPage> {
   }
 }
 
-class _LocationCardData {
-  final double top;
-  final String title;
-  final String subtitle;
-  final String status;
-  final Color statusColor;
-  final String imageUrl;
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
-  const _LocationCardData({
-    required this.top,
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.statusColor,
-    required this.imageUrl,
-  });
-}
+class _EmptyNearby extends StatelessWidget {
+  const _EmptyNearby({required this.isDark, required this.textSecondary});
 
-class _LocationReportCard extends StatelessWidget {
-  final _LocationCardData card;
-  final double scale;
-
-  const _LocationReportCard({required this.card, required this.scale});
+  final bool isDark;
+  final Color textSecondary;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBackground = isDark
-        ? AppColors.backgroundDark
-        : AppColors.backgroundLight;
-    final cardBorderColor = isDark
-        ? AppColors.textPrimaryDark
-        : const Color(0x33060C3A);
-    final cardTitleColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final cardSubtitleColor = isDark
-        ? AppColors.textSecondaryDark
-        : const Color(0x66060C3A);
-    final statusTextColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-
-    double sx(double value) => value * scale;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardBackground,
-        borderRadius: BorderRadius.circular(sx(10)),
-        border: Border.all(color: cardBorderColor, width: 1),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0D1445) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark ? const Color(0xFF1E2D6B) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.search_off_rounded,
+                size: 40, color: textSecondary.withValues(alpha: 0.4)),
+            const SizedBox(height: 12),
+            Text(
+              'لا توجد بلاغات قريبة',
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'لم يتم العثور على بلاغات في نطاق ٥ كم من موقعك',
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: textSecondary.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: sx(1),
-            top: sx(-1),
-            width: sx(88),
-            height: sx(92),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(sx(10)),
-              child: Image.asset(card.imageUrl, fit: BoxFit.cover),
-            ),
+    );
+  }
+}
+
+// ─── Pin Report Card ──────────────────────────────────────────────────────────
+
+class _PinReportCard extends StatelessWidget {
+  const _PinReportCard({
+    required this.pin,
+    required this.cardBg,
+    required this.cardBorder,
+    required this.textSecondary,
+    required this.onTap,
+  });
+
+  final ReportMapPin pin;
+  final Color cardBg;
+  final Color cardBorder;
+  final Color textSecondary;
+  final VoidCallback onTap;
+
+  Color get _statusColor => switch (pin.status.toLowerCase()) {
+    'underreview' => const Color(0xFFF59E0B),
+    'dispatched' => const Color(0xFF3B82F6),
+    'resolved' => const Color(0xFF22C55E),
+    'rejected' => const Color(0xFFEF4444),
+    _ => AppColors.primary,
+  };
+
+  String get _statusLabel => switch (pin.status.toLowerCase()) {
+    'underreview' => 'قيد المراجعة',
+    'dispatched' => 'موزع',
+    'resolved' => 'تم الحل',
+    'rejected' => 'مرفوض',
+    _ => pin.status,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cardBorder),
           ),
-          Positioned(
-            left: sx(7),
-            top: sx(7),
-            width: sx(96),
-            height: sx(36),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0x3366C8FF),
-                borderRadius: BorderRadius.circular(sx(10)),
-              ),
-              child: Row(
-                textDirection: TextDirection.rtl,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    card.status,
-                    textDirection: TextDirection.rtl,
-                    textScaler: TextScaler.noScaling,
-                    style: TextStyle(
-                      fontSize: sx(13),
-                      fontWeight: FontWeight.w400,
-                      color: statusTextColor,
+          child: Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              // Colored status dot
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.4),
+                      blurRadius: 6,
+                      spreadRadius: 1,
                     ),
-                  ),
-                  SizedBox(width: sx(6)),
-                  Container(
-                    width: sx(13),
-                    height: sx(13),
-                    decoration: BoxDecoration(
-                      color: card.statusColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ),
-          Positioned(
-            right: sx(96),
-            top: sx(6),
-            width: sx(208),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  card.title,
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.start,
-                  textScaler: TextScaler.noScaling,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: sx(19),
-                    fontWeight: FontWeight.w400,
-                    color: cardTitleColor,
-                    height: 1.1,
-                  ),
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Category + Status row
+                    Row(
+                      textDirection: TextDirection.rtl,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pin.title,
+                            textDirection: TextDirection.rtl,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: color.withValues(alpha: 0.35)),
+                          ),
+                          child: Text(
+                            _statusLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      textDirection: TextDirection.rtl,
+                      children: [
+                        if (pin.categoryName.isNotEmpty) ...[
+                          Icon(Icons.category_outlined,
+                              size: 12, color: textSecondary),
+                          const SizedBox(width: 4),
+                          Text(
+                            pin.categoryName,
+                            style: TextStyle(
+                                fontSize: 11, color: textSecondary),
+                          ),
+                          Text(' • ',
+                              style:
+                                  TextStyle(fontSize: 11, color: textSecondary)),
+                        ],
+                        if (pin.timeAgo.isNotEmpty)
+                          Text(
+                            pin.timeAgo,
+                            style:
+                                TextStyle(fontSize: 11, color: textSecondary),
+                          ),
+                        if (pin.locationName != null &&
+                            pin.locationName!.isNotEmpty) ...[
+                          Text(' • ',
+                              style:
+                                  TextStyle(fontSize: 11, color: textSecondary)),
+                          Expanded(
+                            child: Text(
+                              pin.locationName!,
+                              textDirection: TextDirection.rtl,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 11, color: textSecondary),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
-                SizedBox(height: sx(8)),
-                Text(
-                  card.subtitle,
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.start,
-                  textScaler: TextScaler.noScaling,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: sx(13),
-                    fontWeight: FontWeight.w400,
-                    color: cardSubtitleColor,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
+              ),
+
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_left,
+                  size: 16, color: textSecondary.withValues(alpha: 0.5)),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

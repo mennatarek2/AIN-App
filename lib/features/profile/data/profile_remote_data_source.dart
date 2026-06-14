@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -17,7 +19,8 @@ class ProfileApiModel extends ProfileModel {
     required super.phoneNumber,
     required super.userName,
     super.isVerified = false,
-    super.points = 50, // Default: 50 trust points for new accounts
+    super.trustPoints = 0,
+    super.badge = 'Newcomer',
     super.profilePhotoUrl,
   });
 
@@ -32,26 +35,26 @@ class ProfileApiModel extends ProfileModel {
   /// - points: 50 (trust points)
   /// - isVerified: false
   factory ProfileApiModel.fromApiJson(Map<String, dynamic> json) {
-    // Log raw API response for debugging
     print('[ProfileApiModel] Raw API JSON keys: ${json.keys.toList()}');
     print('[ProfileApiModel] Raw API JSON: $json');
 
-    // Extract points with default value of 50 for new accounts
-    final pointsValue = json['points'];
-    int points;
+    // API returns 'trustPoints' (not 'points')
+    final pointsValue = json['trustPoints'] ?? json['points'];
+    int trustPoints;
     if (pointsValue is int) {
-      points = pointsValue;
+      trustPoints = pointsValue;
     } else if (pointsValue is String) {
-      points = int.tryParse(pointsValue) ?? 50;
+      trustPoints = int.tryParse(pointsValue) ?? 0;
     } else {
-      points = 50; // Default for new accounts
+      trustPoints = 0;
     }
 
-    // Extract and resolve profile photo URL
-    // Try all possible field names the API might use
+    // API returns badge as 'Newcomer' | 'Contributor' | 'Trusted' | 'Guardian'
+    final badge = json['badge']?.toString() ?? 'Newcomer';
+
     final rawPhotoUrl = _extractPhotoUrl(json);
     final resolvedPhotoUrl = _resolvePhotoUrl(rawPhotoUrl);
-    print('[ProfileApiModel] Raw photo URL from API: $rawPhotoUrl');
+    print('[ProfileApiModel] trustPoints: $trustPoints, badge: $badge');
     print('[ProfileApiModel] Resolved photo URL: $resolvedPhotoUrl');
 
     return ProfileApiModel(
@@ -63,7 +66,8 @@ class ProfileApiModel extends ProfileModel {
       userName:
           json['userName']?.toString() ?? json['username']?.toString() ?? '',
       isVerified: json['isVerified'] == true,
-      points: points,
+      trustPoints: trustPoints,
+      badge: badge,
       profilePhotoUrl:
           resolvedPhotoUrl?.trim().isNotEmpty == true ? resolvedPhotoUrl : null,
     );
@@ -190,44 +194,37 @@ class ProfileRemoteDataSource {
   }) async {
     try {
       final token = await _requiredToken();
+      // C# [FromForm] requires PascalCase field names
       final fields = <String, String>{};
 
-      // Add fields if provided and not empty
       if (displayName != null && displayName.trim().isNotEmpty) {
-        fields['displayName'] = displayName.trim();
-        print('[Profile] Updating displayName: ${displayName.trim()}');
+        fields['DisplayName'] = displayName.trim();
+        print('[Profile] Updating DisplayName: ${displayName.trim()}');
       }
       if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
-        fields['phoneNumber'] = phoneNumber.trim();
-        print('[Profile] Updating phoneNumber');
-      }
-      if (userName != null && userName.trim().isNotEmpty) {
-        fields['userName'] = userName.trim();
-        print('[Profile] Updating userName');
+        fields['PhoneNumber'] = phoneNumber.trim();
+        print('[Profile] Updating PhoneNumber');
       }
 
       Map<String, String>? filePaths;
       if (profilePhotoPath != null && profilePhotoPath.trim().isNotEmpty) {
         final file = File(profilePhotoPath);
         if (await file.exists()) {
-          filePaths = {'profilePhoto': profilePhotoPath};
-          print('[Profile] Uploading profile photo: $profilePhotoPath');
+          // C# [FromForm] expects 'ProfilePhoto' (PascalCase)
+          filePaths = {'ProfilePhoto': profilePhotoPath};
+          print('[Profile] Uploading ProfilePhoto: $profilePhotoPath');
         } else {
-          print(
-            '[Profile] Profile photo file does not exist: $profilePhotoPath',
-          );
+          print('[Profile] Profile photo file does not exist: $profilePhotoPath');
         }
       }
 
-      // At least one field must be provided
       if (fields.isEmpty && filePaths == null) {
         throw ProfileException('No profile data to update', 400);
       }
 
-      print('[Profile] Sending update request to: ${ApiConfig.baseUrl}${ApiEndpoints.updateProfile}');
-      print('[Profile] Fields: $fields');
-      print('[Profile] Files: $filePaths');
+      print('[Profile] PUT ${ApiConfig.baseUrl}${ApiEndpoints.updateProfile}');
 
+      // PUT returns AuthResult { isSuccess, user: { displayName, email, token, refreshToken } }
       final response = await _client.putMultipart(
         ApiEndpoints.updateProfile,
         token: token,
@@ -235,14 +232,45 @@ class ProfileRemoteDataSource {
         filePaths: filePaths,
       );
 
-      print('[Profile] Update API response: $response');
+      // Save new JWT so subsequent requests use updated claims
+      await _saveNewToken(response);
       print('[Profile] Profile updated successfully');
     } on ApiException catch (e) {
-      // Preserve API status code for better error handling
       throw ProfileException('Failed to update profile: $e', e.statusCode);
     } catch (e) {
       if (e is ProfileException) rethrow;
       throw ProfileException('Failed to update profile: $e');
+    }
+  }
+
+  /// Extract and persist the new JWT returned by PUT /api/profile/update-profile.
+  /// The response shape is: { isSuccess, user: { token, refreshToken, ... } }
+  Future<void> _saveNewToken(dynamic response) async {
+    try {
+      Map<String, dynamic>? map;
+      if (response is Map<String, dynamic>) {
+        map = response;
+      } else if (response is Map) {
+        map = Map<String, dynamic>.from(response);
+      }
+      if (map == null) return;
+
+      final user = map['user'];
+      String? newToken;
+      if (user is Map) {
+        newToken = user['token']?.toString();
+      }
+      newToken ??= map['token']?.toString();
+
+      if (newToken != null && newToken.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        // Use the exact key the auth layer reads from
+        await prefs.setString('auth_cached_token_v1', newToken);
+        print('[Profile] Saved new JWT (auth_cached_token_v1)');
+      }
+    } catch (e) {
+      // Non-fatal — profile update succeeded even if token save fails
+      print('[Profile] Could not save new token: $e');
     }
   }
 
