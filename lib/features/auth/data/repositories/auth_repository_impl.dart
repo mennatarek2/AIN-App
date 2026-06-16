@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../domain/entities/auth_failure.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -113,7 +114,11 @@ class AuthRepositoryImpl implements AuthRepository {
           );
 
       if (token != null && token.trim().isNotEmpty) {
-        await userLocalDataSource.saveSession(user: user, token: token);
+        await userLocalDataSource.saveSession(
+          user: user,
+          token: token,
+          refreshToken: session.refreshToken,
+        );
       }
 
       return Right(user);
@@ -228,7 +233,11 @@ class AuthRepositoryImpl implements AuthRepository {
       final token = session.authToken;
       if (token != null && token.trim().isNotEmpty) {
         print('[AUTH] Saving session with token length: ${token.length}');
-        await userLocalDataSource.saveSession(user: user, token: token);
+        await userLocalDataSource.saveSession(
+          user: user,
+          token: token,
+          refreshToken: session.refreshToken,
+        );
         await userLocalDataSource.clearSignupToken();
         print('[AUTH] Session saved and signup token cleared');
       } else {
@@ -304,11 +313,42 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<AuthFailure, void>> changePassword({
+    required String oldPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    try {
+      final token = await userLocalDataSource.getCachedToken();
+      if (token == null || token.trim().isEmpty) {
+        return Left(const InvalidTokenFailure());
+      }
+
+      await remoteDataSource.changePassword(
+        authToken: token,
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(_handleException(e));
+    }
+  }
+
+  @override
   Future<Either<AuthFailure, void>> logout() async {
     try {
       final token = await userLocalDataSource.getCachedToken();
-      if (token != null && token.trim().isNotEmpty) {
-        await remoteDataSource.signOut(authToken: token);
+      final refreshToken = await userLocalDataSource.getCachedRefreshToken();
+      if (token != null &&
+          token.trim().isNotEmpty &&
+          refreshToken != null &&
+          refreshToken.trim().isNotEmpty) {
+        await remoteDataSource.signOut(
+          authToken: token,
+          refreshToken: refreshToken,
+        );
       }
       await userLocalDataSource.clearSession();
       return const Right(null);
@@ -337,7 +377,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   AuthFailure _handleException(Object e) {
-    final message = e.toString();
+    final message = e is ApiException ? e.message : e.toString();
 
     if (message.contains('already exists')) {
       return const UserAlreadyExistsFailure();

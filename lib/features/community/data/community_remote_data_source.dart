@@ -71,6 +71,33 @@ enum MemberStatus {
   };
 }
 
+// ─── Community type ───────────────────────────────────────────────────────────
+
+enum CommunityType {
+  neighborhood(0, 'حي', 'قابل للاكتشاف من المستخدمين القريبين', 500),
+  building(1, 'مبنى', 'بكود دعوة فقط', 100),
+  privateGroup(2, 'مجموعة خاصة', 'بدون نطاق جغرافي', null);
+
+  const CommunityType(
+    this.value,
+    this.labelAr,
+    this.descriptionAr,
+    this.defaultRadiusMeters,
+  );
+
+  final int value;
+  final String labelAr;
+  final String descriptionAr;
+  final int? defaultRadiusMeters;
+
+  bool get hasRadius => defaultRadiusMeters != null;
+
+  static CommunityType fromValue(int value) => CommunityType.values.firstWhere(
+        (t) => t.value == value,
+        orElse: () => CommunityType.neighborhood,
+      );
+}
+
 // ─── UserDetailsDto ───────────────────────────────────────────────────────────
 
 class UserDetailsDto {
@@ -135,6 +162,10 @@ class CreateCommunityResponseDto {
   final String? inviteCode;
   final DateTime? inviteCodeExpiresAt;
   final UserDetailsDto userDetails;
+
+  bool get isLocationPending =>
+      userDetails.userLocation == null ||
+      userDetails.memberStatus == MemberStatus.locationPending;
 
   factory CreateCommunityResponseDto.fromJson(Map<String, dynamic> json) =>
       CreateCommunityResponseDto(

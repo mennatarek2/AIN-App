@@ -1,11 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/cached_app_image.dart';
+import '../../../../core/widgets/profile_photo_image.dart';
+import '../../domain/profile_validators.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/profile_state_banner.dart';
 
@@ -19,30 +18,34 @@ class EditProfilePage extends ConsumerStatefulWidget {
 class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _usernameController;
 
   /// Local file path chosen from camera/gallery (for instant preview)
   String? _selectedImagePath;
 
   /// Whether we are currently uploading/saving
   bool _isSaving = false;
+  bool _fieldsInitialized = false;
 
   final _imagePicker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    final profile = ref.read(profileProvider);
-    _nameController = TextEditingController(text: profile?.name ?? '');
-    _phoneController = TextEditingController(text: profile?.phone ?? '');
-    _usernameController = TextEditingController(text: profile?.username ?? '');
+    _nameController = TextEditingController();
+    _phoneController = TextEditingController();
+  }
+
+  void _initializeFieldsFromProfile(UserProfile profile) {
+    if (_fieldsInitialized || _isSaving) return;
+    _nameController.text = profile.name;
+    _phoneController.text = profile.phone;
+    _fieldsInitialized = true;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _usernameController.dispose();
     super.dispose();
   }
 
@@ -53,11 +56,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   /// Show bottom sheet letting user pick camera, gallery, or remove photo
   void _showImagePickerBottomSheet() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final profile = ref.read(profileProvider);
-    final hasCurrentPhoto =
-        _selectedImagePath != null ||
-        (profile?.profilePhotoUrl != null &&
-            profile!.profilePhotoUrl!.isNotEmpty);
 
     showModalBottomSheet<void>(
       context: context,
@@ -83,7 +81,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   ),
                 ),
                 Text(
-                  'تغيير صورة الملف الشخصي',
+                  'صورة الملف الشخصي',
                   textDirection: TextDirection.rtl,
                   style: TextStyle(
                     fontSize: 17,
@@ -110,16 +108,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     _pickImage(ImageSource.gallery);
                   },
                 ),
-                if (hasCurrentPhoto)
-                  _BottomSheetOption(
-                    icon: Icons.delete_outline,
-                    label: 'إزالة الصورة الحالية',
-                    color: Colors.red,
-                    onTap: () {
-                      Navigator.of(ctx).pop();
-                      setState(() => _selectedImagePath = null);
-                    },
-                  ),
                 const SizedBox(height: 8),
               ],
             ),
@@ -146,6 +134,19 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       }
 
       print('[EditProfile] Image selected: ${picked.path}');
+
+      if (!ProfileValidators.isAllowedProfilePhoto(picked.path)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('يُسمح فقط بصور jpg أو jpeg أو png'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       setState(() => _selectedImagePath = picked.path);
     } catch (e) {
       print('[EditProfile] Error picking image: $e');
@@ -167,25 +168,56 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   Future<void> _save() async {
     if (_isSaving) return;
 
+    final profile = ref.read(profileProvider);
+    if (profile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر تحميل بيانات الملف الشخصي'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
-    final username = _usernameController.text.trim();
 
-    print('[EditProfile] Saving profile...');
-    print('[EditProfile] Name: $name');
-    print('[EditProfile] Phone: $phone');
-    print('[EditProfile] Username: $username');
-    print('[EditProfile] Photo path: $_selectedImagePath');
+    final nameError = ProfileValidators.validateDisplayName(name);
+    if (nameError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(nameError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final phoneError = ProfileValidators.validatePhoneNumber(phone);
+    if (phoneError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(phoneError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final nameChanged = name != profile.name;
+    final phoneChanged = phone != profile.phone;
+    final photoChanged =
+        _selectedImagePath != null && _selectedImagePath!.trim().isNotEmpty;
+
+    if (!nameChanged && !phoneChanged && !photoChanged) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لم يتم إجراء أي تغييرات')),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
 
     try {
       await ref.read(profileAsyncProvider.notifier).updateProfileData(
-        displayName: name.isNotEmpty ? name : null,
-        phoneNumber: phone.isNotEmpty ? phone : null,
-        userName: username.isNotEmpty ? username : null,
-        profilePhotoPath: _selectedImagePath,
-      );
+            displayName: nameChanged ? name : null,
+            phoneNumber: phoneChanged ? phone : null,
+            profilePhotoPath: photoChanged ? _selectedImagePath : null,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -198,7 +230,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      print('[EditProfile] Save failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -223,15 +254,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final pageBackground = isDark
         ? const Color(0xFF060C3A)
         : AppColors.backgroundLight;
-    final primaryTextColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
     final secondaryTextColor = isDark
         ? const Color(0xFFF3F6F9)
         : const Color(0x80060C3A);
 
     final profileAsync = ref.watch(profileAsyncProvider);
     final profile = ref.watch(profileProvider);
+    final resolvedPhotoUrl = ref.watch(profilePhotoUrlProvider);
+    if (profile != null) {
+      _initializeFieldsFromProfile(profile);
+    }
     final isLoading = profileAsync.isLoading;
     final errorText = profileAsync.hasError
         ? 'حدث خطأ: ${profileAsync.error}'
@@ -242,7 +274,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     // 2) Then server photo URL
     // 3) Then default avatar
     final String? displayPhotoPath =
-        _selectedImagePath ?? profile?.profilePhotoUrl;
+        _selectedImagePath ?? resolvedPhotoUrl;
 
     return Scaffold(
       backgroundColor: pageBackground,
@@ -266,66 +298,59 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0099FF)),
                 ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
-              // Tappable profile avatar with edit badge
+              // ProfilePhoto — PUT multipart field
               _EditableProfileAvatar(
                 imagePath: displayPhotoPath,
                 onTap: _isSaving ? null : _showImagePickerBottomSheet,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Text(
-                profile?.name ?? 'بلا اسم',
-                style: TextStyle(
-                  fontSize: 40 * 0.525,
-                  fontWeight: FontWeight.w600,
-                  color: primaryTextColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                'اضغط لتغيير الصورة',
                 textDirection: TextDirection.rtl,
-                children: [
-                  Icon(
-                    Icons.circle,
-                    size: 12,
-                    color: profile?.levelDotColor ?? Colors.grey,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    profile?.level ?? 'مستخدم جديد',
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w400,
-                      color: secondaryTextColor,
-                    ),
-                  ),
-                ],
+                style: TextStyle(fontSize: 13, color: secondaryTextColor),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 24),
+
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    _SectionTitle(
+                      title: 'معلومات قابلة للتعديل',
+                      color: secondaryTextColor,
+                    ),
+                    const SizedBox(height: 12),
                     _LabeledField(
-                      label: 'الاسم',
+                      label: 'اسم العرض',
                       controller: _nameController,
-                      enabled: !_isSaving,
+                      enabled: !_isSaving && profile != null,
                     ),
                     const SizedBox(height: 14),
                     _LabeledField(
-                      label: 'رقم الهاتف المحمول',
+                      label: 'رقم الهاتف',
                       controller: _phoneController,
-                      enabled: !_isSaving,
+                      enabled: !_isSaving && profile != null,
                       keyboardType: TextInputType.phone,
                     ),
+                    const SizedBox(height: 24),
+                    _SectionTitle(
+                      title: 'معلومات الحساب (للعرض فقط)',
+                      color: secondaryTextColor,
+                    ),
+                    const SizedBox(height: 12),
+                    _ReadOnlyField(
+                      label: 'البريد الإلكتروني',
+                      value: profile?.email ?? '',
+                    ),
                     const SizedBox(height: 14),
-                    _LabeledField(
+                    _ReadOnlyField(
                       label: 'اسم المستخدم',
-                      controller: _usernameController,
-                      enabled: !_isSaving,
+                      value: profile?.username.trim().isNotEmpty == true
+                          ? '@${profile!.username}'
+                          : '',
                     ),
                     const SizedBox(height: 28),
                     // Save button — disabled while uploading
@@ -344,7 +369,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: TextButton(
-                          onPressed: _isSaving ? null : _save,
+                          onPressed:
+                              (_isSaving || profile == null) ? null : _save,
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFFF3F6F9),
                             shape: RoundedRectangleBorder(
@@ -450,9 +476,6 @@ class _EditableProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasImage = imagePath != null && imagePath!.trim().isNotEmpty;
-
-    print('[_EditableProfileAvatar] imagePath: $imagePath, hasImage: $hasImage');
 
     return GestureDetector(
       onTap: onTap,
@@ -485,7 +508,12 @@ class _EditableProfileAvatar extends StatelessWidget {
               ],
             ),
             clipBehavior: Clip.antiAlias,
-            child: _buildImage(hasImage),
+            child: ProfilePhotoImage(
+              imagePath: imagePath,
+              fit: BoxFit.cover,
+              width: 148,
+              height: 148,
+            ),
           ),
 
           // Semi-transparent edit overlay (shown at bottom of circle)
@@ -512,39 +540,6 @@ class _EditableProfileAvatar extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Widget _buildImage(bool hasImage) {
-    if (!hasImage) {
-      return Image.asset(
-        'assets/images/user_chatbot.png',
-        fit: BoxFit.cover,
-      );
-    }
-
-    final path = imagePath!.trim();
-
-    // Local file path (from camera/gallery picker)
-    final isLocalFile = path.startsWith('/') ||
-        path.startsWith('file://') ||
-        RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(path) ||
-        path.startsWith('/data/') ||
-        path.startsWith('/storage/') ||
-        path.startsWith('/sdcard/');
-
-    if (isLocalFile) {
-      final file = File(path.startsWith('file://')
-          ? Uri.parse(path).toFilePath()
-          : path);
-      if (file.existsSync()) {
-        return Image.file(file, fit: BoxFit.cover);
-      }
-      // File doesn't exist, fall through to default
-      return Image.asset('assets/images/user_chatbot.png', fit: BoxFit.cover);
-    }
-
-    // Network URL
-    return CachedAppImage(imagePath: path, fit: BoxFit.cover);
   }
 }
 
@@ -582,6 +577,92 @@ class _BottomSheetOption extends StatelessWidget {
         ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.color});
+
+  final String title;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.right,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
+    );
+  }
+}
+
+class _ReadOnlyField extends StatelessWidget {
+  const _ReadOnlyField({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark
+        ? const Color(0xFFF3F6F9)
+        : const Color(0xFF596186);
+    final fieldBorderColor = isDark
+        ? const Color(0xFFF3F6F9)
+        : const Color(0xF2060C3A);
+    final fieldBackground =
+        isDark ? const Color(0xFF121A5C) : const Color(0xFFF1F5F9);
+    final valueColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 4, bottom: 6),
+          child: Text(
+            label,
+            textDirection: TextDirection.rtl,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: labelColor,
+            ),
+          ),
+        ),
+        Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: fieldBackground,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: fieldBorderColor, width: 1),
+          ),
+          child: Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              Expanded(
+                child: Text(
+                  value.isEmpty ? '—' : value,
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 16, color: valueColor),
+                ),
+              ),
+              Icon(Icons.lock_outline, size: 16, color: valueColor),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

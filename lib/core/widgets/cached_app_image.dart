@@ -13,6 +13,7 @@ class CachedAppImage extends StatelessWidget {
     this.height,
     this.placeholder,
     this.errorWidget,
+    this.headers,
   });
 
   final String imagePath;
@@ -21,6 +22,82 @@ class CachedAppImage extends StatelessWidget {
   final double? height;
   final Widget? placeholder;
   final Widget? errorWidget;
+  final Map<String, String>? headers;
+
+  /// Headers for loading images from the API (auth + ngrok).
+  static Map<String, String> apiImageHeaders({String? token}) {
+    final result = <String, String>{
+      'Accept': 'image/*',
+      'ngrok-skip-browser-warning': 'true',
+    };
+    if (token != null && token.trim().isNotEmpty) {
+      result['Authorization'] = 'Bearer ${token.trim()}';
+    }
+    return result;
+  }
+
+  static bool isNetworkPath(String path) {
+    final trimmed = path.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return true;
+    }
+    if (trimmed.startsWith('assets/') || trimmed.startsWith('file://')) {
+      return false;
+    }
+    if (trimmed.startsWith('/')) {
+      return !isLocalDevicePath(trimmed);
+    }
+    return trimmed.isNotEmpty;
+  }
+
+  static bool isLocalDevicePath(String path) {
+    final lower = path.toLowerCase();
+    return lower.startsWith('file://') ||
+        lower.startsWith('/data/') ||
+        lower.startsWith('/storage/') ||
+        lower.startsWith('/sdcard/') ||
+        lower.startsWith('/mnt/') ||
+        lower.startsWith('/var/') ||
+        lower.startsWith('/private/') ||
+        RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(path);
+  }
+
+  static String resolveNetworkUrl(String path) {
+    final trimmed = path.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return normalizeApiHost(trimmed);
+    }
+
+    final baseUrl = ApiConfig.baseUrl.endsWith('/')
+        ? ApiConfig.baseUrl.substring(0, ApiConfig.baseUrl.length - 1)
+        : ApiConfig.baseUrl;
+    final encodedPath = _encodePathSegments(trimmed);
+    return normalizeApiHost('$baseUrl$encodedPath');
+  }
+
+  /// Rewrites localhost/loopback hosts to the configured API base URL.
+  static String normalizeApiHost(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty) return url;
+
+    final host = uri.host.toLowerCase();
+    if (host != 'localhost' &&
+        host != '127.0.0.1' &&
+        host != '10.0.2.2') {
+      return url;
+    }
+
+    final base = Uri.tryParse(ApiConfig.baseUrl);
+    if (base == null || base.host.isEmpty) return url;
+
+    return uri
+        .replace(
+          scheme: base.scheme,
+          host: base.host,
+          port: base.hasPort ? base.port : null,
+        )
+        .toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,8 +110,8 @@ class CachedAppImage extends StatelessWidget {
     }
 
     // Handle network URLs (http, https)
-    if (_isNetworkUrl(trimmedPath)) {
-      final resolvedUrl = _resolveNetworkUrl(trimmedPath);
+    if (isNetworkPath(trimmedPath)) {
+      final resolvedUrl = resolveNetworkUrl(trimmedPath);
       print('CachedAppImage: Network URL - "$trimmedPath" → "$resolvedUrl"');
 
       // Don't try to load if resolved URL is still empty
@@ -48,6 +125,7 @@ class CachedAppImage extends StatelessWidget {
         fit: fit,
         width: width,
         height: height,
+        headers: headers ?? apiImageHeaders(),
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) {
             return child;
@@ -63,7 +141,7 @@ class CachedAppImage extends StatelessWidget {
     }
 
     // Handle local files
-    if (_looksLikeLocalFile(trimmedPath)) {
+    if (isLocalDevicePath(trimmedPath)) {
       final normalized = trimmedPath.startsWith('file://')
           ? Uri.parse(trimmedPath).toFilePath()
           : trimmedPath;
@@ -101,57 +179,7 @@ class CachedAppImage extends StatelessWidget {
     );
   }
 
-  bool _isNetworkUrl(String path) {
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return true;
-    }
-
-    if (path.startsWith('assets/')) {
-      return false;
-    }
-
-    if (path.startsWith('file://')) {
-      return false;
-    }
-
-    if (path.startsWith('/')) {
-      return !_looksLikeLocalFile(path);
-    }
-
-    return true;
-  }
-
-  bool _looksLikeLocalFile(String path) {
-    final lower = path.toLowerCase();
-    return lower.startsWith('file://') ||
-        lower.startsWith('/data/') ||
-        lower.startsWith('/storage/') ||
-        lower.startsWith('/sdcard/') ||
-        lower.startsWith('/mnt/') ||
-        lower.startsWith('/var/') ||
-        lower.startsWith('/private/') ||
-        RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(path);
-  }
-
-  String _resolveNetworkUrl(String path) {
-    // Already absolute URL
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
-
-    // Get base URL and remove trailing slash if present
-    final baseUrl = ApiConfig.baseUrl.endsWith('/')
-        ? ApiConfig.baseUrl.substring(0, ApiConfig.baseUrl.length - 1)
-        : ApiConfig.baseUrl;
-
-    // Encode the relative path
-    final encodedPath = _encodePathSegments(path);
-
-    // Combine base URL with encoded path
-    return '$baseUrl$encodedPath';
-  }
-
-  String _encodePathSegments(String path) {
+  static String _encodePathSegments(String path) {
     if (path.isEmpty) return '';
 
     final trimmed = path.trim();

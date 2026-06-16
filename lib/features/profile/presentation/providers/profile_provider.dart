@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/connectivity_service.dart';
 import '../../../../core/network/api_providers.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/widgets/cached_app_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/state/auth_state_simple.dart';
 import '../../data/data_sources/profile_local_data_source.dart';
@@ -126,6 +127,7 @@ class UserProfile {
     required this.email,
     required this.phone,
     required this.username,
+    this.ssn = '',
     required this.isVerified,
     required this.points,
     this.badge = 'Newcomer',
@@ -139,6 +141,7 @@ class UserProfile {
       email: model.email,
       phone: model.phoneNumber,
       username: model.userName,
+      ssn: model.ssn,
       isVerified: model.isVerified,
       points: model.trustPoints,
       badge: model.badge,
@@ -151,6 +154,7 @@ class UserProfile {
   final String email;
   final String phone;
   final String username;
+  final String ssn;
   final bool isVerified;
   final int points;
   /// Badge from API: 'Newcomer' | 'Contributor' | 'Trusted' | 'Guardian'
@@ -188,6 +192,7 @@ class UserProfile {
     String? email,
     String? phone,
     String? username,
+    String? ssn,
     bool? isVerified,
     int? points,
     String? badge,
@@ -200,6 +205,7 @@ class UserProfile {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       username: username ?? this.username,
+      ssn: ssn ?? this.ssn,
       isVerified: isVerified ?? this.isVerified,
       points: points ?? this.points,
       badge: badge ?? this.badge,
@@ -320,23 +326,13 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
     }
   }
 
-  /// Update username
-  ///
-  /// Updates local state immediately, then syncs to API
+  /// Update username locally only (read-only from API).
   Future<void> updateUsername(String username) async {
     final current = state.value;
     if (current == null) return;
 
-    print('[ProfileNotifier] Updating username to: $username');
+    print('[ProfileNotifier] Username is read-only from API');
     state = AsyncValue.data(current.copyWith(username: username));
-
-    try {
-      await _updateProfileUseCase(userName: username);
-    } catch (e) {
-      print('[ProfileNotifier] Error updating username: $e');
-      // Revert on failure
-      state = AsyncValue.data(current);
-    }
   }
 
   /// Update profile photo
@@ -380,7 +376,6 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
   Future<void> updateProfileData({
     String? displayName,
     String? phoneNumber,
-    String? userName,
     String? profilePhotoPath,
   }) async {
     final current = state.value;
@@ -394,8 +389,6 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
       current.copyWith(
         name: displayName ?? current.name,
         phone: phoneNumber ?? current.phone,
-        username: userName ?? current.username,
-        // Show local preview if photo is being updated
         profilePhotoUrl: profilePhotoPath ?? current.profilePhotoUrl,
       ),
     );
@@ -404,7 +397,6 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
       await _updateProfileUseCase(
         displayName: displayName,
         phoneNumber: phoneNumber,
-        userName: userName,
         profilePhotoPath: profilePhotoPath,
       );
 
@@ -510,6 +502,15 @@ final profileAsyncProvider =
 
       return notifier;
     });
+
+/// Best available profile photo URL (profile API, then auth session).
+final profilePhotoUrlProvider = Provider<String?>((ref) {
+  final profile = ref.watch(profileProvider);
+  final authUser = ref.watch(currentUserProvider);
+  final raw = profile?.profilePhotoUrl ?? authUser?.profileImageUrl;
+  if (raw == null || raw.trim().isEmpty) return null;
+  return CachedAppImage.resolveNetworkUrl(raw.trim());
+});
 
 /// Simple profile provider (synchronous)
 ///

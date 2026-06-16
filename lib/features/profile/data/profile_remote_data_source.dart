@@ -5,8 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/widgets/cached_app_image.dart';
 import '../../../core/network/api_exception.dart';
 import 'profile_exceptions.dart';
+import '../domain/update_profile_response.dart';
 import '../domain/profile_model.dart';
 
 /// API model for profile data from server
@@ -18,6 +20,7 @@ class ProfileApiModel extends ProfileModel {
     required super.email,
     required super.phoneNumber,
     required super.userName,
+    super.ssn = '',
     super.isVerified = false,
     super.trustPoints = 0,
     super.badge = 'Newcomer',
@@ -65,6 +68,7 @@ class ProfileApiModel extends ProfileModel {
       phoneNumber: json['phoneNumber']?.toString() ?? '',
       userName:
           json['userName']?.toString() ?? json['username']?.toString() ?? '',
+      ssn: json['ssn']?.toString() ?? '',
       isVerified: json['isVerified'] == true,
       trustPoints: trustPoints,
       badge: badge,
@@ -102,17 +106,7 @@ class ProfileApiModel extends ProfileModel {
 
     final trimmed = url.trim();
 
-    // Already an absolute URL — return as-is
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
-    }
-
-    // Relative path — prepend the API base URL
-    final base = ApiConfig.baseUrl.endsWith('/')
-        ? ApiConfig.baseUrl.substring(0, ApiConfig.baseUrl.length - 1)
-        : ApiConfig.baseUrl;
-    final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
-    return '$base$path';
+    return CachedAppImage.resolveNetworkUrl(trimmed);
   }
 }
 
@@ -171,25 +165,12 @@ class ProfileRemoteDataSource {
     }
   }
 
-  /// Update user profile with multipart form data
+  /// Update user profile with multipart form data.
   ///
-  /// Supports:
-  /// - displayName update
-  /// - phoneNumber update
-  /// - userName update
-  /// - profilePhoto upload (image file)
-  ///
-  /// Parameters:
-  /// - [displayName]: New display name (optional)
-  /// - [phoneNumber]: New phone number (optional)
-  /// - [userName]: New username (optional)
-  /// - [profilePhotoPath]: Local file path to profile image (optional, jpg/png)
-  ///
-  /// Throws [ProfileException] if API call fails
-  Future<void> updateProfile({
+  /// Form fields: DisplayName, PhoneNumber, ProfilePhoto
+  Future<UpdateProfileResponse> updateProfile({
     String? displayName,
     String? phoneNumber,
-    String? userName,
     String? profilePhotoPath,
   }) async {
     try {
@@ -224,7 +205,7 @@ class ProfileRemoteDataSource {
 
       print('[Profile] PUT ${ApiConfig.baseUrl}${ApiEndpoints.updateProfile}');
 
-      // PUT returns AuthResult { isSuccess, user: { displayName, email, token, refreshToken } }
+      // PUT returns { isSuccess, errors }
       final response = await _client.putMultipart(
         ApiEndpoints.updateProfile,
         token: token,
@@ -232,15 +213,30 @@ class ProfileRemoteDataSource {
         filePaths: filePaths,
       );
 
-      // Save new JWT so subsequent requests use updated claims
+      final result = _parseUpdateResponse(response);
+      if (!result.isSuccess) {
+        throw ProfileException(result.errorMessage, 400);
+      }
+
       await _saveNewToken(response);
       print('[Profile] Profile updated successfully');
+      return result;
     } on ApiException catch (e) {
       throw ProfileException('Failed to update profile: $e', e.statusCode);
     } catch (e) {
       if (e is ProfileException) rethrow;
       throw ProfileException('Failed to update profile: $e');
     }
+  }
+
+  UpdateProfileResponse _parseUpdateResponse(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      return UpdateProfileResponse.fromJson(response);
+    }
+    if (response is Map) {
+      return UpdateProfileResponse.fromJson(Map<String, dynamic>.from(response));
+    }
+    return const UpdateProfileResponse(isSuccess: true);
   }
 
   /// Extract and persist the new JWT returned by PUT /api/profile/update-profile.

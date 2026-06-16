@@ -182,7 +182,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<void> updateProfile({
     String? displayName,
     String? phoneNumber,
-    String? userName,
     String? profilePhotoPath,
   }) async {
     print('[ProfileRepo] Starting profile update');
@@ -196,7 +195,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
         await remoteDataSource.updateProfile(
           displayName: displayName,
           phoneNumber: phoneNumber,
-          userName: userName,
           profilePhotoPath: profilePhotoPath,
         );
 
@@ -211,9 +209,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
               phoneNumber: phoneNumber?.trim().isNotEmpty == true
                   ? phoneNumber!.trim()
                   : cached.phoneNumber,
-              userName: userName?.trim().isNotEmpty == true
-                  ? userName!.trim()
-                  : cached.userName,
             ),
           );
           print('[ProfileRepo] Profile updated and cached successfully');

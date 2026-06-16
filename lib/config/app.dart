@@ -28,6 +28,7 @@ import '../features/my_reports/presentation/pages/my_reports_page.dart';
 import '../features/notifications/presentation/pages/notifications_page.dart';
 import '../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../features/profile/presentation/pages/profile_page.dart';
+import '../features/profile/presentation/pages/edit_password_page.dart';
 import '../features/reports/presentation/pages/report_detail_page.dart';
 import '../features/reports/presentation/providers/report_sync_provider.dart';
 import '../features/sos/presentation/pages/sos_page.dart';
@@ -118,6 +119,7 @@ class _AppState extends ConsumerState<App> {
         AppRoutes.community: (_) => const CommunityPage(),
         AppRoutes.notifications: (_) => const NotificationsPage(),
         AppRoutes.profile: (_) => const ProfilePage(),
+        AppRoutes.changePassword: (_) => const EditPasswordPage(),
         AppRoutes.sos: (_) => const SosPage(),
       },
       // Routes that require arguments cannot use the static routes table.

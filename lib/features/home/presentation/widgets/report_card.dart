@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/cached_app_image.dart';
 
-class ReportCard extends StatelessWidget {
+class ReportCard extends StatefulWidget {
   final String username;
+  final String? reporterAvatarUrl;
   final String timeAgo;
   final String title;
   final String description;
   final String imageUrl;
+  final List<String> imageUrls;
   final List<ReportTag> tags;
   final int commentCount;
   final int attachmentCount;
+  final String? locationPreview;
+  final String? locationMapUrl;
   final VoidCallback? onTap;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
@@ -19,18 +25,57 @@ class ReportCard extends StatelessWidget {
   const ReportCard({
     super.key,
     required this.username,
+    this.reporterAvatarUrl,
     required this.timeAgo,
     required this.title,
     this.description = '',
     required this.imageUrl,
+    this.imageUrls = const [],
     required this.tags,
     this.commentCount = 0,
     this.attachmentCount = 0,
+    this.locationPreview,
+    this.locationMapUrl,
     this.onTap,
     this.onLike,
     this.onComment,
     this.onShare,
   });
+
+  @override
+  State<ReportCard> createState() => _ReportCardState();
+}
+
+class _ReportCardState extends State<ReportCard> {
+  late final PageController _pageController;
+  int _currentImageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  List<String> get _displayImages {
+    if (widget.imageUrls.isNotEmpty) return widget.imageUrls;
+    if (widget.imageUrl.trim().isNotEmpty) return [widget.imageUrl];
+    return const [];
+  }
+
+  Future<void> _openInMaps() async {
+    final url = widget.locationMapUrl?.trim();
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,9 +90,13 @@ class ReportCard extends StatelessWidget {
     final dividerColor = isDark
         ? const Color(0xFF32417B)
         : const Color(0xFFE5E7EB);
+    final images = _displayImages;
+    final hasReporterPhoto =
+        widget.reporterAvatarUrl != null &&
+        widget.reporterAvatarUrl!.trim().isNotEmpty;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -86,15 +135,26 @@ class ReportCard extends StatelessWidget {
                             width: 1.5,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.person,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: hasReporterPhoto
+                            ? CachedAppImage(
+                                imagePath: widget.reporterAvatarUrl!,
+                                fit: BoxFit.cover,
+                                errorWidget: const Icon(
+                                  Icons.person,
+                                  size: 16,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.person,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        username,
+                        widget.username,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -112,7 +172,7 @@ class ReportCard extends StatelessWidget {
                     Icon(Icons.access_time, size: 13, color: secondaryText),
                     const SizedBox(width: 4),
                     Text(
-                      timeAgo,
+                      widget.timeAgo,
                       style: TextStyle(fontSize: 13, color: secondaryText),
                     ),
                   ],
@@ -123,7 +183,7 @@ class ReportCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Text(
-              title,
+              widget.title,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -135,11 +195,11 @@ class ReportCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           // Description (if provided)
-          if (description.trim().isNotEmpty)
+          if (widget.description.trim().isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: Text(
-                description,
+                widget.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textDirection: TextDirection.rtl,
@@ -150,45 +210,72 @@ class ReportCard extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Builder(
-                  builder: (context) {
-                    return CachedAppImage(
-                      imagePath: imageUrl,
-                      fit: BoxFit.cover,
-                      errorWidget: Container(
-                        color: isDark
-                            ? const Color(0xFF1A255C)
-                            : Colors.grey[300],
-                        child: Center(
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : Colors.grey,
-                            size: 36,
-                          ),
+          if (images.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: images.length == 1
+                      ? CachedAppImage(
+                          imagePath: images.first,
+                          fit: BoxFit.cover,
+                          errorWidget: _imageError(isDark),
+                        )
+                      : Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            PageView.builder(
+                              controller: _pageController,
+                              itemCount: images.length,
+                              onPageChanged: (index) {
+                                setState(() => _currentImageIndex = index);
+                              },
+                              itemBuilder: (context, index) {
+                                return CachedAppImage(
+                                  imagePath: images[index],
+                                  fit: BoxFit.cover,
+                                  errorWidget: _imageError(isDark),
+                                );
+                              },
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(
+                                  images.length,
+                                  (index) => Container(
+                                    width: 6,
+                                    height: 6,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: index == _currentImageIndex
+                                          ? Colors.white
+                                          : Colors.white.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    );
-                  },
                 ),
               ),
             ),
-          ),
+          ],
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
               textDirection: TextDirection.rtl,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: tags
+              children: widget.tags
                   .map(
                     (tag) => Expanded(
                       child: Padding(
@@ -200,8 +287,44 @@ class ReportCard extends StatelessWidget {
                   .toList(),
             ),
           ),
+          if (widget.locationPreview != null &&
+              widget.locationPreview!.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.locationPreview!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(fontSize: 12, color: secondaryText),
+                    ),
+                  ),
+                  if (widget.locationMapUrl != null &&
+                      widget.locationMapUrl!.trim().isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: _openInMaps,
+                      icon: const Icon(Icons.map_outlined, size: 16),
+                      label: const Text('فتح في الخرائط'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           // Attachment count chip
-          if (attachmentCount > 0)
+          if (widget.attachmentCount > 0)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: Row(
@@ -214,7 +337,7 @@ class ReportCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '$attachmentCount مرفق',
+                    '${widget.attachmentCount} مرفق',
                     style: TextStyle(
                       fontSize: 11,
                       color: secondaryText,
@@ -238,21 +361,23 @@ class ReportCard extends StatelessWidget {
                   child: _ActionButton(
                     icon: Icons.favorite_border,
                     label: 'إعجاب',
-                    onTap: onLike,
+                    onTap: widget.onLike,
                   ),
                 ),
                 Expanded(
                   child: _ActionButton(
                     icon: Icons.chat_bubble_outline,
-                    label: commentCount > 0 ? 'تعليق ($commentCount)' : 'تعليق',
-                    onTap: onComment,
+                    label: widget.commentCount > 0
+                        ? 'تعليق (${widget.commentCount})'
+                        : 'تعليق',
+                    onTap: widget.onComment,
                   ),
                 ),
                 Expanded(
                   child: _ActionButton(
                     icon: Icons.share_outlined,
                     label: 'مشاركة',
-                    onTap: onShare,
+                    onTap: widget.onShare,
                   ),
                 ),
               ],
@@ -263,6 +388,19 @@ class ReportCard extends StatelessWidget {
       ),
     ),
   );
+  }
+
+  Widget _imageError(bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF1A255C) : Colors.grey[300],
+      child: Center(
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          color: isDark ? AppColors.textSecondaryDark : Colors.grey,
+          size: 36,
+        ),
+      ),
+    );
   }
 }
 

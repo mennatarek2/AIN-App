@@ -28,12 +28,10 @@ class UpdateProfileUseCase {
   Future<void> call({
     String? displayName,
     String? phoneNumber,
-    String? userName,
     String? profilePhotoPath,
   }) => _repository.updateProfile(
     displayName: displayName,
     phoneNumber: phoneNumber,
-    userName: userName,
     profilePhotoPath: profilePhotoPath,
   );
 }

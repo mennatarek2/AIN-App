@@ -7,6 +7,7 @@ class ProfileModel {
     required this.email,
     required this.phoneNumber,
     required this.userName,
+    this.ssn = '',
     this.isVerified = false,
     this.trustPoints = 0,
     this.badge = 'Newcomer',
@@ -18,6 +19,7 @@ class ProfileModel {
   final String email;
   final String phoneNumber;
   final String userName;
+  final String ssn;
   final bool isVerified;
   /// Raw trust points from API (trustPoints field)
   final int trustPoints;
@@ -59,6 +61,7 @@ class ProfileModel {
     String? email,
     String? phoneNumber,
     String? userName,
+    String? ssn,
     bool? isVerified,
     int? trustPoints,
     String? badge,
@@ -71,6 +74,7 @@ class ProfileModel {
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       userName: userName ?? this.userName,
+      ssn: ssn ?? this.ssn,
       isVerified: isVerified ?? this.isVerified,
       trustPoints: trustPoints ?? this.trustPoints,
       badge: badge ?? this.badge,
@@ -89,6 +93,7 @@ class ProfileModel {
           email == other.email &&
           phoneNumber == other.phoneNumber &&
           userName == other.userName &&
+          ssn == other.ssn &&
           isVerified == other.isVerified &&
           trustPoints == other.trustPoints &&
           badge == other.badge &&
@@ -101,6 +106,7 @@ class ProfileModel {
       email.hashCode ^
       phoneNumber.hashCode ^
       userName.hashCode ^
+      ssn.hashCode ^
       isVerified.hashCode ^
       trustPoints.hashCode ^
       badge.hashCode ^

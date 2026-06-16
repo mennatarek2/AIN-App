@@ -339,46 +339,53 @@ class _HomePageState extends ConsumerState<HomePage> {
   // Report card
   // ---------------------------------------------------------------------------
   Widget _buildReportCard(ReportModel report) {
-    // Build tags: category → status → location
     final tags = <ReportTag>[
-      ReportTag(
-        label: report.categoryName ?? report.subCategoryName ?? 'بلاغ',
-        dotColor: Colors.grey,
-        showDot: false,
-      ),
+      if (report.categoryName != null && report.categoryName!.isNotEmpty)
+        ReportTag(
+          label: report.categoryName!,
+          dotColor: AppColors.primary,
+          showDot: false,
+        ),
+      if (report.subCategoryName != null &&
+          report.subCategoryName!.isNotEmpty)
+        ReportTag(
+          label: report.subCategoryName!,
+          dotColor: const Color(0xFF6366F1),
+          showDot: false,
+        ),
       ReportTag(
         label: report.statusLabel,
         dotColor: report.statusColor,
       ),
-      if (report.locationAddress != null &&
-          report.locationAddress!.isNotEmpty)
-        ReportTag(
-          label: report.locationAddress!.length > 25
-              ? '${report.locationAddress!.substring(0, 25)}...'
-              : report.locationAddress!,
-          dotColor: Colors.red,
-          showPin: true,
-        ),
     ];
 
+    final vis = report.visibility?.toLowerCase();
+    final reporterName = report.reporter?.name ?? report.createdByName;
     final username = () {
-      final vis = report.visibility?.toLowerCase();
       if (vis == 'anonymous') return 'مجهول';
-      if (report.createdByName != null &&
-          report.createdByName!.trim().isNotEmpty) {
-        return report.createdByName!;
+      if (reporterName != null && reporterName.trim().isNotEmpty) {
+        return reporterName.trim();
       }
-      return 'مستخدم';
+      return '';
     }();
+
+    final imageUrls = report.imageUrls;
+    final primaryImage = imageUrls.isNotEmpty
+        ? imageUrls.first
+        : report.imagePath;
 
     return ReportCard(
       username: username,
-      timeAgo: report.submittedAgo.isNotEmpty ? report.submittedAgo : 'الآن',
+      reporterAvatarUrl: report.reporter?.resolvedPhotoUrl,
+      timeAgo: report.submittedAgo,
       title: report.title,
       description: report.description,
-      imageUrl: report.imagePath,
+      imageUrl: primaryImage,
+      imageUrls: imageUrls,
       tags: tags,
       attachmentCount: report.attachments.length,
+      locationPreview: report.displayLocation,
+      locationMapUrl: report.mapsUrl,
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(

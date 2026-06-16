@@ -13,7 +13,6 @@ abstract class ProfileRepository {
   Future<void> updateProfile({
     String? displayName,
     String? phoneNumber,
-    String? userName,
     String? profilePhotoPath,
   });
 

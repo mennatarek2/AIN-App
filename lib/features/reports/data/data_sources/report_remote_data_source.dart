@@ -93,7 +93,7 @@ class ReportRemoteDataSource {
     String? search,
   }) async {
     final query = <String, dynamic>{
-      'page': pageNumber,
+      'pageNumber': pageNumber,
       'pageSize': pageSize,
     };
     if (categoryId != null && categoryId.isNotEmpty) {

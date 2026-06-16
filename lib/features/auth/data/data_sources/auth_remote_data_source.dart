@@ -3,11 +3,12 @@ import '../../../../core/network/api_endpoints.dart';
 import '../models/user_model.dart';
 
 class AuthSession {
-  const AuthSession({this.user, this.authToken, this.signupToken});
+  const AuthSession({this.user, this.authToken, this.signupToken, this.refreshToken});
 
   final UserModel? user;
   final String? authToken;
   final String? signupToken;
+  final String? refreshToken;
 }
 
 class AuthRemoteDataSource {
@@ -101,8 +102,29 @@ class AuthRemoteDataSource {
     return _parseSession(response);
   }
 
-  Future<void> signOut({required String authToken}) async {
-    await _client.postJson(ApiEndpoints.signOut, token: authToken);
+  Future<void> signOut({required String authToken, required String refreshToken}) async {
+    await _client.postJson(
+      ApiEndpoints.signOut,
+      token: authToken,
+      body: {'refreshToken': refreshToken},
+    );
+  }
+
+  Future<void> changePassword({
+    required String authToken,
+    required String oldPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    await _client.postJson(
+      ApiEndpoints.changePassword,
+      token: authToken,
+      body: {
+        'oldPassword': oldPassword,
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      },
+    );
   }
 
   AuthSession _parseSession(dynamic payload) {
@@ -110,6 +132,10 @@ class AuthRemoteDataSource {
       'token',
       'authToken',
       'accessToken',
+    ]);
+    final refreshToken = _findToken(payload, [
+      'refreshToken',
+      'refresh_token',
     ]);
     final signupToken = _findToken(payload, [
       'signupToken',
@@ -119,6 +145,7 @@ class AuthRemoteDataSource {
 
     return AuthSession(
       authToken: authToken,
+      refreshToken: refreshToken,
       signupToken: signupToken,
       user: userMap == null ? null : UserModel.fromApiJson(userMap),
     );

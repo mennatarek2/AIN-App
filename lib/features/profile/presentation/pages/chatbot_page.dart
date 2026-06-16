@@ -30,21 +30,15 @@ class _ChatbotPageState extends State<ChatbotPage> {
     final pageBackground = isDark
         ? const Color(0xFF060C3A)
         : AppColors.backgroundLight;
-    final assistantBubbleColor = isDark
-        ? const Color(0xFFCDE6F8)
-        : const Color(0xFFC6DEEF);
-    final assistantTextColor = isDark
-        ? const Color(0xFF060C3A)
-        : AppColors.textPrimaryLight;
-    final userBubbleColor = isDark
-        ? const Color(0xFF0099FF)
-        : AppColors.primary;
     final inputBackground = isDark
         ? const Color(0xFF121A5C)
         : AppColors.primarySoft;
     final inputTextColor = isDark
         ? const Color(0xFFF3F6F9)
         : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
     return Scaffold(
       backgroundColor: pageBackground,
@@ -56,39 +50,45 @@ class _ChatbotPageState extends State<ChatbotPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  const Spacer(flex: 4),
-                  _AssistantMessage(
-                    bubbleColor: assistantBubbleColor,
-                    textColor: assistantTextColor,
-                    text:
-                        'أهلاً بك، أنا هنا لمساعدتك في الإبلاغ\nآمناً. كيف يمكنني مساعدتك ؟',
+                  const Spacer(flex: 2),
+                  Icon(
+                    Icons.smart_toy_outlined,
+                    size: 64,
+                    color: secondaryTextColor.withValues(alpha: 0.6),
                   ),
-                  const SizedBox(height: 22),
-                  _UserMessage(
-                    text: 'كيفية تقديم بلّغ ؟',
-                    bubbleColor: userBubbleColor,
+                  const SizedBox(height: 16),
+                  Text(
+                    'المساعد الذكي غير متاح حالياً',
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: inputTextColor,
+                    ),
                   ),
-                  const SizedBox(height: 18),
-                  _AssistantMessage(
-                    large: true,
-                    bubbleColor: assistantBubbleColor,
-                    textColor: assistantTextColor,
-                    text:
-                        'لتقديم البلاغ اتبع الخطوات التالية:\nاضغط على زر إضافة بلاغ من الصفحة الرئيسية.\nاختر نوع البلاغ ثم فئة البلاغ المناسبة.\nأدخل عنوان البلاغ ثم اكتب وصف البلاغ.\nارفع صورة توضح البلاغ.\nحدد موقع البلاغ على الخريطة.\nاضغط على إرسال البلاغ.',
+                  const SizedBox(height: 8),
+                  Text(
+                    'سيتم تفعيل هذه الميزة عند توفر واجهة برمجة التطبيقات',
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: secondaryTextColor,
+                      height: 1.5,
+                    ),
                   ),
-                  const SizedBox(height: 22),
+                  const Spacer(flex: 3),
                   Row(
                     textDirection: TextDirection.ltr,
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          _messageController.clear();
-                        },
+                        onTap: null,
                         child: Container(
                           width: 48,
                           height: 48,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.4),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -108,12 +108,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
                           ),
                           child: TextField(
                             controller: _messageController,
+                            enabled: false,
                             textDirection: TextDirection.rtl,
                             textAlign: TextAlign.right,
                             style: TextStyle(
                               fontSize: 36 * 0.525,
                               fontWeight: FontWeight.w400,
-                              color: inputTextColor,
+                              color: inputTextColor.withValues(alpha: 0.5),
                             ),
                             decoration: InputDecoration(
                               hintText: 'مراسلة...',
@@ -121,10 +122,10 @@ class _ChatbotPageState extends State<ChatbotPage> {
                               hintStyle: TextStyle(
                                 fontSize: 36 * 0.525,
                                 fontWeight: FontWeight.w400,
-                                color: inputTextColor.withValues(alpha: 0.8),
+                                color: inputTextColor.withValues(alpha: 0.4),
                               ),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 22,
                                 vertical: 10,
                               ),
@@ -187,117 +188,6 @@ class _ChatbotHeader extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _AssistantMessage extends StatelessWidget {
-  const _AssistantMessage({
-    required this.text,
-    required this.bubbleColor,
-    required this.textColor,
-    this.large = false,
-  });
-
-  final String text;
-  final Color bubbleColor;
-  final Color textColor;
-  final bool large;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Flexible(
-          child: Container(
-            constraints: BoxConstraints(maxWidth: large ? 335 : 275),
-            padding: EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: large ? 16 : 11,
-            ),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(6),
-                topRight: const Radius.circular(20),
-                bottomLeft: const Radius.circular(20),
-                bottomRight: Radius.circular(large ? 30 : 22),
-              ),
-            ),
-            child: Text(
-              text,
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                height: large ? 1.65 : 1.45,
-                fontSize: 36 * 0.525,
-                fontWeight: FontWeight.w400,
-                color: textColor,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-
-        Image.asset(
-          'assets/images/assestant_chatbot.png',
-          width: 44,
-          height: 44,
-          fit: BoxFit.cover,
-        ),
-      ],
-    );
-  }
-}
-
-class _UserMessage extends StatelessWidget {
-  const _UserMessage({required this.text, required this.bubbleColor});
-
-  final String text;
-  final Color bubbleColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Image.asset(
-          'assets/images/user_chatbot.png',
-          width: 44,
-          height: 44,
-          fit: BoxFit.cover,
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 220),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(6),
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20),
-              ),
-            ),
-
-            child: Text(
-              text,
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 36 * 0.525,
-                fontWeight: FontWeight.w400,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

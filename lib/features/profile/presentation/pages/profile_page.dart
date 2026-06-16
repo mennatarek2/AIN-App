@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/cached_app_image.dart';
+import '../../../../core/widgets/profile_photo_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../community/presentation/pages/community_page.dart';
 import '../providers/profile_provider.dart';
 import 'edit_profile_page.dart';
+import 'points_page.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -19,16 +19,14 @@ class ProfilePage extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final trustAsync = ref.watch(myTrustProvider);
 
-    // Derive trust info: prefer API trust endpoint, fall back to profile badge
+    // Derive trust info from profile API response
     final trust = trustAsync.valueOrNull;
-    final pts = trust?.trustPoints ?? profile?.points ?? 0;
-    // Use API badge from profile (server-computed) as primary source
-    final badge = trust?.badge
-        ?? TrustBadge.fromString(profile?.badge)
-        ?? TrustBadge.fromPoints(pts);
+    final pts = profile?.points ?? trust?.trustPoints ?? 0;
+    final badge = trust?.badge ?? TrustBadge.fromString(profile?.badge);
     final totalReports = trust?.totalReports ?? 0;
     final resolvedReports = trust?.resolvedReports ?? 0;
     final pendingReports = trust?.pendingReports ?? 0;
+    final photoUrl = ref.watch(profilePhotoUrlProvider);
 
     final bg = isDark ? const Color(0xFF060C3A) : const Color(0xFFF5F7FA);
     final cardBg = isDark ? const Color(0xFF0D1445) : Colors.white;
@@ -86,6 +84,7 @@ class ProfilePage extends ConsumerWidget {
               flexibleSpace: FlexibleSpaceBar(
                 background: _ProfileHero(
                   profile: userProfile,
+                  photoUrl: photoUrl,
                   badge: badge,
                   isDark: isDark,
                 ),
@@ -105,6 +104,9 @@ class ProfilePage extends ConsumerWidget {
                       cardBorder: cardBorder,
                       textPrimary: textPrimary,
                       textSecondary: textSecondary,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PointsPage()),
+                      ),
                     ),
 
                     const SizedBox(height: 14),
@@ -142,22 +144,14 @@ class ProfilePage extends ConsumerWidget {
                         _SettingsTileData(
                           icon: Icons.lock_outline_rounded,
                           label: 'تغيير كلمة المرور',
-                          onTap: () =>
-                              Navigator.of(context).pushNamed('/change-password'),
+                          onTap: () => Navigator.of(context)
+                              .pushNamed(AppRoutes.changePassword),
                         ),
                         _SettingsTileData(
                           icon: Icons.assignment_outlined,
                           label: 'بلاغاتي',
                           onTap: () =>
                               Navigator.of(context).pushNamed(AppRoutes.myReports),
-                        ),
-                        _SettingsTileData(
-                          icon: Icons.group_outlined,
-                          label: 'مجتمعاتي',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                                builder: (_) => const CommunityPage()),
-                          ),
                         ),
                       ],
                     ),
@@ -282,19 +276,18 @@ class ProfilePage extends ConsumerWidget {
 class _ProfileHero extends StatelessWidget {
   const _ProfileHero({
     required this.profile,
+    required this.photoUrl,
     required this.badge,
     required this.isDark,
   });
 
   final dynamic profile;
+  final String? photoUrl;
   final TrustBadge badge;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = profile?.profilePhotoUrl != null &&
-        (profile.profilePhotoUrl as String).isNotEmpty;
-
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -326,26 +319,36 @@ class _ProfileHero extends StatelessWidget {
                 ],
               ),
               clipBehavior: Clip.antiAlias,
-              child: hasImage
-                  ? CachedAppImage(
-                      imagePath: profile.profilePhotoUrl as String,
-                      fit: BoxFit.cover,
-                    )
-                  : Image.asset('assets/images/user_chatbot.png',
-                      fit: BoxFit.cover),
+              child: ProfilePhotoImage(
+                imagePath: photoUrl,
+                fit: BoxFit.cover,
+                width: 90,
+                height: 90,
+              ),
             ),
 
             const SizedBox(height: 10),
 
             // Name
             Text(
-              profile?.name ?? 'بلا اسم',
+              profile?.name ?? '',
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
             ),
+
+            if (profile?.username.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 4),
+              Text(
+                '@${profile!.username}',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 4),
 
@@ -406,6 +409,7 @@ class _TrustProgressCard extends StatelessWidget {
     required this.cardBorder,
     required this.textPrimary,
     required this.textSecondary,
+    this.onTap,
   });
 
   final int pts;
@@ -414,6 +418,7 @@ class _TrustProgressCard extends StatelessWidget {
   final Color cardBorder;
   final Color textPrimary;
   final Color textSecondary;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +426,12 @@ class _TrustProgressCard extends StatelessWidget {
     final toNext = badge.pointsToNext(pts);
     final isMax = badge == TrustBadge.guardian;
 
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
@@ -496,6 +506,8 @@ class _TrustProgressCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

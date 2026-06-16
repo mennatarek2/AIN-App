@@ -7,6 +7,7 @@ abstract final class ApiEndpoints {
   static const String uploadIdCard = '/api/Account/upload-idCard';
   static const String uploadProfilePhoto = '/api/Account/upload-profile-photo';
   static const String signOut = '/api/Account/signOut';
+  static const String changePassword = '/api/Account/change-password';
 
   static const String reports = '/api/Reports';
   static const String reportsPublic = '/api/Reports/public';

@@ -17,6 +17,7 @@ abstract final class AppRoutes {
   static const String map = '/map';
   static const String sos = '/sos';
   static const String profile = '/profile';
+  static const String changePassword = '/change-password';
   static const String myReports = '/my-reports';
   static const String community = '/community';
   static const String notifications = '/notifications';

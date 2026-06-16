@@ -56,6 +56,7 @@ class ProfileLocalDataSource {
       'email': profile.email,
       'phoneNumber': profile.phoneNumber,
       'userName': profile.userName,
+      'ssn': profile.ssn,
       'isVerified': profile.isVerified,
       'trustPoints': profile.trustPoints,
       'badge': profile.badge,
@@ -70,6 +71,7 @@ class ProfileLocalDataSource {
       email: json['email'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',
       userName: json['userName'] as String? ?? '',
+      ssn: json['ssn'] as String? ?? '',
       isVerified: json['isVerified'] as bool? ?? false,
       // Support both old cache key 'points' and new 'trustPoints'
       trustPoints: (json['trustPoints'] ?? json['points']) as int? ?? 0,

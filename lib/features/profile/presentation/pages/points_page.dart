@@ -21,6 +21,12 @@ class PointsPage extends ConsumerWidget {
         ? const Color(0xFF060C3A)
         : AppColors.textPrimaryLight;
 
+    final pts = profile?.points ?? 0;
+    final badge = TrustBadge.fromString(profile?.badge);
+    final progress = badge.progressFor(pts);
+    final toNext = badge.pointsToNext(pts);
+    final isMax = badge == TrustBadge.guardian;
+
     return Scaffold(
       backgroundColor: pageBackground,
       body: SafeArea(
@@ -73,11 +79,11 @@ class PointsPage extends ConsumerWidget {
                         Icon(
                           Icons.circle,
                           size: 12,
-                          color: profile?.levelDotColor ?? Colors.grey,
+                          color: profile?.levelDotColor ?? badge.color,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          profile?.level ?? 'مستخدم جديد',
+                          badge.label,
                           textDirection: TextDirection.rtl,
                           style: TextStyle(
                             fontSize: 17,
@@ -89,7 +95,9 @@ class PointsPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'متبقي ${profile?.pointsToNextLevel ?? 100} نقطة لتصل مستوى ${profile?.level ?? 'مستخدم جديد'} !\nاستمر في المشاركة',
+                      isMax
+                          ? '🏆 أعلى مستوى — حارس\nاستمر في المشاركة'
+                          : 'متبقي $toNext نقطة للمستوى التالي!\nاستمر في المشاركة',
                       textDirection: TextDirection.rtl,
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -104,13 +112,11 @@ class PointsPage extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(100),
                       child: LinearProgressIndicator(
                         minHeight: 16,
-                        value: ((profile?.points ?? 0) % 100) / 100,
+                        value: progress,
                         backgroundColor: isDark
                             ? const Color(0xFFD9D9D9)
                             : const Color(0xFFE0E2E6),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF0F9DFA),
-                        ),
+                        valueColor: AlwaysStoppedAnimation<Color>(badge.color),
                       ),
                     ),
                   ],
@@ -138,27 +144,27 @@ class PointsPage extends ConsumerWidget {
                 child: Column(
                   children: [
                     _LevelItem(
-                      label: 'مستخدم جديد',
-                      dotColor: const Color(0xFF697184),
-                      achieved: (profile?.points ?? 0) >= 0,
+                      label: TrustBadge.newcomer.label,
+                      dotColor: TrustBadge.newcomer.color,
+                      achieved: pts >= 0,
                     ),
                     const SizedBox(height: 10),
                     _LevelItem(
-                      label: 'مساهم',
-                      dotColor: const Color(0xFF498EF4),
-                      achieved: (profile?.points ?? 0) >= 100,
+                      label: TrustBadge.contributor.label,
+                      dotColor: TrustBadge.contributor.color,
+                      achieved: pts >= 20,
                     ),
                     const SizedBox(height: 10),
                     _LevelItem(
-                      label: 'موثق',
-                      dotColor: const Color(0xFF14B57A),
-                      achieved: (profile?.points ?? 0) >= 200,
+                      label: TrustBadge.trusted.label,
+                      dotColor: TrustBadge.trusted.color,
+                      achieved: pts >= 50,
                     ),
                     const SizedBox(height: 10),
                     _LevelItem(
-                      label: 'متميز',
-                      dotColor: const Color(0xFFF59E0B),
-                      achieved: (profile?.points ?? 0) >= 300,
+                      label: TrustBadge.guardian.label,
+                      dotColor: TrustBadge.guardian.color,
+                      achieved: pts >= 100,
                     ),
                     const SizedBox(height: 24),
                   ],

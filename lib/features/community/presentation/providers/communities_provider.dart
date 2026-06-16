@@ -166,6 +166,11 @@ class CommunitiesNotifier extends StateNotifier<CommunitiesState> {
         communityType: communityType,
         coverageRadiusMeters: coverageRadiusMeters,
       );
+      final showBanner = result.isLocationPending;
+      state = state.copyWith(
+        showLocationBanner: showBanner,
+        locationBannerCommunityId: showBanner ? result.id : null,
+      );
       await _loadFromApi();
       return result;
     } catch (e) {
@@ -192,6 +197,13 @@ class CommunitiesNotifier extends StateNotifier<CommunitiesState> {
       state = state.copyWith(isJoining: false, error: e.toString());
       return null;
     }
+  }
+
+  void showLocationPendingBanner({required String communityId}) {
+    state = state.copyWith(
+      showLocationBanner: true,
+      locationBannerCommunityId: communityId,
+    );
   }
 
   void dismissLocationBanner() {

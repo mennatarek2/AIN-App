@@ -1,7 +1,10 @@
+import 'package:ain_graduation_project/core/formatters/time_ago_formatter.dart';
 import 'package:ain_graduation_project/core/network/api_config.dart';
 import 'package:flutter/material.dart';
 
 import 'attachment_model.dart';
+import 'location_model.dart';
+import 'reporter_model.dart';
 
 class ReportModel {
   const ReportModel({
@@ -28,6 +31,12 @@ class ReportModel {
     this.authorityName,
     this.createdByName,
     this.createdById,
+    this.status = '',
+    this.createdAt,
+    this.locationName,
+    this.locationMapUrl,
+    this.reporter,
+    this.location,
   }) : _legacyImagePath = imagePath;
 
   final String id;
@@ -71,6 +80,47 @@ class ReportModel {
   /// The reporter's user ID — used for owner-check (`createdById == currentUserId`).
   final String? createdById;
 
+  /// Raw status from API (e.g. "UnderReview").
+  final String status;
+
+  /// Report creation timestamp from API.
+  final DateTime? createdAt;
+
+  /// Human-readable location name from API.
+  final String? locationName;
+
+  /// Google Maps URL from API.
+  final String? locationMapUrl;
+
+  /// Nested reporter object from API.
+  final ReporterModel? reporter;
+
+  /// Nested location object from API.
+  final LocationModel? location;
+
+  /// Best display label for the report location.
+  String? get displayLocation =>
+      (locationName?.trim().isNotEmpty == true
+          ? locationName
+          : locationAddress)?.trim();
+
+  /// Resolved Google Maps URL for opening the report location.
+  String? get mapsUrl {
+    final mapUrl = locationMapUrl?.trim();
+    if (mapUrl != null && mapUrl.isNotEmpty) return mapUrl;
+    if (latitude != 0 || longitude != 0) {
+      return 'https://maps.google.com/?q=$latitude,$longitude';
+    }
+    return null;
+  }
+
+  /// Image attachment URLs for carousel display.
+  List<String> get imageUrls => attachments
+      .where((a) => a.isImage)
+      .map((a) => a.fullUrl)
+      .where((url) => url.isNotEmpty)
+      .toList();
+
   ReportModel copyWith({
     String? id,
     String? title,
@@ -95,6 +145,12 @@ class ReportModel {
     String? authorityName,
     String? createdByName,
     String? createdById,
+    String? status,
+    DateTime? createdAt,
+    String? locationName,
+    String? locationMapUrl,
+    ReporterModel? reporter,
+    LocationModel? location,
   }) {
     return ReportModel(
       id: id ?? this.id,
@@ -120,6 +176,12 @@ class ReportModel {
       authorityName: authorityName ?? this.authorityName,
       createdByName: createdByName ?? this.createdByName,
       createdById: createdById ?? this.createdById,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      locationName: locationName ?? this.locationName,
+      locationMapUrl: locationMapUrl ?? this.locationMapUrl,
+      reporter: reporter ?? this.reporter,
+      location: location ?? this.location,
     );
   }
 
@@ -148,6 +210,12 @@ class ReportModel {
       'authorityName': authorityName,
       'createdByName': createdByName,
       'createdById': createdById,
+      'status': status,
+      'createdAt': createdAt?.toIso8601String(),
+      'locationName': locationName,
+      'locationMapUrl': locationMapUrl,
+      'reporter': reporter?.toJson(),
+      'location': location?.toJson(),
     };
   }
 
@@ -190,6 +258,20 @@ class ReportModel {
       authorityName: json['authorityName']?.toString(),
       createdByName: json['createdByName']?.toString(),
       createdById: json['createdById']?.toString(),
+      status: json['status']?.toString() ?? '',
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
+      locationName: json['locationName']?.toString(),
+      locationMapUrl: json['locationMapUrl']?.toString(),
+      reporter: json['reporter'] is Map
+          ? ReporterModel.fromJson(
+              Map<String, dynamic>.from(json['reporter'] as Map),
+            )
+          : null,
+      location: json['location'] is Map
+          ? LocationModel.fromJson(
+              Map<String, dynamic>.from(json['location'] as Map),
+            )
+          : null,
     );
   }
 
@@ -197,6 +279,11 @@ class ReportModel {
     final status = json['status']?.toString() ?? '';
     final statusLabel = _statusLabel(status, json['statusLabel']?.toString());
     final statusColor = _statusColor(statusLabel);
+
+    final createdAt = DateTime.tryParse(json['createdAt']?.toString() ?? '');
+    final submittedAgo = json['submittedAgo']?.toString().trim().isNotEmpty == true
+        ? json['submittedAgo']!.toString()
+        : TimeAgoFormatter.format(createdAt);
 
     // Parse attachments array from backend response
     final rawAttachments = json['attachments'];
@@ -226,18 +313,19 @@ class ReportModel {
 
     // Parse location — handle both nested object and flat fields
     final locationData = json['location'];
+    LocationModel? location;
     double latitude;
     double longitude;
     String? locationAddress;
 
     if (locationData is Map) {
-      latitude =
-          double.tryParse(locationData['latitude']?.toString() ?? '') ?? 0;
-      longitude =
-          double.tryParse(locationData['longitude']?.toString() ?? '') ?? 0;
+      final locationMap = Map<String, dynamic>.from(locationData);
+      location = LocationModel.fromApiJson(locationMap);
+      latitude = location.latitude;
+      longitude = location.longitude;
       locationAddress =
-          locationData['address']?.toString() ??
-          locationData['locationAddress']?.toString() ??
+          locationMap['address']?.toString() ??
+          locationMap['locationAddress']?.toString() ??
           json['locationAddress']?.toString() ??
           json['address']?.toString();
     } else {
@@ -245,6 +333,22 @@ class ReportModel {
       longitude = double.tryParse(json['longitude']?.toString() ?? '') ?? 0;
       locationAddress =
           json['locationAddress']?.toString() ?? json['address']?.toString();
+    }
+
+    final locationName = json['locationName']?.toString();
+    final locationMapUrl = json['locationMapUrl']?.toString();
+
+    if (locationAddress == null || locationAddress.trim().isEmpty) {
+      locationAddress = locationName;
+    }
+
+    // Parse reporter object
+    ReporterModel? reporter;
+    final reporterData = json['reporter'];
+    if (reporterData is Map) {
+      reporter = ReporterModel.fromApiJson(
+        Map<String, dynamic>.from(reporterData),
+      );
     }
 
     // Parse subcategory name from either string or nested object
@@ -265,7 +369,7 @@ class ReportModel {
       id: json['id']?.toString() ?? json['reportId']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      submittedAgo: json['submittedAgo']?.toString() ?? '',
+      submittedAgo: submittedAgo,
       fullDescription:
           json['fullDescription']?.toString() ??
           json['description']?.toString() ??
@@ -294,11 +398,19 @@ class ReportModel {
               : null),
       visibility: json['visibility']?.toString(),
       authorityName: json['authorityName']?.toString(),
-      createdByName: json['createdByName']?.toString(),
+      createdByName:
+          reporter?.name ??
+          json['createdByName']?.toString(),
       createdById:
           json['createdById']?.toString() ??
           json['reporterId']?.toString() ??
           json['userId']?.toString(),
+      status: status,
+      createdAt: createdAt,
+      locationName: locationName,
+      locationMapUrl: locationMapUrl,
+      reporter: reporter,
+      location: location,
     );
   }
 

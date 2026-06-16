@@ -9,16 +9,9 @@ import '../pages/fullscreen_photo_page.dart';
 enum _AttachmentType { image, video, file }
 
 _AttachmentType _typeOf(AttachmentModel a) {
+  if (a.isImage) return _AttachmentType.image;
+
   final lower = a.fileName.toLowerCase();
-  if (lower.endsWith('.jpg') ||
-      lower.endsWith('.jpeg') ||
-      lower.endsWith('.png') ||
-      lower.endsWith('.webp') ||
-      lower.endsWith('.gif') ||
-      lower.endsWith('.bmp') ||
-      lower.endsWith('.heic')) {
-    return _AttachmentType.image;
-  }
   if (lower.endsWith('.mp4') ||
       lower.endsWith('.mov') ||
       lower.endsWith('.avi') ||

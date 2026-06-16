@@ -12,6 +12,8 @@ class AttachmentModel {
     required this.fileName,
     required this.filePath,
     this.fileSize = '',
+    this.contentType = '',
+    this.aiValidated = false,
   });
 
   /// Unique identifier for the attachment (GUID from backend).
@@ -25,6 +27,26 @@ class AttachmentModel {
 
   /// File size as a string (e.g. "1024").
   final String fileSize;
+
+  /// MIME type (e.g. "image/jpeg").
+  final String contentType;
+
+  /// Whether the attachment passed AI validation on the server.
+  final bool aiValidated;
+
+  bool get isImage {
+    final type = contentType.toLowerCase();
+    if (type.startsWith('image/')) return true;
+
+    final lower = fileName.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.bmp') ||
+        lower.endsWith('.heic');
+  }
 
   /// Returns the fully resolved URL for displaying the attachment.
   ///
@@ -53,6 +75,8 @@ class AttachmentModel {
       fileName: json['fileName']?.toString() ?? '',
       filePath: json['filePath']?.toString() ?? '',
       fileSize: json['fileSize']?.toString() ?? '',
+      contentType: json['contentType']?.toString() ?? '',
+      aiValidated: json['aiValidated'] == true,
     );
   }
 
@@ -63,6 +87,8 @@ class AttachmentModel {
       fileName: json['fileName']?.toString() ?? '',
       filePath: json['filePath']?.toString() ?? '',
       fileSize: json['fileSize']?.toString() ?? '',
+      contentType: json['contentType']?.toString() ?? '',
+      aiValidated: json['aiValidated'] == true,
     );
   }
 
@@ -73,6 +99,8 @@ class AttachmentModel {
       'fileName': fileName,
       'filePath': filePath,
       'fileSize': fileSize,
+      'contentType': contentType,
+      'aiValidated': aiValidated,
     };
   }
 
@@ -81,12 +109,16 @@ class AttachmentModel {
     String? fileName,
     String? filePath,
     String? fileSize,
+    String? contentType,
+    bool? aiValidated,
   }) {
     return AttachmentModel(
       id: id ?? this.id,
       fileName: fileName ?? this.fileName,
       filePath: filePath ?? this.filePath,
       fileSize: fileSize ?? this.fileSize,
+      contentType: contentType ?? this.contentType,
+      aiValidated: aiValidated ?? this.aiValidated,
     );
   }
 

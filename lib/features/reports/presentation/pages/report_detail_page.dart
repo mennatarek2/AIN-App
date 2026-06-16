@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../config/routes/app_routes.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/cached_app_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../home/presentation/providers/home_feed_provider.dart';
 import '../../../my_reports/presentation/providers/my_reports_provider.dart';
@@ -575,11 +577,11 @@ class _ReporterSection extends StatelessWidget {
     }
 
     final isMasked = report.createdByName == 'مجهول الهوية';
+    final reporterName = report.reporter?.name ?? report.createdByName;
     final displayName = isMasked
         ? 'مجهول الهوية'
-        : (report.createdByName?.isNotEmpty == true
-            ? report.createdByName!
-            : 'مستخدم');
+        : (reporterName?.trim().isNotEmpty == true ? reporterName!.trim() : '');
+    final photoUrl = report.reporter?.resolvedPhotoUrl;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -589,14 +591,15 @@ class _ReporterSection extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                displayName,
-                textDirection: TextDirection.rtl,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              if (displayName.isNotEmpty)
+                Text(
+                  displayName,
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
               const Text(
                 'المُبلِّغ',
                 style: TextStyle(fontSize: 11, color: Colors.grey),
@@ -611,6 +614,19 @@ class _ReporterSection extends StatelessWidget {
                 ? const Icon(
                     Icons.person_off_outlined,
                     color: AppColors.primary,
+                  )
+                : photoUrl != null && photoUrl.isNotEmpty
+                ? ClipOval(
+                    child: CachedAppImage(
+                      imagePath: photoUrl,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorWidget: const Icon(
+                        Icons.person_outline,
+                        color: AppColors.primary,
+                      ),
+                    ),
                   )
                 : const Icon(Icons.person_outline, color: AppColors.primary),
           ),
@@ -674,19 +690,37 @@ class _MapSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           const _SectionLabel(label: 'الموقع'),
-          if (report.locationAddress != null &&
-              report.locationAddress!.isNotEmpty)
+          if (report.displayLocation != null &&
+              report.displayLocation!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Text(
-                    report.locationAddress!,
-                    textDirection: TextDirection.rtl,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey,
+                  if (report.mapsUrl != null && report.mapsUrl!.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse(report.mapsUrl!);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.map_outlined, size: 16),
+                      label: const Text('فتح في Google Maps'),
+                    ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      report.displayLocation!,
+                      textDirection: TextDirection.rtl,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),

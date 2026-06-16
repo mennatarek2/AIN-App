@@ -20,7 +20,6 @@ class _NoopProfileRepository implements ProfileRepository {
   Future<void> updateProfile({
     String? displayName,
     String? phoneNumber,
-    String? userName,
     String? profilePhotoPath,
   }) async {}
 
@@ -43,7 +42,6 @@ class _NoopUpdateProfileUseCase implements UpdateProfileUseCase {
   Future<void> call({
     String? displayName,
     String? phoneNumber,
-    String? userName,
     String? profilePhotoPath,
   }) async {}
 }
