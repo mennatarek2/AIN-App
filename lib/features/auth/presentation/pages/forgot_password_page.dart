@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
 import '../notifiers/password_reset_notifier.dart';
 import '../state/form_state_simple.dart' as auth_form;
 import 'email_verification_page.dart';
@@ -57,7 +61,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.failure.message),
-            backgroundColor: Colors.red,
+            backgroundColor: context.semantic.error,
           ),
         );
         Future.microtask(
@@ -72,54 +76,73 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 70),
-                Center(
-                  child: Image.asset(
-                    'assets/images/forgetpassword.png',
-                    height: 270,
-                    width: 270,
-                    fit: BoxFit.contain,
+                _buildHero(context),
+                Transform.translate(
+                  offset: const Offset(0, -AppSpacing.xxxl),
+                  child: AppFormCard(
+                    title: 'نسيت كلمة المرور',
+                    subtitle:
+                        'أدخل بريدك الإلكتروني وسنرسل لك رمز التحقق لإعادة التعيين',
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _emailController,
+                            enabled: !isLoading,
+                            keyboardType: TextInputType.emailAddress,
+                            textAlign: TextAlign.right,
+                            textDirection: TextDirection.rtl,
+                            style: context.text.bodyLarge,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'هذا الحقل مطلوب';
+                              }
+                              if (!value.contains('@')) {
+                                return 'البريد الإلكتروني غير صحيح';
+                              }
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'البريد الإلكتروني',
+                              prefixIcon: Icon(
+                                Icons.email_outlined,
+                                color: context.colors.primary,
+                                size: 22,
+                              ),
+                              filled: true,
+                              fillColor: context.semantic.surfaceInput,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _buildPrimaryButton(
+                            label: 'استمرار',
+                            isLoading: isLoading,
+                            onPressed: isLoading ? null : _handleSubmit,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextButton(
+                            onPressed: () => Navigator.of(context)
+                                .pushReplacementNamed(AppRoutes.login),
+                            child: Text(
+                              'العودة لتسجيل الدخول',
+                              style: TextStyle(
+                                color: context.colors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 40),
-                Text(
-                  'نسيت كلمة المرور',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.onBackground,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'الرجاء إدخال البريد الإلكتروني الخاص بك لإعادة تعيين كلمة المرور',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 18,
-                    height: 1.6,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                Form(
-                  key: _formKey,
-                  child: _EmailField(
-                    controller: _emailController,
-                    enabled: !isLoading,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                _PrimaryButton(
-                  label: 'استمرار',
-                  isLoading: isLoading,
-                  onPressed: isLoading ? null : _handleSubmit,
-                ),
-                const SizedBox(height: 40),
+                const SizedBox(height: AppSpacing.xxl),
+                const AppTrustIndicators(),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
           ),
@@ -127,117 +150,103 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
       ),
     );
   }
-}
 
-class _EmailField extends StatelessWidget {
-  const _EmailField({required this.controller, required this.enabled});
-
-  final TextEditingController controller;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return TextFormField(
-      controller: controller,
-      enabled: enabled,
-      keyboardType: TextInputType.emailAddress,
-      textAlign: TextAlign.right,
-      style: TextStyle(color: colorScheme.onBackground),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'هذا الحقل مطلوب';
-        }
-        if (!value.contains('@')) {
-          return 'البريد الإلكتروني غير صحيح';
-        }
-        return null;
-      },
-      decoration: InputDecoration(
-        hintText: 'البريد الإلكتروني',
-        hintStyle: TextStyle(color: colorScheme.outline, fontSize: 18),
-        filled: true,
-        fillColor: colorScheme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
+  Widget _buildHero(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xxl,
+        AppSpacing.xl,
+        AppSpacing.huge + AppSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        gradient: context.headerGradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AppRadius.xxl),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: context.semantic.textOnPrimary.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+            child: Icon(
+              Icons.lock_reset_rounded,
+              size: 36,
+              color: context.semantic.textOnPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'استعادة الحساب',
+            style: context.text.headlineMedium?.copyWith(
+              color: context.semantic.textOnPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'لا تقلق، سنساعدك على استعادة الوصول',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({
-    required this.label,
-    required this.onPressed,
-    required this.isLoading,
-  });
-
-  final String label;
-  final VoidCallback? onPressed;
-  final bool isLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 49, vertical: 90),
-      child: SizedBox(
-        height: 56,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [colorScheme.secondary, colorScheme.primary],
+  Widget _buildPrimaryButton({
+    required String label,
+    required VoidCallback? onPressed,
+    required bool isLoading,
+  }) {
+    return SizedBox(
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          gradient: context.primaryGradient,
+          boxShadow: [
+            BoxShadow(
+              color: context.colors.primary.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onPressed,
-              child: Center(
-                child: isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                        ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            onTap: onPressed,
+            child: Center(
+              child: isLoading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: context.semantic.textOnPrimary,
+                        strokeWidth: 2.5,
                       ),
-              ),
+                    )
+                  : Text(
+                      label,
+                      style: context.text.titleMedium?.copyWith(
+                        color: context.semantic.textOnPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ),

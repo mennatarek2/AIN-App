@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/widgets/cached_app_image.dart';
 import '../../../location/presentation/widgets/map_screen.dart';
 import '../../../reports/domain/attachment_model.dart';
@@ -13,9 +15,11 @@ class ReportInfoPage extends StatefulWidget {
     required this.submittedAgo,
     required this.description,
     required this.reportType,
+
     /// All attachments (images/videos) for this report.
     /// Falls back to [legacyImagePath] if empty.
     this.attachments = const [],
+
     /// Legacy single image path for backward compat with local/unsynced reports.
     this.legacyImagePath = '',
     required this.progressIndex,
@@ -57,21 +61,12 @@ class _ReportInfoPageState extends State<ReportInfoPage> {
     return [];
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final background = Theme.of(context).scaffoldBackgroundColor;
-    final primaryText = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final secondaryText = isDark
-        ? AppColors.textSecondaryDark
-        : AppColors.textSecondaryLight;
     final images = _imageUrls;
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -84,7 +79,10 @@ class _ReportInfoPageState extends State<ReportInfoPage> {
                   children: [
                     Positioned.fill(
                       child: MapScreen(
-                        initialTarget: LatLng(widget.latitude, widget.longitude),
+                        initialTarget: LatLng(
+                          widget.latitude,
+                          widget.longitude,
+                        ),
                         initialZoom: 15,
                         markers: {
                           Marker(
@@ -108,7 +106,7 @@ class _ReportInfoPageState extends State<ReportInfoPage> {
                           padding: const EdgeInsets.all(4),
                           child: Icon(
                             Icons.arrow_forward_ios,
-                            color: primaryText,
+                            color: context.colors.onSurface,
                             size: 24,
                           ),
                         ),
@@ -130,20 +128,17 @@ class _ReportInfoPageState extends State<ReportInfoPage> {
                             widget.title,
                             textDirection: TextDirection.rtl,
                             textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 19,
+                            style: context.text.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: primaryText,
+                              color: context.colors.onSurface,
                             ),
                           ),
                         ),
                         Text(
                           widget.submittedAgo,
                           textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            color: secondaryText,
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.semantic.textMuted,
                           ),
                         ),
                       ],
@@ -159,15 +154,14 @@ class _ReportInfoPageState extends State<ReportInfoPage> {
                   imageUrls: images,
                   currentIndex: _currentImageIndex,
                   onPageChanged: (i) => setState(() => _currentImageIndex = i),
-                  isDark: isDark,
                 )
               else
                 Container(
                   height: 148,
-                  color: isDark ? const Color(0xFF1A255C) : Colors.grey[300],
+                  color: context.semantic.chipBackground,
                   child: Icon(
                     Icons.image_not_supported,
-                    color: isDark ? AppColors.textPrimaryDark : Colors.grey,
+                    color: context.semantic.textMuted,
                   ),
                 ),
               Container(
@@ -215,14 +209,6 @@ class _ProgressTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final lineColor = isDark
-        ? AppColors.textPrimaryDark
-        : const Color(0xFF2A356D);
-    final labelColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-
     return Column(
       children: [
         Row(
@@ -231,11 +217,16 @@ class _ProgressTimeline extends StatelessWidget {
             for (var i = 0; i < _statusLabels.length; i++) ...[
               _StepDot(isDone: i <= currentStep),
               if (i < _statusLabels.length - 1)
-                Expanded(child: Container(height: 1, color: lineColor)),
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    color: context.semantic.borderStrong,
+                  ),
+                ),
             ],
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         Row(
           textDirection: TextDirection.rtl,
           children: [
@@ -247,10 +238,8 @@ class _ProgressTimeline extends StatelessWidget {
                   textDirection: TextDirection.rtl,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: labelColor,
+                  style: context.text.labelSmall?.copyWith(
+                    color: context.colors.onSurface,
                   ),
                 ),
               ),
@@ -266,13 +255,11 @@ class _AttachmentGallery extends StatelessWidget {
     required this.imageUrls,
     required this.currentIndex,
     required this.onPageChanged,
-    required this.isDark,
   });
 
   final List<String> imageUrls;
   final int currentIndex;
   final ValueChanged<int> onPageChanged;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -288,12 +275,10 @@ class _AttachmentGallery extends StatelessWidget {
                 imagePath: imageUrls[index],
                 fit: BoxFit.cover,
                 errorWidget: Container(
-                  color: isDark
-                      ? const Color(0xFF1A255C)
-                      : Colors.grey[300],
+                  color: context.semantic.chipBackground,
                   child: Icon(
                     Icons.image_not_supported,
-                    color: isDark ? AppColors.textPrimaryDark : Colors.grey,
+                    color: context.semantic.textMuted,
                   ),
                 ),
               );
@@ -301,7 +286,7 @@ class _AttachmentGallery extends StatelessWidget {
           ),
           if (imageUrls.length > 1)
             Positioned(
-              bottom: 8,
+              bottom: AppSpacing.xs,
               left: 0,
               right: 0,
               child: Row(
@@ -315,8 +300,10 @@ class _AttachmentGallery extends StatelessWidget {
                     height: 6,
                     decoration: BoxDecoration(
                       color: i == currentIndex
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.5),
+                          ? context.semantic.textOnPrimary
+                          : context.semantic.textOnPrimary.withValues(
+                              alpha: 0.5,
+                            ),
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -336,20 +323,12 @@ class _StepDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final strokeColor = isDark
-        ? AppColors.textPrimaryDark
-        : const Color(0xFF2A356D);
-    final fillColor = isDark
-        ? AppColors.textPrimaryDark
-        : const Color(0xFF0A1B62);
-
     return Container(
       width: 24,
       height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: strokeColor, width: 1),
+        border: Border.all(color: context.semantic.borderStrong),
       ),
       alignment: Alignment.center,
       child: Container(
@@ -357,7 +336,7 @@ class _StepDot extends StatelessWidget {
         height: 10,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isDone ? fillColor : Colors.transparent,
+          color: isDone ? context.colors.primary : Colors.transparent,
         ),
       ),
     );
@@ -377,14 +356,6 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final labelColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final valueColor = isDark
-        ? AppColors.textSecondaryDark
-        : const Color(0x66060C3A);
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       textDirection: TextDirection.rtl,
@@ -392,13 +363,11 @@ class _InfoRow extends StatelessWidget {
         Text(
           '$label :',
           textDirection: TextDirection.rtl,
-          style: TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w400,
-            color: labelColor,
+          style: context.text.titleSmall?.copyWith(
+            color: context.colors.onSurface,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
             value,
@@ -406,10 +375,8 @@ class _InfoRow extends StatelessWidget {
             textAlign: TextAlign.right,
             maxLines: valueMaxLines,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w400,
-              color: valueColor,
+            style: context.text.bodyLarge?.copyWith(
+              color: context.semantic.textMuted,
               height: 1.25,
             ),
           ),

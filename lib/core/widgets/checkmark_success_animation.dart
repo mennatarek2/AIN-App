@@ -2,17 +2,19 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../theme/theme_extensions.dart';
+
 class CheckmarkSuccessAnimation extends StatefulWidget {
   const CheckmarkSuccessAnimation({
     super.key,
     this.size = 140,
-    this.circleColor = const Color(0xFF13ABED),
-    this.checkColor = const Color(0xFF13ABED),
+    this.circleColor,
+    this.checkColor,
   });
 
   final double size;
-  final Color circleColor;
-  final Color checkColor;
+  final Color? circleColor;
+  final Color? checkColor;
 
   @override
   State<CheckmarkSuccessAnimation> createState() =>
@@ -54,6 +56,10 @@ class _CheckmarkSuccessAnimationState extends State<CheckmarkSuccessAnimation>
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.colors.primary;
+    final circleColor = widget.circleColor ?? accent;
+    final checkColor = widget.checkColor ?? context.semantic.success;
+
     return SizedBox(
       width: widget.size,
       height: widget.size,
@@ -64,8 +70,8 @@ class _CheckmarkSuccessAnimationState extends State<CheckmarkSuccessAnimation>
             painter: _CheckmarkPainter(
               circleProgress: _circleProgress.value,
               checkProgress: _checkProgress.value,
-              circleColor: widget.circleColor,
-              checkColor: widget.checkColor,
+              circleColor: circleColor,
+              checkColor: checkColor,
             ),
           );
         },

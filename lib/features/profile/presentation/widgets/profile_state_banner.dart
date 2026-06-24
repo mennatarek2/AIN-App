@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+
 class ProfileStateBanner extends StatelessWidget {
   const ProfileStateBanner({
     super.key,
@@ -16,31 +20,38 @@ class ProfileStateBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     if (errorText != null && errorText!.trim().isNotEmpty) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          0,
+        ),
         child: Container(
           key: const ValueKey('profile_state_error_banner'),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF1F1),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFFFCACA)),
+            color: context.semantic.errorContainer,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(color: context.semantic.error.withValues(alpha: 0.3)),
           ),
           child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline,
-                color: Color(0xFFC62828),
+                color: context.semantic.error,
                 size: 18,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
                   errorText!,
                   textDirection: TextDirection.rtl,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF7F1D1D),
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.semantic.error,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -48,7 +59,10 @@ class ProfileStateBanner extends StatelessWidget {
               if (onRetry != null)
                 TextButton(
                   onPressed: onRetry,
-                  child: const Text('إعادة المحاولة'),
+                  child: Text(
+                    'إعادة المحاولة',
+                    style: TextStyle(color: context.colors.primary),
+                  ),
                 ),
             ],
           ),
@@ -58,31 +72,43 @@ class ProfileStateBanner extends StatelessWidget {
 
     if (isLoading) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          0,
+        ),
         child: Container(
           key: const ValueKey('profile_state_loading_banner'),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
           decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
+            color: context.semantic.infoContainer,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: context.semantic.info.withValues(alpha: 0.3),
+            ),
           ),
           child: Row(
             textDirection: TextDirection.rtl,
-            children: const [
+            children: [
               SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: context.colors.primary,
+                ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   'جاري تحديث بيانات الملف الشخصي...',
                   textDirection: TextDirection.rtl,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF1E3A8A),
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.semantic.info,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

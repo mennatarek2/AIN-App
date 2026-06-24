@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../providers/sos_badge_provider.dart';
 
 class BottomNavBar extends ConsumerWidget {
@@ -22,36 +24,31 @@ class BottomNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sosBadge = ref.watch(sosBadgeCountProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final navBg = isDark ? const Color(0xFF0D1230) : Colors.white;
-    final unselected =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final selected = AppColors.primary;
+    final semantic = context.semantic;
+    final unselected = context.semantic.textMuted;
+    final selected = context.colors.primary;
 
     return Container(
-      height: 72,
+      height: 76,
       decoration: BoxDecoration(
-        color: navBg,
+        color: semantic.surfaceNavBar,
         border: Border(
           top: BorderSide(
-            color: isDark
-                ? const Color(0xFF1E2D6B).withValues(alpha: 0.6)
-                : const Color(0xFFE5E7EB),
+            color: semantic.borderSubtle.withValues(alpha: 0.6),
             width: 1,
           ),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
+            color: semantic.shadow,
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // Tab 0 — Home
           _NavItem(
             icon: Icons.home_outlined,
             activeIcon: Icons.home_rounded,
@@ -61,7 +58,6 @@ class BottomNavBar extends ConsumerWidget {
             unselectedColor: unselected,
             onTap: () => onTap(0),
           ),
-          // Tab 1 — Communities
           _NavItem(
             icon: Icons.group_outlined,
             activeIcon: Icons.group_rounded,
@@ -71,12 +67,7 @@ class BottomNavBar extends ConsumerWidget {
             unselectedColor: unselected,
             onTap: () => onTap(1),
           ),
-          // Tab 2 — Report (central FAB)
-          _ReportFab(
-            onTap: onReportTap ?? () => onTap(2),
-            isDark: isDark,
-          ),
-          // Tab 3 — SOS
+          _ReportFab(onTap: onReportTap ?? () => onTap(2)),
           _SosNavItem(
             isSelected: selectedIndex == 3,
             selectedColor: selected,
@@ -84,7 +75,6 @@ class BottomNavBar extends ConsumerWidget {
             badgeCount: sosBadge,
             onTap: () => onTap(3),
           ),
-          // Tab 4 — Profile
           _NavItem(
             icon: Icons.person_outline_rounded,
             activeIcon: Icons.person_rounded,
@@ -100,9 +90,6 @@ class BottomNavBar extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Simple nav item
-// ---------------------------------------------------------------------------
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
@@ -134,23 +121,32 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedSwitcher(
+            AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              child: Icon(
-                isSelected ? activeIcon : icon,
-                key: ValueKey(isSelected),
-                color: color,
-                size: 24,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? selectedColor.withValues(alpha: 0.12)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  isSelected ? activeIcon : icon,
+                  key: ValueKey(isSelected),
+                  color: color,
+                  size: 24,
+                ),
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
                 fontSize: 10,
                 color: color,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
           ],
@@ -160,46 +156,107 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Central Report FAB
-// ---------------------------------------------------------------------------
-class _ReportFab extends StatelessWidget {
-  const _ReportFab({required this.onTap, required this.isDark});
+class _ReportFab extends StatefulWidget {
+  const _ReportFab({required this.onTap});
 
   final VoidCallback onTap;
-  final bool isDark;
+
+  @override
+  State<_ReportFab> createState() => _ReportFabState();
+}
+
+class _ReportFabState extends State<_ReportFab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseScale;
+  late final Animation<double> _pulseOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat();
+
+    _pulseScale = Tween<double>(begin: 1.0, end: 1.35).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+    );
+    _pulseOpacity = Tween<double>(begin: 0.35, end: 0.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primary, AppColors.primaryDark],
-          ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.40),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+      onTap: widget.onTap,
+      child: SizedBox(
+        width: 64,
+        height: 64,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseScale.value,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: context.colors.primary.withValues(
+                        alpha: _pulseOpacity.value,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            Transform.translate(
+              offset: const Offset(0, -6),
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: context.headerGradient,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: context.semantic.textOnPrimary.withValues(
+                      alpha: 0.25,
+                    ),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: context.colors.primary.withValues(alpha: 0.45),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  color: context.semantic.textOnPrimary,
+                  size: 30,
+                ),
+              ),
             ),
           ],
         ),
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// SOS nav item with badge
-// ---------------------------------------------------------------------------
 class _SosNavItem extends StatelessWidget {
   const _SosNavItem({
     required this.isSelected,
@@ -230,34 +287,49 @@ class _SosNavItem extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                AnimatedSwitcher(
+                AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    isSelected ? Icons.crisis_alert_rounded : Icons.sos_rounded,
-                    key: ValueKey(isSelected),
-                    color: color,
-                    size: 24,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? selectedColor.withValues(alpha: 0.12)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      isSelected
+                          ? Icons.crisis_alert_rounded
+                          : Icons.sos_rounded,
+                      key: ValueKey(isSelected),
+                      color: color,
+                      size: 24,
+                    ),
                   ),
                 ),
                 if (badgeCount > 0)
                   Positioned(
-                    top: -4,
-                    right: -6,
+                    top: -2,
+                    right: -4,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 1,
+                        horizontal: 5,
+                        vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white, width: 1.2),
+                        color: context.semantic.sos,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        border: Border.all(
+                          color: context.semantic.textOnPrimary,
+                          width: 1.5,
+                        ),
                       ),
                       child: Text(
                         badgeCount > 99 ? '99+' : badgeCount.toString(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 9,
-                          color: Colors.white,
+                          color: context.semantic.textOnPrimary,
                           fontWeight: FontWeight.w700,
                           height: 1,
                         ),
@@ -266,14 +338,13 @@ class _SosNavItem extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               'نجدة',
               style: TextStyle(
                 fontSize: 10,
                 color: color,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
           ],

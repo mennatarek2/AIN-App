@@ -13,10 +13,12 @@ class SosAlertModel {
     this.triggeredAt,
     this.resolvedBy,
     this.cancelledAt,
+    this.affectedCommunityIds = const [],
   });
 
   final String id;
   final String communityId;
+  final List<String> affectedCommunityIds;
   final double latitude;
   final double longitude;
   final String severity;
@@ -28,6 +30,13 @@ class SosAlertModel {
   final DateTime? triggeredAt;
   final String? resolvedBy;
   final DateTime? cancelledAt;
+
+  /// All communities that received this alert (falls back to [communityId]).
+  List<String> get allAffectedCommunityIds {
+    if (affectedCommunityIds.isNotEmpty) return affectedCommunityIds;
+    if (communityId.isNotEmpty) return [communityId];
+    return const [];
+  }
 
   factory SosAlertModel.fromApiJson(Map<String, dynamic> json) {
     // The API now returns integer status (0=Active,1=Resolved,2=Cancelled,3=FalseAlarm)
@@ -49,6 +58,7 @@ class SosAlertModel {
     return SosAlertModel(
       id: json['id']?.toString() ?? '',
       communityId: json['communityId']?.toString() ?? '',
+      affectedCommunityIds: _parseAffectedCommunityIds(json),
       latitude: _toDouble(json['latitude']),
       longitude: _toDouble(json['longitude']),
       severity: severityStr,
@@ -73,9 +83,16 @@ class SosAlertModel {
     return double.tryParse(v?.toString() ?? '') ?? 0.0;
   }
 
+  static List<String> _parseAffectedCommunityIds(Map<String, dynamic> json) {
+    final raw = json['affectedCommunityIds'];
+    if (raw is! List) return const [];
+    return raw.map((item) => item.toString()).where((id) => id.isNotEmpty).toList();
+  }
+
   SosAlertModel copyWith({
     String? id,
     String? communityId,
+    List<String>? affectedCommunityIds,
     double? latitude,
     double? longitude,
     String? severity,
@@ -91,6 +108,7 @@ class SosAlertModel {
     return SosAlertModel(
       id: id ?? this.id,
       communityId: communityId ?? this.communityId,
+      affectedCommunityIds: affectedCommunityIds ?? this.affectedCommunityIds,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       severity: severity ?? this.severity,

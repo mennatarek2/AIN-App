@@ -17,9 +17,13 @@ class ApiClient {
     String path, {
     String? token,
     Map<String, dynamic>? query,
+    bool jsonContentType = true,
   }) async {
     final uri = _buildUri(path, query);
-    final response = await _client.get(uri, headers: _headers(token: token));
+    final response = await _client.get(
+      uri,
+      headers: _headers(token: token, json: jsonContentType),
+    );
     return _handleResponse(response);
   }
 
@@ -56,6 +60,46 @@ class ApiClient {
       uri,
       headers: _headers(token: token),
       body: jsonEncode(body ?? const {}),
+    );
+    return _handleResponse(response);
+  }
+
+  /// PUT with a pre-encoded JSON body (raw integer, string, etc.).
+  Future<dynamic> putRaw(
+    String path, {
+    String? token,
+    required Object body,
+  }) async {
+    final uri = _buildUri(path);
+    final response = await _client.put(
+      uri,
+      headers: _headers(token: token),
+      body: jsonEncode(body),
+    );
+    return _handleResponse(response);
+  }
+
+  /// PUT with no body (e.g. approve/reject join request → 204).
+  Future<dynamic> putEmpty(String path, {String? token}) async {
+    final uri = _buildUri(path);
+    final response = await _client.put(
+      uri,
+      headers: _headers(token: token, json: false),
+    );
+    return _handleResponse(response);
+  }
+
+  /// POST with a pre-encoded JSON body (raw integer, string, etc.).
+  Future<dynamic> postRaw(
+    String path, {
+    String? token,
+    required Object body,
+  }) async {
+    final uri = _buildUri(path);
+    final response = await _client.post(
+      uri,
+      headers: _headers(token: token),
+      body: jsonEncode(body),
     );
     return _handleResponse(response);
   }
@@ -265,7 +309,10 @@ class ApiClient {
   }
 
   Map<String, String> _headers({String? token, bool json = true}) {
-    final headers = <String, String>{'Accept': 'application/json'};
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
     if (json) {
       headers['Content-Type'] = 'application/json';
     }
@@ -299,10 +346,9 @@ class ApiClient {
       return _decode(body);
     }
 
-    final message = _extractError(body);
-    print('[API] Error: $status - $message');
+    print('[API] Error: $status');
     if (body.isNotEmpty) print('[API] Error Body: $body');
-    throw ApiException(message, statusCode: status);
+    throw ApiException.fromResponse(response);
   }
 
   dynamic _decode(String body) {
@@ -376,27 +422,5 @@ class ApiClient {
       // If parsing fails, return null to use default
     }
     return null;
-  }
-
-  String _extractError(String body) {
-    if (body.isEmpty) return 'Request failed';
-
-    final decoded = _decode(body);
-    if (decoded is Map) {
-      final message =
-          decoded['message'] ?? decoded['error'] ?? decoded['title'];
-      if (message != null) return message.toString();
-
-      final errors = decoded['errors'];
-      if (errors is Map && errors.isNotEmpty) {
-        final first = errors.values.first;
-        if (first is List && first.isNotEmpty) {
-          return first.first.toString();
-        }
-        return first.toString();
-      }
-    }
-
-    return body;
   }
 }

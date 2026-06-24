@@ -1,94 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_page_header.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 
-class CommunityNotificationItem {
-  const CommunityNotificationItem({
-    required this.title,
-    required this.timeAgo,
-    required this.titleColor,
+/// Community-scoped view of SOS notifications (from the app notifications store).
+class CommunityNotificationPage extends ConsumerWidget {
+  const CommunityNotificationPage({
+    super.key,
+    required this.communityId,
+    required this.communityName,
   });
 
-  final String title;
-  final String timeAgo;
-  final Color titleColor;
-}
-
-class CommunityNotificationPage extends StatelessWidget {
-  const CommunityNotificationPage({super.key});
+  final String communityId;
+  final String communityName;
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref
+        .watch(notificationsProvider)
+        .items
+        .where((item) => item.type == NotificationType.sos)
+        .toList();
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF060C3A)
-          : AppColors.backgroundLight,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
-          _Header(onBack: () => Navigator.of(context).pop()),
+          AppPageHeader(
+            title: 'تنبيهات $communityName',
+            subtitle: '${items.length} تنبيه',
+            onBack: () => Navigator.of(context).pop(),
+          ),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
-              itemBuilder: (context, index) {
-                final item = _notifications[index];
-                return _NotificationCard(item: item);
-              },
-              separatorBuilder: (context, i) => const SizedBox(height: 12),
-              itemCount: _notifications.length,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      width: double.infinity,
-      height: 100,
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 16,
-            top: 52,
-            child: GestureDetector(
-              onTap: onBack,
-              child: Icon(
-                Icons.arrow_forward_ios,
-                color: isDark
-                    ? const Color(0xFFF3F6F9)
-                    : AppColors.textPrimaryLight,
-                size: 24,
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment(0, 0.32),
-              child: Text(
-                'تنبيهات الدائرة',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? const Color(0xFFF3F6F9)
-                      : AppColors.textPrimaryLight,
-                ),
-              ),
-            ),
+            child: items.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xxl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.notifications_none_rounded,
+                            size: 48,
+                            color: context.semantic.textMuted
+                                .withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'لا توجد تنبيهات SOS بعد',
+                            textDirection: TextDirection.rtl,
+                            style: context.text.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          Text(
+                            'ستظهر هنا تنبيهات الطوارئ الواردة عبر SignalR',
+                            textDirection: TextDirection.rtl,
+                            textAlign: TextAlign.center,
+                            style: context.text.bodySmall?.copyWith(
+                              color: context.semantic.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.screenHorizontal,
+                      AppSpacing.lg,
+                      AppSpacing.screenHorizontal,
+                      AppSpacing.xl,
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return _NotificationCard(item: item);
+                    },
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: AppSpacing.sm),
+                    itemCount: items.length,
+                  ),
           ),
         ],
       ),
@@ -99,46 +95,53 @@ class _Header extends StatelessWidget {
 class _NotificationCard extends StatelessWidget {
   const _NotificationCard({required this.item});
 
-  final CommunityNotificationItem item;
+  final NotificationItem item;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color =
+        item.highlighted ? context.semantic.sos : context.colors.onSurface;
 
-    return Container(
-      height: 80,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF060C3A) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isDark ? const Color(0xFFF3F6F9) : const Color(0x66060C3A),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.center,
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        textDirection: TextDirection.rtl,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            item.title,
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w400,
-              color: item.titleColor,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
+            child: Icon(Icons.crisis_alert_rounded, color: color, size: 22),
           ),
-          const SizedBox(height: 6),
-          Text(
-            '• ${item.timeAgo}',
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              color: isDark ? const Color(0xFFF3F6F9) : const Color(0x66060C3A),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.text,
+                  textDirection: TextDirection.rtl,
+                  style: context.text.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+                if (!item.isRead) ...[
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    'غير مقروء',
+                    textDirection: TextDirection.rtl,
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.semantic.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -146,21 +149,3 @@ class _NotificationCard extends StatelessWidget {
     );
   }
 }
-
-const List<CommunityNotificationItem> _notifications = [
-  CommunityNotificationItem(
-    title: 'حادث بالقرب من Laila',
-    timeAgo: 'منذ 3 دقائق',
-    titleColor: Color(0xFFD9D9D9),
-  ),
-  CommunityNotificationItem(
-    title: 'المنطقة المحيطة بـ Khaled مستقرة',
-    timeAgo: 'منذ 4 دقائق',
-    titleColor: Color(0xFF2E8B57),
-  ),
-  CommunityNotificationItem(
-    title: 'اندلاع حريق بالقرب من Youssef',
-    timeAgo: 'منذ 15 دقيقة',
-    titleColor: Color(0xFFD23B3B),
-  ),
-];

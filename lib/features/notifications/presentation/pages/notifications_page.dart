@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/realtime/signalr_provider.dart';
 import '../../../../core/realtime/signalr_state.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../../../../core/widgets/app_state_views.dart';
 import '../../../home/presentation/providers/home_navigation_provider.dart';
 import '../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../providers/notifications_provider.dart';
@@ -24,7 +28,6 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final notificationsState = ref.watch(notificationsProvider);
     final signalRStatus = ref.watch(signalRStatusProvider);
 
@@ -37,54 +40,113 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     final unread = notificationsState.unreadCount;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF060C3A)
-          : AppColors.backgroundLight,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
-          // ── Connection banner ─────────────────────────────────────────────
           _ConnectionBanner(status: signalRStatus),
 
-          // ── Header ────────────────────────────────────────────────────────
-          _Header(
-            unread: unread,
-            onMarkAll: () =>
-                ref.read(notificationsProvider.notifier).markAllRead(),
-            onClear: () =>
-                ref.read(notificationsProvider.notifier).clearAll(),
+          AppDashboardHeader(
+            title: 'الإشعارات',
+            subtitle: unread > 0 ? '$unread غير مقروء' : 'لا توجد إشعارات جديدة',
+            compact: true,
+            trailing: [
+              if (unread > 0)
+                TextButton(
+                  onPressed: () =>
+                      ref.read(notificationsProvider.notifier).markAllRead(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'قراءة الكل',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.semantic.textOnPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              TextButton(
+                onPressed: () =>
+                    ref.read(notificationsProvider.notifier).clearAll(),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'مسح',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.semantic.textOnPrimary.withValues(
+                      alpha: 0.75,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          // ── List ──────────────────────────────────────────────────────────
           Expanded(
             child: notificationsState.items.isEmpty
-                ? _EmptyState(isDark: isDark)
+                ? const AppEmptyView(
+                    icon: Icons.notifications_none_rounded,
+                    title: 'لا توجد إشعارات',
+                  )
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                     children: [
                       if (todayItems.isNotEmpty) ...[
-                        _SectionTitle('اليوم', isDark: isDark),
-                        const SizedBox(height: 8),
+                        AppSectionHeader(
+                          title: 'اليوم',
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.screenHorizontal,
+                            AppSpacing.md,
+                            AppSpacing.screenHorizontal,
+                            AppSpacing.xs,
+                          ),
+                        ),
                         ...todayItems.map(
                           (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.screenHorizontal,
+                              0,
+                              AppSpacing.screenHorizontal,
+                              AppSpacing.xs,
+                            ),
                             child: _NotificationTile(
                               item: item,
-                              isDark: isDark,
                               onTap: () => _onTap(item),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 4),
                       ],
                       if (weekItems.isNotEmpty) ...[
-                        _SectionTitle('هذا الأسبوع', isDark: isDark),
-                        const SizedBox(height: 8),
+                        AppSectionHeader(
+                          title: 'هذا الأسبوع',
+                          padding: EdgeInsets.fromLTRB(
+                            AppSpacing.screenHorizontal,
+                            todayItems.isNotEmpty ? AppSpacing.md : AppSpacing.sm,
+                            AppSpacing.screenHorizontal,
+                            AppSpacing.xs,
+                          ),
+                        ),
                         ...weekItems.map(
                           (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.screenHorizontal,
+                              0,
+                              AppSpacing.screenHorizontal,
+                              AppSpacing.xs,
+                            ),
                             child: _NotificationTile(
                               item: item,
-                              isDark: isDark,
                               onTap: () => _onTap(item),
                             ),
                           ),
@@ -100,7 +162,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
         onTap: (index) {
           if (index == 3) return;
           ref.read(homeNavigationProvider.notifier).setSelectedIndex(index);
-          navigateFromBottomNav(context, index);
+          navigateFromBottomNav(context, ref, index);
         },
       ),
     );
@@ -112,10 +174,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       Navigator.of(context).pushNamed('/sos');
     } else if (item.type == NotificationType.reportUpdate &&
         item.relatedId != null) {
-      Navigator.of(context).pushNamed(
-        '/report',
-        arguments: item.relatedId,
-      );
+      Navigator.of(context).pushNamed('/report', arguments: item.relatedId);
     }
   }
 }
@@ -129,7 +188,8 @@ class _ConnectionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDisconnected = status == SignalRStatus.disconnected ||
+    final isDisconnected =
+        status == SignalRStatus.disconnected ||
         status == SignalRStatus.error ||
         status == SignalRStatus.reconnecting;
 
@@ -141,129 +201,29 @@ class _ConnectionBanner extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      color: const Color(0xFFF59E0B),
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      color: context.semantic.warning,
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.xxs,
+        horizontal: AppSpacing.sm,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.white),
-          const SizedBox(width: 6),
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 14,
+            color: context.semantic.textOnPrimary,
+          ),
+          const SizedBox(width: AppSpacing.xxs),
           Text(
             label,
             textDirection: TextDirection.rtl,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white,
+            style: context.text.labelSmall?.copyWith(
+              color: context.semantic.textOnPrimary,
               fontWeight: FontWeight.w500,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Header ───────────────────────────────────────────────────────────────────
-
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.unread,
-    required this.onMarkAll,
-    required this.onClear,
-  });
-
-  final int unread;
-  final VoidCallback onMarkAll;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
-
-    return Container(
-      width: double.infinity,
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 8,
-        bottom: 12,
-        left: 12,
-        right: 12,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left actions
-          Row(
-            children: [
-              TextButton(
-                onPressed: onClear,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'مسح',
-                  style: TextStyle(fontSize: 13, color: Color(0xFFEF4444)),
-                ),
-              ),
-              if (unread > 0)
-                TextButton(
-                  onPressed: onMarkAll,
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'قراءة الكل ($unread)',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          // Title
-          Text(
-            'الإشعارات',
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w600,
-              color: titleColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Section title ────────────────────────────────────────────────────────────
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title, {required this.isDark});
-
-  final String title;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Text(
-        title,
-        textDirection: TextDirection.rtl,
-        style: TextStyle(
-          fontSize: 19,
-          fontWeight: FontWeight.w400,
-          color: isDark ? const Color(0xFFF3F6F9) : AppColors.textPrimaryLight,
-        ),
       ),
     );
   }
@@ -274,112 +234,156 @@ class _SectionTitle extends StatelessWidget {
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({
     required this.item,
-    required this.isDark,
     required this.onTap,
   });
 
   final NotificationItem item;
-  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isUnread = !item.isRead;
-    final (typeIcon, typeColor) = _typeInfo(item.type);
+    final (typeIcon, typeColor) = _typeInfo(context, item.type);
 
-    final bgColor = isUnread
-        ? (isDark
-              ? const Color(0x3366C8FF)
-              : AppColors.primarySoft.withValues(alpha: 0.2))
-        : (isDark ? const Color(0xFF060C3A) : Colors.white);
-
-    final borderColor = isUnread
-        ? Colors.transparent
-        : (isDark ? const Color(0xFFF3F6F9) : const Color(0x66060C3A));
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderColor, width: 1),
-        ),
-        child: Row(
-          textDirection: TextDirection.rtl,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Type icon
-            Container(
-              width: 32,
-              height: 32,
-              margin: const EdgeInsets.only(left: 10, top: 2),
-              decoration: BoxDecoration(
-                color: typeColor.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(typeIcon, size: 16, color: typeColor),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: isUnread
+                ? context.colors.primary.withValues(alpha: 0.06)
+                : context.semantic.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: isUnread
+                  ? context.colors.primary.withValues(alpha: 0.25)
+                  : context.semantic.borderSubtle,
             ),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    item.text,
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.right,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400,
-                      color: isDark
-                          ? const Color(0xFFF3F6F9)
-                          : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  if (item.createdAt != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      _timeAgo(item.createdAt!),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
+            boxShadow: isUnread ? null : context.cardShadows,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              textDirection: TextDirection.rtl,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (isUnread)
+                  Container(
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: context.colors.primary,
+                      borderRadius: const BorderRadius.horizontal(
+                        right: Radius.circular(AppRadius.lg),
                       ),
                     ),
-                  ],
-                ],
-              ),
-            ),
-            // Unread dot
-            if (isUnread)
-              Container(
-                width: 8,
-                height: 8,
-                margin: const EdgeInsets.only(right: 6, top: 6),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    child: Row(
+                      textDirection: TextDirection.rtl,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: typeColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: Icon(typeIcon, size: 20, color: typeColor),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                textDirection: TextDirection.rtl,
+                                children: [
+                                  if (isUnread)
+                                    Container(
+                                      margin: const EdgeInsets.only(
+                                        left: AppSpacing.xxs,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: context.colors.primary,
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.pill,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'جديد',
+                                        style: context.text.labelSmall?.copyWith(
+                                          color: context.semantic.textOnPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: Text(
+                                      item.text,
+                                      textDirection: TextDirection.rtl,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: context.text.bodyMedium?.copyWith(
+                                        fontWeight: isUnread
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
+                                        color: context.colors.onSurface,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (item.createdAt != null) ...[
+                                const SizedBox(height: AppSpacing.xxs),
+                                Text(
+                                  _timeAgo(item.createdAt!),
+                                  textDirection: TextDirection.rtl,
+                                  style: context.text.labelSmall?.copyWith(
+                                    color: context.semantic.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  (IconData, Color) _typeInfo(NotificationType type) {
+  (IconData, Color) _typeInfo(BuildContext context, NotificationType type) {
     return switch (type) {
-      NotificationType.sos => (Icons.crisis_alert_rounded, const Color(0xFFEF4444)),
-      NotificationType.reportUpdate => (Icons.description_rounded, AppColors.primary),
-      NotificationType.system => (Icons.info_rounded, const Color(0xFFF59E0B)),
+      NotificationType.sos => (
+        Icons.crisis_alert_rounded,
+        context.semantic.sos,
+      ),
+      NotificationType.reportUpdate => (
+        Icons.description_rounded,
+        context.colors.primary,
+      ),
+      NotificationType.system => (
+        Icons.info_rounded,
+        context.semantic.warning,
+      ),
     };
   }
 
@@ -389,43 +393,6 @@ class _NotificationTile extends StatelessWidget {
     if (diff.inMinutes < 60) return 'منذ ${diff.inMinutes} دقيقة';
     if (diff.inHours < 24) return 'منذ ${diff.inHours} ساعة';
     return 'منذ ${diff.inDays} يوم';
-  }
-}
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.notifications_none_rounded,
-            size: 64,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'لا توجد إشعارات',
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 16,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

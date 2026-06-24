@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
+
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../../../../core/widgets/app_page_header.dart';
 import '../../../../core/widgets/checkmark_success_animation.dart';
 
 class AddMemberSuccessPage extends StatelessWidget {
@@ -7,92 +12,83 @@ class AddMemberSuccessPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDark
-        ? const Color(0xFF060C3A)
-        : AppColors.backgroundLight;
-    final mainTextColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
-    final detailsTextColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : const Color(0x803C2F2F);
-    final buttonTextColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.backgroundLight;
-
     return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CheckmarkSuccessAnimation(),
-                const SizedBox(height: 18),
-                Text(
-                  'تمت إضافة العضو بنجاح',
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w700,
-                    color: mainTextColor,
-                  ),
+      backgroundColor: context.colors.surface,
+      body: Column(
+        children: [
+          AppPageHeader(
+            title: 'تمت الإضافة',
+            useGradient: false,
+          ),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.screenHorizontal,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'أصبح بإمكانكِ متابعة حالته وموقعه بالنسبة للمناطق\nالتي قد تشكّل خطراً.',
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w400,
-                    color: detailsTextColor,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 96),
-                SizedBox(
-                  width: 300,
-                  height: 52,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      gradient: const LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [AppColors.primary, AppColors.primarySoft],
-                      ),
-                    ),
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).pop();
-                      },
-                      child: Text(
-                        'المتابعة',
+                child: AppFormCard(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CheckmarkSuccessAnimation(),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        'تمت إضافة العضو بنجاح',
                         textDirection: TextDirection.rtl,
-                        style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w600,
-                          color: buttonTextColor,
+                        textAlign: TextAlign.center,
+                        style: context.text.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'أصبح بإمكانكِ متابعة حالته وموقعه بالنسبة للمناطق\nالتي قد تشكّل خطراً.',
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.center,
+                        style: context.text.bodyMedium?.copyWith(
+                          color: context.semantic.textMuted,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxl),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            gradient: context.headerGradient,
+                          ),
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.of(context).pop();
+                            },
+                            child: Text(
+                              'المتابعة',
+                              textDirection: TextDirection.rtl,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: context.semantic.textOnPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -37,6 +37,8 @@ class AuthRepositoryImpl implements AuthRepository {
       }
 
       print('[AUTH] Starting signup step one with email: $email');
+      await userLocalDataSource.clearSession();
+
       final session = await remoteDataSource.signUpStepOne(
         displayName: name,
         userName: userName,
@@ -67,6 +69,12 @@ class AuthRepositoryImpl implements AuthRepository {
 
       print('[AUTH] Saving signup token to local storage...');
       await userLocalDataSource.saveSignupToken(signupToken);
+      await userLocalDataSource.savePendingRegistration(
+        email: normalizedEmail,
+        name: name,
+        phoneNumber: phoneNumber,
+        ssn: ssn,
+      );
       print('[AUTH] Signup token saved successfully');
 
       // Verify token was saved
@@ -103,7 +111,16 @@ class AuthRepositoryImpl implements AuthRepository {
         password: password,
       );
 
-      final token = session.authToken;
+      final token = session.authToken?.trim();
+      if (token == null || token.isEmpty) {
+        print('[AUTH] Login failed: auth token missing from API response');
+        return Left(
+          const ServerFailure(
+            'Login succeeded but no auth token was returned. Please try again.',
+          ),
+        );
+      }
+
       final user =
           session.user ??
           UserModel(
@@ -113,13 +130,12 @@ class AuthRepositoryImpl implements AuthRepository {
             isVerified: false,
           );
 
-      if (token != null && token.trim().isNotEmpty) {
-        await userLocalDataSource.saveSession(
-          user: user,
-          token: token,
-          refreshToken: session.refreshToken,
-        );
-      }
+      await userLocalDataSource.saveSession(
+        user: user,
+        token: token,
+        refreshToken: session.refreshToken,
+      );
+      print('[AUTH] Login session saved (token length: ${token.length})');
 
       return Right(user);
     } catch (e) {
@@ -132,7 +148,18 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
   }) async {
     try {
-      await mockDataSource.sendPasswordResetEmail(email: email);
+      final normalizedEmail = email.trim();
+      await userLocalDataSource.clearForgotPasswordToken();
+      await userLocalDataSource.clearForgotPasswordEmail();
+      await userLocalDataSource.saveForgotPasswordEmail(normalizedEmail);
+
+      final token = await remoteDataSource.sendForgotPasswordOtp(
+        email: normalizedEmail,
+      );
+      if (token != null && token.trim().isNotEmpty) {
+        await userLocalDataSource.saveForgotPasswordToken(token);
+      }
+
       return const Right(null);
     } catch (e) {
       return Left(_handleException(e));
@@ -140,28 +167,81 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<AuthFailure, void>> resetPassword({
+  Future<Either<AuthFailure, User>> resetPassword({
+    required String email,
     required String token,
     required String newPassword,
+    required String confirmPassword,
   }) async {
     try {
-      await mockDataSource.resetPassword(
-        token: token,
+      final session = await remoteDataSource.resetPassword(
+        email: email.trim(),
+        token: token.trim(),
         newPassword: newPassword,
+        confirmPassword: confirmPassword,
       );
-      return const Right(null);
+
+      final authToken = session.authToken?.trim();
+      if (authToken == null || authToken.isEmpty) {
+        return Left(
+          const ServerFailure(
+            'Password reset succeeded but no auth token was returned',
+          ),
+        );
+      }
+
+      final user =
+          session.user ??
+          UserModel(
+            id: email.trim(),
+            email: email.trim(),
+            name: email.trim().split('@').first,
+            isVerified: true,
+          );
+
+      await userLocalDataSource.saveSession(
+        user: user,
+        token: authToken,
+        refreshToken: session.refreshToken,
+      );
+      await userLocalDataSource.clearForgotPasswordToken();
+      await userLocalDataSource.clearForgotPasswordEmail();
+
+      return Right(user);
     } catch (e) {
       return Left(_handleException(e));
     }
   }
 
   @override
-  Future<Either<AuthFailure, void>> verifyPasswordResetCode({
+  Future<Either<AuthFailure, String>> verifyPasswordResetCode({
     required String email,
     required String code,
   }) async {
     try {
-      await mockDataSource.verifyPasswordResetCode(email: email, code: code);
+      final forgotToken = await userLocalDataSource.getForgotPasswordToken();
+      final resetToken = await remoteDataSource.verifyForgotPasswordOtp(
+        forgotPasswordToken: forgotToken,
+        otpCode: code.trim(),
+        email: email.trim(),
+      );
+
+      return Right(resetToken);
+    } catch (e) {
+      return Left(_handleException(e));
+    }
+  }
+
+  @override
+  Future<Either<AuthFailure, void>> resendForgotPasswordOtp() async {
+    try {
+      final forgotToken = await userLocalDataSource.getForgotPasswordToken();
+      final email = await userLocalDataSource.getForgotPasswordEmail();
+
+      await remoteDataSource.resendForgotPasswordOtp(
+        forgotPasswordToken: forgotToken,
+        email: email,
+      );
       return const Right(null);
     } catch (e) {
       return Left(_handleException(e));
@@ -205,6 +285,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }) async {
     try {
       final signupToken = await userLocalDataSource.getSignupToken();
+      final pending = await userLocalDataSource.getPendingRegistration();
       print(
         '[AUTH] Complete signup: Retrieved signup token: ${signupToken != null ? 'EXISTS' : 'NULL'} (length: ${signupToken?.length ?? 0})',
       );
@@ -213,6 +294,13 @@ class AuthRepositoryImpl implements AuthRepository {
         print('[AUTH] Complete signup: ERROR - Signup token is missing');
         return Left(const InvalidTokenFailure());
       }
+
+      final resolvedEmail = email.trim().isNotEmpty
+          ? email.trim()
+          : (pending?['email'] ?? '').trim();
+      final resolvedName = name.trim().isNotEmpty
+          ? name.trim()
+          : (pending?['name'] ?? '').trim();
 
       print('[AUTH] Completing sign up...');
       final session = await remoteDataSource.completeSignUp(
@@ -223,10 +311,13 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       final fallbackUser = UserModel(
-        id: email.trim().isNotEmpty ? email.trim() : signupToken,
-        email: email.trim(),
-        name: name.trim().isNotEmpty ? name.trim() : email.trim().split('@').first,
+        id: resolvedEmail.isNotEmpty ? resolvedEmail : signupToken,
+        email: resolvedEmail,
+        name: resolvedName.isNotEmpty
+            ? resolvedName
+            : resolvedEmail.split('@').first,
         isVerified: true,
+        phoneNumber: pending?['phoneNumber'],
       );
       final user = session.user ?? fallbackUser;
 
@@ -239,6 +330,7 @@ class AuthRepositoryImpl implements AuthRepository {
           refreshToken: session.refreshToken,
         );
         await userLocalDataSource.clearSignupToken();
+        await userLocalDataSource.clearPendingRegistration();
         print('[AUTH] Session saved and signup token cleared');
       } else {
         print('[AUTH] WARNING: No auth token received from complete signup');
@@ -381,7 +473,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
     if (message.contains('already exists')) {
       return const UserAlreadyExistsFailure();
-    } else if (message.contains('Invalid email or password')) {
+    } else if (message.contains('Invalid email or password') ||
+        message.contains('Invalid password') ||
+        message.contains('Invalid email')) {
       return const InvalidCredentialsFailure();
     } else if (message.contains('Invalid email format')) {
       return const InvalidEmailFailure();

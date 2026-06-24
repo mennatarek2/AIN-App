@@ -5,13 +5,15 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../../../community/presentation/providers/communities_provider.dart';
+import '../../domain/sos_alert_model.dart';
 import '../providers/sos_notifier.dart';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const _accentRed = Color(0xFFEF4444);
 const _accentEmerald = Color(0xFF22C55E);
 const _activeBg = Color(0xFF1A0A0A);
 const _activeBanner = Color(0xFF2A0A0A);
@@ -19,7 +21,9 @@ const _activeBanner = Color(0xFF2A0A0A);
 // ─── SOS Page ────────────────────────────────────────────────────────────────
 
 class SosPage extends ConsumerStatefulWidget {
-  const SosPage({super.key});
+  const SosPage({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
   ConsumerState<SosPage> createState() => _SosPageState();
@@ -98,13 +102,8 @@ class _SosPageState extends ConsumerState<SosPage>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(sosNotifierProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return switch (state.mode) {
-      SosScreenMode.idle || SosScreenMode.triggering => _buildIdleScreen(
-        state,
-        isDark,
-      ),
+      SosScreenMode.idle || SosScreenMode.triggering => _buildIdleScreen(state),
       SosScreenMode.active => _buildActiveScreen(state),
       SosScreenMode.resolved => _buildEndScreen(
         resolved: true,
@@ -123,23 +122,18 @@ class _SosPageState extends ConsumerState<SosPage>
   // IDLE SCREEN
   // ──────────────────────────────────────────────────────────────────────────
 
-  Widget _buildIdleScreen(SosState state, bool isDark) {
-    final bgColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final textPrimary = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-
+  Widget _buildIdleScreen(SosState state) {
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
           'نجدة',
           textDirection: TextDirection.rtl,
-          style: TextStyle(
+          style: context.text.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
-            fontSize: 22,
-            color: textPrimary,
+            color: context.colors.onSurface,
           ),
         ),
         centerTitle: true,
@@ -160,6 +154,7 @@ class _SosPageState extends ConsumerState<SosPage>
                   holdController: _holdController,
                   isHolding: _isHolding,
                   isTriggering: state.isTriggering,
+                  sosColor: context.semantic.sos,
                 ),
               ),
             ),
@@ -176,19 +171,18 @@ class _SosPageState extends ConsumerState<SosPage>
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: _accentRed.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    color: context.semantic.sosContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(
-                      color: _accentRed.withValues(alpha: 0.4),
+                      color: context.semantic.sos.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Text(
                     state.error!,
                     textDirection: TextDirection.rtl,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: _accentRed,
-                      fontSize: 13,
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.semantic.sos,
                     ),
                   ),
                 ),
@@ -200,10 +194,9 @@ class _SosPageState extends ConsumerState<SosPage>
             Text(
               'مستوى الطوارئ',
               textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 15,
+              style: context.text.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: textSecondary,
+                color: context.semantic.textMuted,
               ),
             ),
             const SizedBox(height: 12),
@@ -234,18 +227,16 @@ class _SosPageState extends ConsumerState<SosPage>
                   Text(
                     'إرسال إلى المجتمع',
                     textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                      fontSize: 15,
+                    style: context.text.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: textSecondary,
+                      color: context.semantic.textMuted,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   _CommunityDropdown(
                     selectedId: state.selectedCommunityId,
                     onChanged: (id) =>
                         ref.read(sosNotifierProvider.notifier).setCommunityId(id),
-                    isDark: isDark,
                   ),
                 ],
               ),
@@ -267,27 +258,19 @@ class _SosPageState extends ConsumerState<SosPage>
                   hintTextDirection: TextDirection.rtl,
                   counterText: '',
                   filled: true,
-                  fillColor: isDark
-                      ? const Color(0xFF121A5C).withValues(alpha: 0.5)
-                      : Colors.white,
+                  fillColor: context.semantic.surfaceInput,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: isDark
-                          ? const Color(0xFF1E2D6B)
-                          : const Color(0xFFE5E7EB),
-                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: BorderSide(color: context.semantic.borderSubtle),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: isDark
-                          ? const Color(0xFF1E2D6B)
-                          : const Color(0xFFE5E7EB),
-                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: BorderSide(color: context.semantic.borderSubtle),
                   ),
                 ),
-                style: TextStyle(fontSize: 14, color: textPrimary),
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                ),
               ),
             ),
 
@@ -300,11 +283,8 @@ class _SosPageState extends ConsumerState<SosPage>
                 'اضغط مطولاً على الزر لمدة 2 ثانية لإرسال النداء',
                 textDirection: TextDirection.rtl,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
-                      : AppColors.textSecondaryLight.withValues(alpha: 0.7),
+                style: context.text.labelSmall?.copyWith(
+                  color: context.semantic.textMuted,
                 ),
               ),
             ),
@@ -319,6 +299,7 @@ class _SosPageState extends ConsumerState<SosPage>
   // ──────────────────────────────────────────────────────────────────────────
 
   Widget _buildActiveScreen(SosState state) {
+    final sosColor = context.semantic.sos;
     return Scaffold(
       backgroundColor: _activeBg,
       appBar: AppBar(
@@ -345,7 +326,7 @@ class _SosPageState extends ConsumerState<SosPage>
           children: [
             // ── Status banner ──────────────────────────────────────────────
             Container(
-              color: _accentRed,
+              color: sosColor,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               child: Row(
                 textDirection: TextDirection.rtl,
@@ -371,6 +352,12 @@ class _SosPageState extends ConsumerState<SosPage>
                 ],
               ),
             ),
+
+            if (state.activeAlert != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _AffectedCommunitiesLabel(alert: state.activeAlert!),
+              ),
 
             const SizedBox(height: 20),
 
@@ -419,8 +406,8 @@ class _SosPageState extends ConsumerState<SosPage>
                   color: const Color(0xFF2A1010),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Center(
-                  child: CircularProgressIndicator(color: _accentRed),
+                child: Center(
+                  child: CircularProgressIndicator(color: sosColor),
                 ),
               ),
 
@@ -444,13 +431,16 @@ class _SosPageState extends ConsumerState<SosPage>
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: OutlinedButton.icon(
                 onPressed: () => _showCancelDialog(state.activeAlert?.id ?? ''),
-                icon: const Icon(Icons.cancel_outlined, color: _accentRed),
-                label: const Text(
+                icon: Icon(Icons.cancel_outlined, color: sosColor),
+                label: Text(
                   'إلغاء النداء',
-                  style: TextStyle(color: _accentRed, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: sosColor,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: _accentRed, width: 1.5),
+                  side: BorderSide(color: sosColor, width: 1.5),
                   minimumSize: const Size(double.infinity, 52),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -553,7 +543,7 @@ class _SosPageState extends ConsumerState<SosPage>
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: _accentRed),
+            style: ElevatedButton.styleFrom(backgroundColor: context.semantic.sos),
             child: const Text(
               'نعم، إلغاء',
               style: TextStyle(color: Colors.white),
@@ -584,12 +574,14 @@ class _PulsingSosButton extends StatelessWidget {
     required this.holdController,
     required this.isHolding,
     required this.isTriggering,
+    required this.sosColor,
   });
 
   final AnimationController pulseController;
   final AnimationController holdController;
   final bool isHolding;
   final bool isTriggering;
+  final Color sosColor;
 
   @override
   Widget build(BuildContext context) {
@@ -616,7 +608,7 @@ class _PulsingSosButton extends StatelessWidget {
                     height: 160,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _accentRed.withValues(alpha: opacity),
+                      color: sosColor.withValues(alpha: opacity),
                     ),
                   ),
                 );
@@ -644,13 +636,13 @@ class _PulsingSosButton extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  isHolding ? const Color(0xFFFF6666) : _accentRed,
-                  const Color(0xFFB91C1C),
+                  isHolding ? sosColor.withValues(alpha: 0.8) : sosColor,
+                  sosColor.withValues(alpha: 0.85),
                 ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _accentRed.withValues(alpha: 0.5),
+                  color: sosColor.withValues(alpha: 0.5),
                   blurRadius: isHolding ? 30 : 20,
                   spreadRadius: isHolding ? 6 : 2,
                 ),
@@ -752,32 +744,38 @@ class _SeverityChip extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  Color get _chipColor => switch (severity) {
-    SosSeverity.low      => const Color(0xFF6B7280),
-    SosSeverity.standard => const Color(0xFF3B82F6),
-    SosSeverity.high     => const Color(0xFFF59E0B),
-    SosSeverity.critical => _accentRed,
+  Color _chipColorFor(BuildContext context) => switch (severity) {
+    SosSeverity.low => context.semantic.textMuted,
+    SosSeverity.standard => context.colors.primary,
+    SosSeverity.high => context.semantic.warning,
+    SosSeverity.critical => context.semantic.sos,
   };
 
   @override
   Widget build(BuildContext context) {
+    final chipColor = _chipColorFor(context);
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         decoration: BoxDecoration(
-          color: isSelected ? _chipColor : _chipColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(24),
+          color: isSelected ? chipColor : chipColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
-            color: isSelected ? _chipColor : _chipColor.withValues(alpha: 0.3),
+            color: isSelected ? chipColor : chipColor.withValues(alpha: 0.3),
             width: 1.5,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : _chipColor,
+            color: isSelected
+                ? context.semantic.textOnPrimary
+                : chipColor,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             fontSize: 14,
           ),
@@ -793,12 +791,10 @@ class _CommunityDropdown extends ConsumerWidget {
   const _CommunityDropdown({
     required this.selectedId,
     required this.onChanged,
-    required this.isDark,
   });
 
   final String? selectedId;
   final ValueChanged<String?> onChanged;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -806,17 +802,11 @@ class _CommunityDropdown extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF121A5C).withValues(alpha: 0.5)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? const Color(0xFF1E2D6B)
-              : const Color(0xFFE5E7EB),
-        ),
+        color: context.semantic.surfaceInput,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: context.semantic.borderSubtle),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
@@ -826,27 +816,19 @@ class _CommunityDropdown extends ConsumerWidget {
           hint: Text(
             'اختر مجتمعاً',
             textDirection: TextDirection.rtl,
-            style: TextStyle(
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-              fontSize: 14,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.semantic.textMuted,
             ),
           ),
-          dropdownColor: isDark
-              ? const Color(0xFF121A5C)
-              : Colors.white,
+          dropdownColor: context.semantic.surfaceElevated,
           items: communities.map((c) {
             return DropdownMenuItem(
               value: c.id,
               child: Text(
                 c.title,
                 textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                  fontSize: 14,
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
                 ),
               ),
             );
@@ -909,11 +891,11 @@ class _ElapsedTimerText extends StatelessWidget {
 
     return Text(
       text,
-      style: const TextStyle(
-        color: _accentRed,
+      style: TextStyle(
+        color: context.semantic.sos,
         fontWeight: FontWeight.w800,
         fontSize: 15,
-        fontFeatures: [FontFeature.tabularFigures()],
+        fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
   }
@@ -949,7 +931,7 @@ class _SosMap extends StatelessWidget {
               point: point,
               width: 40,
               height: 40,
-              child: const _PulsingDot(),
+              child: _PulsingDot(color: context.semantic.sos),
             ),
           ],
         ),
@@ -959,7 +941,9 @@ class _SosMap extends StatelessWidget {
 }
 
 class _PulsingDot extends StatefulWidget {
-  const _PulsingDot();
+  const _PulsingDot({required this.color});
+
+  final Color color;
 
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
@@ -1000,7 +984,7 @@ class _PulsingDotState extends State<_PulsingDot>
                 height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _accentRed.withValues(
+                  color: widget.color.withValues(
                     alpha: (1.0 - _ctrl.value) * 0.4,
                   ),
                 ),
@@ -1009,9 +993,9 @@ class _PulsingDotState extends State<_PulsingDot>
             Container(
               width: 16,
               height: 16,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _accentRed,
+                color: widget.color,
               ),
             ),
           ],
@@ -1069,25 +1053,22 @@ class _LocationUpdateRow extends StatelessWidget {
 class _SosStatusCard extends StatelessWidget {
   const _SosStatusCard({this.alert});
 
-  final dynamic alert;
+  final SosAlertModel? alert;
 
   @override
   Widget build(BuildContext context) {
+    final sosColor = context.semantic.sos;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A1010),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _accentRed.withValues(alpha: 0.3)),
+        color: context.semantic.sosContainer,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: sosColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         textDirection: TextDirection.rtl,
         children: [
-          const Icon(
-            Icons.wifi_rounded,
-            color: _accentRed,
-            size: 20,
-          ),
+          Icon(Icons.wifi_rounded, color: sosColor, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1123,6 +1104,43 @@ class _SosStatusCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AffectedCommunitiesLabel extends StatelessWidget {
+  const _AffectedCommunitiesLabel({required this.alert});
+
+  final SosAlertModel alert;
+
+  @override
+  Widget build(BuildContext context) {
+    if (alert.allAffectedCommunityIds.length <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    final count = alert.allAffectedCommunityIds.length;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Text(
+        'تم تنبيه $count مجتمعات',
+        textDirection: TextDirection.rtl,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
       ),
     );
   }

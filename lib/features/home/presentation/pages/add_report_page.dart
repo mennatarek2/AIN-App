@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
 import '../providers/categories_provider.dart';
 import '../providers/subcategories_provider.dart';
 import 'select_report_location_page.dart';
@@ -43,63 +46,65 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final s = ref.watch(createReportProvider);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: _buildAppBar(isDark, s),
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
-          _StepIndicator(currentStep: s.currentStep),
+          AppDashboardHeader(
+            title: 'إضافة بلاغ',
+            subtitle: _stepSubtitle(s.currentStep),
+            compact: true,
+            trailing: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(
+                  Icons.close_rounded,
+                  color: context.semantic.textOnPrimary,
+                ),
+                tooltip: 'إغلاق',
+              ),
+            ],
+            bottom: _StepIndicator(currentStep: s.currentStep),
+          ),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: KeyedSubtree(
                 key: ValueKey(s.currentStep),
-                child: _buildStep(s, isDark),
+                child: _buildStep(context, s),
               ),
             ),
           ),
-          // Upload progress bar
           if (s.isSubmitting && s.uploadProgress != null)
             _UploadProgressBar(progress: s.uploadProgress!),
-          _buildNavBar(s, isDark),
+          _buildNavBar(context, s),
         ],
       ),
     );
   }
 
-  AppBar _buildAppBar(bool isDark, CreateReportState s) {
-    return AppBar(
-      backgroundColor: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      foregroundColor: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-      elevation: 0,
-      title: const Text(
-        'إضافة بلاغ',
-        textDirection: TextDirection.rtl,
-        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-      ),
-      centerTitle: true,
-      leading: IconButton(
-        icon: const Icon(Icons.close),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-    );
+  String _stepSubtitle(int step) {
+    return switch (step) {
+      0 => 'الخطوة 1 من 3 — المعلومات الأساسية',
+      1 => 'الخطوة 2 من 3 — تحديد الموقع',
+      2 => 'الخطوة 3 من 3 — المرفقات',
+      _ => '',
+    };
   }
 
-  Widget _buildStep(CreateReportState s, bool isDark) {
+  Widget _buildStep(BuildContext context, CreateReportState s) {
     switch (s.currentStep) {
       case 0:
         return _Step1BasicInfo(
           titleController: _titleController,
           descController: _descController,
-          isDark: isDark,
         );
       case 1:
-        return _Step2Location(isDark: isDark);
+        return const _Step2Location();
       case 2:
-        return _Step3Attachments(picker: _picker, isDark: isDark);
+        return _Step3Attachments(picker: _picker);
       default:
         return const SizedBox();
     }
@@ -109,23 +114,21 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
   // Bottom navigation bar
   // ─────────────────────────────────────────────────────────────────
 
-  Widget _buildNavBar(CreateReportState s, bool isDark) {
+  Widget _buildNavBar(BuildContext context, CreateReportState s) {
     final isLastStep = s.currentStep == 2;
     final canProceed = _canProceedFromStep(s);
 
     return Container(
       padding: EdgeInsets.fromLTRB(
-        16,
-        12,
-        16,
-        12 + MediaQuery.of(context).padding.bottom,
+        AppSpacing.screenHorizontal,
+        AppSpacing.sm,
+        AppSpacing.screenHorizontal,
+        AppSpacing.sm + MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: context.colors.surface,
         border: Border(
-          top: BorderSide(
-            color: isDark ? const Color(0xFF2A3580) : const Color(0xFFD1D9F0),
-          ),
+          top: BorderSide(color: context.semantic.borderSubtle),
         ),
       ),
       child: Row(
@@ -137,10 +140,10 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
                   ? null
                   : () => ref.read(createReportProvider.notifier).prevStep(),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
+                foregroundColor: context.colors.primary,
+                side: BorderSide(color: context.colors.primary),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 minimumSize: const Size(80, 48),
               ),
@@ -154,21 +157,21 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
                   ? null
                   : () => _onNextOrSubmit(s, isLastStep),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: context.colors.primary,
+                foregroundColor: context.semantic.textOnPrimary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 minimumSize: const Size.fromHeight(48),
                 elevation: 0,
               ),
               child: s.isSubmitting
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 22,
                       width: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: Colors.white,
+                        color: context.semantic.textOnPrimary,
                       ),
                     )
                   : Text(
@@ -212,7 +215,10 @@ class _AddReportPageState extends ConsumerState<AddReportPage> {
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('فشل إرسال البلاغ: $error', textDirection: TextDirection.rtl),
+          content: Text(
+            'فشل إرسال البلاغ: $error',
+            textDirection: TextDirection.rtl,
+          ),
           backgroundColor: Colors.redAccent,
           duration: const Duration(seconds: 5),
         ),
@@ -247,106 +253,65 @@ class _StepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final labels = ['المعلومات الأساسية', 'الموقع', 'المرفقات'];
+    final labels = ['المعلومات', 'الموقع', 'المرفقات'];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      child: Column(
-        children: [
-          Row(
-            children: List.generate(3, (i) {
-              final isActive = i <= currentStep;
-              final isCurrent = i == currentStep;
-              return Expanded(
-                child: Row(
-                  children: [
-                    _StepDot(index: i + 1, isActive: isActive, isCurrent: isCurrent),
-                    if (i < 2)
-                      Expanded(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          height: 2,
-                          color: i < currentStep
-                              ? AppColors.primary
-                              : (isDark
-                                  ? const Color(0xFF2A3580)
-                                  : const Color(0xFFB8C4D9)),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(3, (i) {
-              final isCurrent = i == currentStep;
-              return Text(
-                labels[i],
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
-                  color: isCurrent
-                      ? AppColors.primary
-                      : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepDot extends StatelessWidget {
-  const _StepDot({
-    required this.index,
-    required this.isActive,
-    required this.isCurrent,
-  });
-
-  final int index;
-  final bool isActive;
-  final bool isCurrent;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: isCurrent ? 32 : 24,
-      height: isCurrent ? 32 : 24,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isActive ? AppColors.primary : const Color(0xFFB8C4D9),
-        border: isCurrent
-            ? Border.all(color: Colors.white, width: 2.5)
-            : null,
-        boxShadow: isCurrent
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                ),
-              ]
-            : null,
-      ),
-      child: Center(
-        child: Text(
-          '$index',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+        color: context.semantic.textOnPrimary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(
+          color: context.semantic.textOnPrimary.withValues(alpha: 0.2),
         ),
+      ),
+      child: Row(
+        children: List.generate(3, (i) {
+          final isActive = i <= currentStep;
+          final isCurrent = i == currentStep;
+          return Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: isCurrent
+                    ? context.semantic.textOnPrimary
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${i + 1}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: isCurrent
+                          ? context.colors.primary
+                          : context.semantic.textOnPrimary.withValues(
+                              alpha: isActive ? 0.9 : 0.55,
+                            ),
+                    ),
+                  ),
+                  Text(
+                    labels[i],
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight:
+                          isCurrent ? FontWeight.w700 : FontWeight.w500,
+                      color: isCurrent
+                          ? context.colors.primary
+                          : context.semantic.textOnPrimary.withValues(
+                              alpha: isActive ? 0.85 : 0.5,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -366,19 +331,25 @@ class _UploadProgressBar extends StatelessWidget {
       children: [
         LinearProgressIndicator(
           value: progress,
-          backgroundColor: const Color(0xFFD1D9F0),
-          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+          backgroundColor: context.semantic.borderSubtle,
+          valueColor: AlwaysStoppedAnimation<Color>(context.colors.primary),
           minHeight: 4,
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xxs,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
                 'جاري الرفع... ${(progress * 100).toStringAsFixed(0)}%',
                 textDirection: TextDirection.rtl,
-                style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.colors.primary,
+                ),
               ),
             ],
           ),
@@ -396,24 +367,21 @@ class _Step1BasicInfo extends ConsumerWidget {
   const _Step1BasicInfo({
     required this.titleController,
     required this.descController,
-    required this.isDark,
   });
 
   final TextEditingController titleController;
   final TextEditingController descController;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(createReportProvider);
     final n = ref.read(createReportProvider.notifier);
 
-    final borderColor =
-        isDark ? AppColors.textPrimaryDark : const Color(0xB3060C3A);
-    final textColor =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final hintColor =
-        isDark ? AppColors.textSecondaryDark : const Color(0x80060C3A);
+    final borderColor = context.isDarkMode
+        ? context.colors.onSurface
+        : context.colors.onSurface.withValues(alpha: 0.7);
+    final textColor = context.colors.onSurface;
+    final hintColor = context.semantic.textMuted;
 
     final categoriesAsync = ref.watch(categoriesProvider);
     final subcategoriesAsync = s.categoryId.isNotEmpty
@@ -421,128 +389,162 @@ class _Step1BasicInfo extends ConsumerWidget {
         : null;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+        vertical: AppSpacing.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Title ──
-          _SectionLabel(label: 'عنوان البلاغ *', isDark: isDark),
-          const SizedBox(height: 8),
-          TextField(
-            controller: titleController,
-            textDirection: TextDirection.rtl,
-            maxLength: 200,
-            inputFormatters: [LengthLimitingTextInputFormatter(200)],
-            decoration: _inputDecoration(
-              hint: 'أدخل عنواناً واضحاً للبلاغ',
-              borderColor: borderColor,
-              hintColor: hintColor,
-              textColor: textColor,
-            ),
-            style: TextStyle(color: textColor),
-            onChanged: (v) => n.setTitle(v),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Description ──
-          _SectionLabel(label: 'وصف البلاغ *', isDark: isDark),
-          const SizedBox(height: 8),
-          TextField(
-            controller: descController,
-            textDirection: TextDirection.rtl,
-            maxLines: 5,
-            maxLength: 2000,
-            inputFormatters: [LengthLimitingTextInputFormatter(2000)],
-            decoration: _inputDecoration(
-              hint: 'صف الحادثة أو المشكلة بتفصيل',
-              borderColor: borderColor,
-              hintColor: hintColor,
-              textColor: textColor,
-            ),
-            style: TextStyle(color: textColor),
-            onChanged: (v) => n.setDescription(v),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Category ──
-          _SectionLabel(label: 'التصنيف الرئيسي *', isDark: isDark),
-          const SizedBox(height: 8),
-          categoriesAsync.when(
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text(
-              'فشل تحميل التصنيفات',
-              style: TextStyle(color: Colors.red.shade400),
-            ),
-            data: (cats) => _StyledDropdown<String>(
-              value: s.categoryId.isEmpty ? null : s.categoryId,
-              hint: 'اختر التصنيف',
-              borderColor: borderColor,
-              textColor: textColor,
-              items: cats
-                  .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name, textDirection: TextDirection.rtl)))
-                  .toList(),
-              onChanged: (id) {
-                if (id == null) return;
-                final cat = cats.firstWhere((c) => c.id == id);
-                n.setCategory(id: id, name: cat.name);
-              },
+          AppFormCard(
+            title: 'تفاصيل البلاغ',
+            subtitle: 'أدخل عنواناً ووصفاً واضحاً',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SectionLabel(label: 'عنوان البلاغ *'),
+                const SizedBox(height: AppSpacing.xs),
+                TextField(
+                  controller: titleController,
+                  textDirection: TextDirection.rtl,
+                  maxLength: 200,
+                  inputFormatters: [LengthLimitingTextInputFormatter(200)],
+                  decoration: _inputDecoration(
+                    context,
+                    hint: 'أدخل عنواناً واضحاً للبلاغ',
+                    borderColor: borderColor,
+                    hintColor: hintColor,
+                    textColor: textColor,
+                  ),
+                  style: TextStyle(color: textColor),
+                  onChanged: (v) => n.setTitle(v),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _SectionLabel(label: 'وصف البلاغ *'),
+                const SizedBox(height: AppSpacing.xs),
+                TextField(
+                  controller: descController,
+                  textDirection: TextDirection.rtl,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  inputFormatters: [LengthLimitingTextInputFormatter(2000)],
+                  decoration: _inputDecoration(
+                    context,
+                    hint: 'صف الحادثة أو المشكلة بتفصيل',
+                    borderColor: borderColor,
+                    hintColor: hintColor,
+                    textColor: textColor,
+                  ),
+                  style: TextStyle(color: textColor),
+                  onChanged: (v) => n.setDescription(v),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // ── Subcategory ──
-          _SectionLabel(label: 'التصنيف الفرعي *', isDark: isDark),
-          const SizedBox(height: 8),
-          if (s.categoryId.isEmpty)
-            _StyledDropdown<String>(
-              value: null,
-              hint: 'اختر التصنيف الرئيسي أولاً',
-              borderColor: borderColor,
-              textColor: hintColor,
-              items: const [],
-              onChanged: null,
-            )
-          else
-            subcategoriesAsync!.when(
-              loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text(
-                'فشل تحميل التصنيفات الفرعية',
-                style: TextStyle(color: Colors.red.shade400),
-              ),
-              data: (subs) => _StyledDropdown<String>(
-                value: s.subcategoryId.isEmpty ? null : s.subcategoryId,
-                hint: subs.isEmpty ? 'لا يوجد تصنيف فرعي' : 'اختر التصنيف الفرعي',
-                borderColor: borderColor,
-                textColor: textColor,
-                items: subs
-                    .map((sub) => DropdownMenuItem(value: sub.id, child: Text(sub.name, textDirection: TextDirection.rtl)))
-                    .toList(),
-                onChanged: subs.isEmpty
-                    ? null
-                    : (id) {
-                        if (id == null) return;
-                        final sub = subs.firstWhere((s) => s.id == id);
-                        n.setSubcategory(id: id, name: sub.name);
-                      },
-              ),
+          const SizedBox(height: AppSpacing.sm),
+          AppFormCard(
+            title: 'التصنيف',
+            subtitle: 'اختر التصنيف المناسب للبلاغ',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SectionLabel(label: 'التصنيف الرئيسي *'),
+                const SizedBox(height: AppSpacing.xs),
+                categoriesAsync.when(
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) => Text(
+                    'فشل تحميل التصنيفات',
+                    style: TextStyle(color: Colors.red.shade400),
+                  ),
+                  data: (cats) => _StyledDropdown<String>(
+                    value: s.categoryId.isEmpty ? null : s.categoryId,
+                    hint: 'اختر التصنيف',
+                    borderColor: borderColor,
+                    textColor: textColor,
+                    items: cats
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c.id,
+                            child: Text(
+                              c.name,
+                              textDirection: TextDirection.rtl,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (id) {
+                      if (id == null) return;
+                      final cat = cats.firstWhere((c) => c.id == id);
+                      n.setCategory(id: id, name: cat.name);
+                    },
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _SectionLabel(label: 'التصنيف الفرعي *'),
+                const SizedBox(height: AppSpacing.xs),
+                if (s.categoryId.isEmpty)
+                  _StyledDropdown<String>(
+                    value: null,
+                    hint: 'اختر التصنيف الرئيسي أولاً',
+                    borderColor: borderColor,
+                    textColor: hintColor,
+                    items: const [],
+                    onChanged: null,
+                  )
+                else
+                  subcategoriesAsync!.when(
+                    loading: () => const LinearProgressIndicator(),
+                    error: (e, _) => Text(
+                      'فشل تحميل التصنيفات الفرعية',
+                      style: TextStyle(color: Colors.red.shade400),
+                    ),
+                    data: (subs) => _StyledDropdown<String>(
+                      value: s.subcategoryId.isEmpty ? null : s.subcategoryId,
+                      hint: subs.isEmpty
+                          ? 'لا يوجد تصنيف فرعي'
+                          : 'اختر التصنيف الفرعي',
+                      borderColor: borderColor,
+                      textColor: textColor,
+                      items: subs
+                          .map(
+                            (sub) => DropdownMenuItem(
+                              value: sub.id,
+                              child: Text(
+                                sub.name,
+                                textDirection: TextDirection.rtl,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: subs.isEmpty
+                          ? null
+                          : (id) {
+                              if (id == null) return;
+                              final sub = subs.firstWhere((s) => s.id == id);
+                              n.setSubcategory(id: id, name: sub.name);
+                            },
+                    ),
+                  ),
+              ],
             ),
-          const SizedBox(height: 24),
-
-          // ── Visibility ──
-          _SectionLabel(label: 'مستوى الظهور', isDark: isDark),
-          const SizedBox(height: 8),
-          _VisibilitySelector(
-            selected: s.visibility,
-            onSelected: n.setVisibility,
-            isDark: isDark,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.sm),
+          AppFormCard(
+            title: 'مستوى الظهور',
+            subtitle: 'حدد من يمكنه رؤية بلاغك',
+            child: _VisibilitySelector(
+              selected: s.visibility,
+              onSelected: n.setVisibility,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
         ],
       ),
     );
   }
 
-  InputDecoration _inputDecoration({
+  InputDecoration _inputDecoration(
+    BuildContext context, {
     required String hint,
     required Color borderColor,
     required Color hintColor,
@@ -559,8 +561,8 @@ class _Step1BasicInfo extends ConsumerWidget {
       border: border,
       enabledBorder: border,
       focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: context.colors.primary, width: 1.5),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );
@@ -571,15 +573,14 @@ class _VisibilitySelector extends StatelessWidget {
   const _VisibilitySelector({
     required this.selected,
     required this.onSelected,
-    required this.isDark,
   });
 
   final ReportVisibility selected;
   final void Function(ReportVisibility) onSelected;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final semantic = context.semantic;
     return Row(
       textDirection: TextDirection.rtl,
       children: ReportVisibility.values.map((v) {
@@ -593,11 +594,13 @@ class _VisibilitySelector extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary
-                    : (isDark ? const Color(0xFF1A2070) : const Color(0xFFF0F4FF)),
-                borderRadius: BorderRadius.circular(10),
+                    ? context.colors.primary
+                    : semantic.chipBackground,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : const Color(0xFFB8C4D9),
+                  color: isSelected
+                      ? context.colors.primary
+                      : semantic.borderStrong,
                 ),
               ),
               child: Column(
@@ -605,7 +608,9 @@ class _VisibilitySelector extends StatelessWidget {
                   Icon(
                     _iconFor(v),
                     size: 20,
-                    color: isSelected ? Colors.white : AppColors.primary,
+                    color: isSelected
+                        ? context.semantic.textOnPrimary
+                        : context.colors.primary,
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -615,10 +620,8 @@ class _VisibilitySelector extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: isSelected
-                          ? Colors.white
-                          : (isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight),
+                          ? context.semantic.textOnPrimary
+                          : context.colors.onSurface,
                     ),
                   ),
                 ],
@@ -644,135 +647,139 @@ class _VisibilitySelector extends StatelessWidget {
 // =============================================================================
 
 class _Step2Location extends ConsumerWidget {
-  const _Step2Location({required this.isDark});
-  final bool isDark;
+  const _Step2Location();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(createReportProvider);
     final n = ref.read(createReportProvider.notifier);
     final hasLocation = s.hasLocation;
+    final semantic = context.semantic;
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Location display card
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: hasLocation
-                  ? AppColors.primary.withValues(alpha: 0.08)
-                  : (isDark
-                      ? const Color(0xFF1A2070)
-                      : const Color(0xFFF0F4FF)),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+        vertical: AppSpacing.md,
+      ),
+      child: AppFormCard(
+        title: 'موقع البلاغ',
+        subtitle: hasLocation
+            ? 'تم تحديد الموقع بنجاح'
+            : 'حدد موقع الحادثة على الخريطة',
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
                 color: hasLocation
-                    ? AppColors.primary
-                    : (isDark
-                        ? const Color(0xFF2A3580)
-                        : const Color(0xFFD1D9F0)),
-                width: 1.5,
-              ),
-            ),
-            child: hasLocation
-                ? Column(
-                    children: [
-                      const Icon(
-                        Icons.location_on_rounded,
-                        color: AppColors.primary,
-                        size: 48,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        s.locationName.isNotEmpty ? s.locationName : 'تم تحديد الموقع',
-                        textDirection: TextDirection.rtl,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${s.latitude.toStringAsFixed(5)}, ${s.longitude.toStringAsFixed(5)}',
-                        textDirection: TextDirection.ltr,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.primary,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      Icon(
-                        Icons.add_location_alt_outlined,
-                        size: 64,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : const Color(0xFFB8C4D9),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'لم يتم تحديد الموقع بعد',
-                        textDirection: TextDirection.rtl,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : const Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'اضغط على الزر أدناه لفتح الخريطة وتحديد موقع البلاغ',
-                        textDirection: TextDirection.rtl,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : const Color(0xFF9CA3AF),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: () => _openLocationPicker(context, ref, n),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                    ? context.colors.primary.withValues(alpha: 0.08)
+                    : semantic.chipBackground,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(
+                  color: hasLocation
+                      ? context.colors.primary.withValues(alpha: 0.4)
+                      : semantic.borderSubtle,
                 ),
-                elevation: 0,
               ),
-              icon: Icon(
-                hasLocation ? Icons.edit_location_alt_outlined : Icons.map_outlined,
-              ),
-              label: Text(
-                hasLocation ? 'تغيير الموقع' : 'تحديد الموقع على الخريطة',
-                textDirection: TextDirection.rtl,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              child: hasLocation
+                  ? Column(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: context.colors.primary.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.location_on_rounded,
+                            color: context.colors.primary,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          s.locationName.isNotEmpty
+                              ? s.locationName
+                              : 'تم تحديد الموقع',
+                          textDirection: TextDirection.rtl,
+                          textAlign: TextAlign.center,
+                          style: context.text.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          '${s.latitude.toStringAsFixed(5)}, ${s.longitude.toStringAsFixed(5)}',
+                          textDirection: TextDirection.ltr,
+                          style: context.text.labelSmall?.copyWith(
+                            color: context.colors.primary,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        Icon(
+                          Icons.add_location_alt_outlined,
+                          size: 56,
+                          color: semantic.borderStrong,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'لم يتم تحديد الموقع بعد',
+                          textDirection: TextDirection.rtl,
+                          style: context.text.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: semantic.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'اضغط على الزر أدناه لفتح الخريطة وتحديد موقع البلاغ',
+                          textDirection: TextDirection.rtl,
+                          textAlign: TextAlign.center,
+                          style: context.text.bodySmall?.copyWith(
+                            color: semantic.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () => _openLocationPicker(context, ref, n),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.colors.primary,
+                  foregroundColor: context.semantic.textOnPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                  elevation: 0,
+                ),
+                icon: Icon(
+                  hasLocation
+                      ? Icons.edit_location_alt_outlined
+                      : Icons.map_outlined,
+                ),
+                label: Text(
+                  hasLocation ? 'تغيير الموقع' : 'تحديد الموقع على الخريطة',
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -817,9 +824,8 @@ class _Step2Location extends ConsumerWidget {
 // =============================================================================
 
 class _Step3Attachments extends ConsumerStatefulWidget {
-  const _Step3Attachments({required this.picker, required this.isDark});
+  const _Step3Attachments({required this.picker});
   final ImagePicker picker;
-  final bool isDark;
 
   @override
   ConsumerState<_Step3Attachments> createState() => _Step3AttachmentsState();
@@ -832,10 +838,7 @@ class _Step3AttachmentsState extends ConsumerState<_Step3Attachments> {
     if (errors.isEmpty || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          errors.join('\n'),
-          textDirection: TextDirection.rtl,
-        ),
+        content: Text(errors.join('\n'), textDirection: TextDirection.rtl),
         backgroundColor: Colors.redAccent,
         duration: const Duration(seconds: 4),
       ),
@@ -848,7 +851,10 @@ class _Step3AttachmentsState extends ConsumerState<_Step3Attachments> {
     try {
       final XFile? file = video
           ? await widget.picker.pickVideo(source: ImageSource.camera)
-          : await widget.picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+          : await widget.picker.pickImage(
+              source: ImageSource.camera,
+              imageQuality: 85,
+            );
       if (file != null && mounted) {
         final errors = await ref
             .read(createReportProvider.notifier)
@@ -884,96 +890,106 @@ class _Step3AttachmentsState extends ConsumerState<_Step3Attachments> {
 
     return Column(
       children: [
-        // Attachment actions
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Expanded(
-                child: _AttachActionButton(
-                  icon: Icons.camera_alt_outlined,
-                  label: 'التقاط صورة',
-                  onTap: n.canAddMore ? () => _pickFromCamera() : null,
-                  isDark: widget.isDark,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenHorizontal,
+            AppSpacing.md,
+            AppSpacing.screenHorizontal,
+            0,
+          ),
+          child: AppFormCard(
+            title: 'المرفقات',
+            subtitle: 'اختياري — حتى $kMaxAttachments ملف',
+            child: Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Expanded(
+                  child: _AttachActionButton(
+                    icon: Icons.camera_alt_outlined,
+                    label: 'التقاط صورة',
+                    onTap: n.canAddMore ? () => _pickFromCamera() : null,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AttachActionButton(
-                  icon: Icons.videocam_outlined,
-                  label: 'تسجيل فيديو',
-                  onTap: n.canAddMore ? () => _pickFromCamera(video: true) : null,
-                  isDark: widget.isDark,
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: _AttachActionButton(
+                    icon: Icons.videocam_outlined,
+                    label: 'تسجيل فيديو',
+                    onTap: n.canAddMore
+                        ? () => _pickFromCamera(video: true)
+                        : null,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AttachActionButton(
-                  icon: Icons.photo_library_outlined,
-                  label: 'من المعرض',
-                  onTap: n.canAddMore ? () => _pickFromGallery() : null,
-                  isDark: widget.isDark,
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: _AttachActionButton(
+                    icon: Icons.photo_library_outlined,
+                    label: 'من المعرض',
+                    onTap: n.canAddMore ? () => _pickFromGallery() : null,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        // Counter
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.xs,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
                 '${attachments.length} / $kMaxAttachments مرفق',
                 textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 12,
+                style: context.text.labelSmall?.copyWith(
                   color: attachments.length >= kMaxAttachments
-                      ? Colors.redAccent
-                      : (widget.isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
+                      ? context.semantic.error
+                      : context.semantic.textMuted,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
         ),
-        // Grid
         Expanded(
           child: attachments.isEmpty
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.attach_file_rounded,
-                        size: 64,
-                        color: widget.isDark
-                            ? AppColors.textSecondaryDark
-                            : const Color(0xFFB8C4D9),
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: context.semantic.chipBackground,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.attach_file_rounded,
+                          size: 32,
+                          color: context.semantic.borderStrong,
+                        ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
                         'لا توجد مرفقات (اختياري)',
                         textDirection: TextDirection.rtl,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: widget.isDark
-                              ? AppColors.textSecondaryDark
-                              : const Color(0xFF9CA3AF),
+                        style: context.text.bodyMedium?.copyWith(
+                          color: context.semantic.textMuted,
                         ),
                       ),
                     ],
                   ),
                 )
               : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
+                    crossAxisSpacing: AppSpacing.xs,
+                    mainAxisSpacing: AppSpacing.xs,
                   ),
                   itemCount: attachments.length,
                   itemBuilder: (context, index) {
@@ -998,9 +1014,8 @@ class _Step3AttachmentsState extends ConsumerState<_Step3Attachments> {
 // =============================================================================
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label, required this.isDark});
+  const _SectionLabel({required this.label});
   final String label;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -1010,7 +1025,7 @@ class _SectionLabel extends StatelessWidget {
       style: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+        color: context.colors.onSurface,
       ),
     );
   }
@@ -1035,20 +1050,18 @@ class _StyledDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       decoration: BoxDecoration(
         border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
           value: value,
           isExpanded: true,
-          dropdownColor:
-              isDark ? const Color(0xFF1A2070) : Colors.white,
+          dropdownColor: context.semantic.surfaceContainer,
           icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor),
           hint: Align(
             alignment: Alignment.centerRight,
@@ -1072,16 +1085,15 @@ class _AttachActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    required this.isDark,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final semantic = context.semantic;
     final enabled = onTap != null;
     return GestureDetector(
       onTap: onTap,
@@ -1089,17 +1101,15 @@ class _AttachActionButton extends StatelessWidget {
         opacity: enabled ? 1.0 : 0.4,
         duration: const Duration(milliseconds: 200),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A2070) : const Color(0xFFF0F4FF),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? const Color(0xFF2A3580) : const Color(0xFFD1D9F0),
-            ),
+            color: semantic.chipBackground,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: semantic.borderSubtle),
           ),
           child: Column(
             children: [
-              Icon(icon, color: AppColors.primary, size: 24),
+              Icon(icon, color: context.colors.primary, size: 24),
               const SizedBox(height: 6),
               Text(
                 label,
@@ -1108,7 +1118,7 @@ class _AttachActionButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  color: context.colors.onSurface,
                 ),
               ),
             ],
@@ -1141,10 +1151,10 @@ class _AttachmentThumbnail extends StatelessWidget {
               File(filePath),
               fit: BoxFit.cover,
               errorBuilder: (context, error, stack) => Container(
-                color: const Color(0xFF1A2070),
-                child: const Icon(
+                color: context.semantic.chipBackground,
+                child: Icon(
                   Icons.broken_image_outlined,
-                  color: Colors.white54,
+                  color: context.semantic.textMuted,
                   size: 32,
                 ),
               ),
@@ -1152,11 +1162,11 @@ class _AttachmentThumbnail extends StatelessWidget {
           ),
         ),
         if (isVideo)
-          const Positioned.fill(
+          Positioned.fill(
             child: Center(
               child: Icon(
                 Icons.play_circle_filled_rounded,
-                color: Colors.white,
+                color: context.semantic.textOnPrimary,
                 size: 32,
               ),
             ),
@@ -1170,10 +1180,14 @@ class _AttachmentThumbnail extends StatelessWidget {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
+                color: context.semantic.overlay,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.close, color: Colors.white, size: 14),
+              child: Icon(
+                Icons.close,
+                color: context.semantic.textOnPrimary,
+                size: 14,
+              ),
             ),
           ),
         ),

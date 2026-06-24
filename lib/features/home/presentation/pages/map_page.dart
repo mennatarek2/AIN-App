@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../config/routes/app_routes.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../../../home/domain/report_map_pin.dart';
 import '../../../home/presentation/providers/categories_provider.dart';
 import '../../../home/presentation/providers/map_notifier.dart';
@@ -22,7 +24,7 @@ Color _statusColor(String status) {
     'dispatched' => const Color(0xFF3B82F6),
     'resolved' => const Color(0xFF22C55E),
     'rejected' => const Color(0xFFEF4444),
-    _ => AppColors.primary,
+    _ => const Color(0xFF0099FF),
   };
 }
 
@@ -187,7 +189,6 @@ class _MapPageState extends ConsumerState<MapPage>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(mapProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedNavIndex = ref.watch(homeNavigationProvider);
 
     final markers = _buildMarkers(s);
@@ -208,7 +209,7 @@ class _MapPageState extends ConsumerState<MapPage>
             mapToolbarEnabled: false,
             compassEnabled: true,
             mapType: MapType.normal,
-            style: isDark ? _darkMapStyle : null,
+            style: context.isDarkMode ? _darkMapStyle : null,
             onMapCreated: (controller) {
               _mapController = controller;
             },
@@ -223,7 +224,6 @@ class _MapPageState extends ConsumerState<MapPage>
             child: _MapTopBar(
               isLoading: s.isLoading,
               hasFilter: s.hasActiveFilter,
-              isDark: isDark,
               onBack: () => Navigator.of(context).pop(),
               onRefresh: () => ref.read(mapProvider.notifier).refresh(),
               onFilter: _openFilterSheet,
@@ -242,15 +242,13 @@ class _MapPageState extends ConsumerState<MapPage>
                 _MapFab(
                   icon: Icons.my_location_rounded,
                   onTap: _onMyLocation,
-                  isDark: isDark,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm - 2),
                 _MapFab(
                   icon: s.hasActiveFilter
                       ? Icons.filter_list_rounded
                       : Icons.tune_rounded,
                   onTap: _openFilterSheet,
-                  isDark: isDark,
                   badge: s.hasActiveFilter,
                 ),
               ],
@@ -266,24 +264,31 @@ class _MapPageState extends ConsumerState<MapPage>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444),
-                  borderRadius: BorderRadius.circular(12),
+                  color: context.semantic.error,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.error_outline,
+                      color: context.semantic.textOnPrimary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         s.error!,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        style: TextStyle(
+                          color: context.semantic.textOnPrimary,
+                          fontSize: 13,
+                        ),
                         textDirection: TextDirection.rtl,
                       ),
                     ),
                     GestureDetector(
                       onTap: () => ref.read(mapProvider.notifier).refresh(),
                       child:
-                          const Icon(Icons.refresh, color: Colors.white, size: 18),
+                          Icon(Icons.refresh, color: context.semantic.textOnPrimary, size: 18),
                     ),
                   ],
                 ),
@@ -325,7 +330,7 @@ class _MapPageState extends ConsumerState<MapPage>
         selectedIndex: selectedNavIndex,
         onTap: (index) {
           ref.read(homeNavigationProvider.notifier).setSelectedIndex(index);
-          navigateFromBottomNav(context, index);
+          navigateFromBottomNav(context, ref, index);
         },
         onReportTap: () {
           Navigator.of(context).push(
@@ -343,7 +348,6 @@ class _MapTopBar extends StatelessWidget {
   const _MapTopBar({
     required this.isLoading,
     required this.hasFilter,
-    required this.isDark,
     required this.onBack,
     required this.onRefresh,
     required this.onFilter,
@@ -351,30 +355,22 @@ class _MapTopBar extends StatelessWidget {
 
   final bool isLoading;
   final bool hasFilter;
-  final bool isDark;
   final VoidCallback onBack;
   final VoidCallback onRefresh;
   final VoidCallback onFilter;
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark
-        ? const Color(0xFF0D1230).withValues(alpha: 0.92)
-        : Colors.white.withValues(alpha: 0.92);
-    final fg = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final semantic = context.semantic;
+    final bg = semantic.surfaceNavBar.withValues(alpha: 0.92);
+    final fg = context.colors.onSurface;
 
     return Container(
       height: 52,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: context.cardShadows,
       ),
       child: Row(
         children: [
@@ -385,7 +381,7 @@ class _MapTopBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             constraints: const BoxConstraints(),
           ),
-          Icon(Icons.map_rounded, color: AppColors.primary, size: 20),
+          Icon(Icons.map_rounded, color: context.colors.primary, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -412,14 +408,14 @@ class _MapTopBar extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: context.colors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 'فلتر مفعل',
                 style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.primary,
+                  color: context.colors.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -441,19 +437,17 @@ class _MapFab extends StatelessWidget {
   const _MapFab({
     required this.icon,
     required this.onTap,
-    required this.isDark,
     this.badge = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
-  final bool isDark;
   final bool badge;
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? const Color(0xFF0D1230) : Colors.white;
-    final fg = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final semantic = context.semantic;
+    final fg = context.colors.onSurface;
 
     return GestureDetector(
       onTap: onTap,
@@ -461,15 +455,9 @@ class _MapFab extends StatelessWidget {
         width: 46,
         height: 46,
         decoration: BoxDecoration(
-          color: bg,
+          color: semantic.surfaceNavBar,
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.10),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          boxShadow: context.cardShadows,
         ),
         child: Stack(
           children: [
@@ -481,8 +469,8 @@ class _MapFab extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  decoration: BoxDecoration(
+                    color: context.colors.primary,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -509,27 +497,20 @@ class _PinDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0D1230) : Colors.white;
-    final fg = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final sub = isDark
-        ? AppColors.textSecondaryDark
-        : AppColors.textSecondaryLight;
+    final semantic = context.semantic;
+    final fg = context.colors.onSurface;
+    final sub = semantic.textMuted;
 
     return GestureDetector(
       onTap: () {},
       child: Container(
         height: 220,
         decoration: BoxDecoration(
-          color: bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.40 : 0.12),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
-            ),
-          ],
+          color: semantic.surfaceContainer,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xxl),
+          ),
+          boxShadow: context.cardShadows,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -626,10 +607,10 @@ class _PinDetailSheet extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: onViewDetail,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: context.colors.primary,
+                        foregroundColor: context.semantic.textOnPrimary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         elevation: 0,
                       ),
@@ -718,15 +699,16 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0D1230) : Colors.white;
-    final fg = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final semantic = context.semantic;
+    final fg = context.colors.onSurface;
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Container(
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        color: semantic.surfaceContainer,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xxl),
+        ),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
@@ -753,10 +735,10 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               children: [
                 TextButton(
                   onPressed: widget.onClear,
-                  child: const Text(
+                  child: Text(
                     'مسح الفلاتر',
                     textDirection: TextDirection.rtl,
-                    style: TextStyle(color: Color(0xFFEF4444)),
+                    style: TextStyle(color: context.semantic.error),
                   ),
                 ),
                 Text(
@@ -812,10 +794,10 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                       onSelected: (_) => setState(() {
                         _selectedCategoryId = selected ? null : cat.id;
                       }),
-                      selectedColor: AppColors.primary.withValues(alpha: 0.16),
-                      checkmarkColor: AppColors.primary,
+                      selectedColor: context.colors.primary.withValues(alpha: 0.16),
+                      checkmarkColor: context.colors.primary,
                       labelStyle: TextStyle(
-                        color: selected ? AppColors.primary : fg,
+                        color: selected ? context.colors.primary : fg,
                         fontWeight:
                             selected ? FontWeight.w600 : FontWeight.w400,
                         fontSize: 13,
@@ -887,10 +869,10 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 onPressed: () =>
                     widget.onApply(_selectedCategoryId, _selectedStatus),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: context.colors.primary,
+                  foregroundColor: context.semantic.textOnPrimary,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   elevation: 0,
                 ),

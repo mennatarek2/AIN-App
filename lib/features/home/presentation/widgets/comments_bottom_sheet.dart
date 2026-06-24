@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 
 class CommentItemData {
   final String id;
@@ -100,20 +102,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final keyboardBottom = MediaQuery.of(context).viewInsets.bottom;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetColor = isDark ? const Color(0xFF0D1530) : Colors.white;
-    final primaryText = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final dividerColor = isDark
-        ? const Color(0xFF32417B)
-        : const Color(0xFFE5E7EB);
-    final inputFill = isDark
-        ? const Color(0xFF16204A)
-        : const Color(0xFFF3F6F9);
-    final hintColor = isDark
-        ? AppColors.textSecondaryDark
-        : AppColors.textSecondaryLight;
+    final semantic = context.semantic;
 
     return SafeArea(
       child: Padding(
@@ -121,24 +110,29 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
         child: Container(
           height: MediaQuery.of(context).size.height * 0.78,
           decoration: BoxDecoration(
-            color: sheetColor,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            color: semantic.surfaceContainer,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xxl),
+            ),
           ),
           child: Column(
             children: [
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm - 2),
               Container(
                 width: 44,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF475585)
-                      : const Color(0xFFD1D5DB),
-                  borderRadius: BorderRadius.circular(8),
+                  color: semantic.borderStrong,
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm + 2,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
                 child: Row(
                   textDirection: TextDirection.rtl,
                   children: [
@@ -150,10 +144,9 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                           Text(
                             'التعليقات (${_comments.length})',
                             textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              fontSize: 18,
+                            style: context.text.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: primaryText,
+                              color: context.colors.onSurface,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -163,19 +156,24 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                   ],
                 ),
               ),
-              Divider(height: 1, color: dividerColor),
+              Divider(height: 1, color: semantic.divider),
               Expanded(
                 child: _comments.isEmpty
-                    ? _EmptyCommentsState(isDark: isDark)
+                    ? const _EmptyCommentsState()
                     : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.sm + 2,
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                        ),
                         itemCount: _comments.length,
-                        separatorBuilder: (context, i) => const SizedBox(height: 14),
+                        separatorBuilder: (context, i) =>
+                            const SizedBox(height: AppSpacing.sm + 2),
                         itemBuilder: (context, index) {
                           final comment = _comments[index];
                           return _CommentListItem(
                             item: comment,
-                            isDark: isDark,
                             onLike: () {
                               widget.onLikeComment(comment.id);
                               setState(() {
@@ -191,9 +189,14 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                         },
                       ),
               ),
-              Divider(height: 1, color: dividerColor),
+              Divider(height: 1, color: semantic.divider),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm - 2,
+                  AppSpacing.md,
+                  AppSpacing.sm + 2,
+                ),
                 child: Row(
                   textDirection: TextDirection.rtl,
                   children: [
@@ -206,34 +209,34 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                         decoration: InputDecoration(
                           hintText: 'اكتب تعليقك...',
                           hintTextDirection: TextDirection.rtl,
-                          hintStyle: TextStyle(color: hintColor),
+                          hintStyle: TextStyle(color: semantic.textMuted),
                           filled: true,
-                          fillColor: inputFill,
+                          fillColor: semantic.surfaceInput,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
+                            horizontal: AppSpacing.sm + 2,
                             vertical: 11,
                           ),
                         ),
                         onSubmitted: (_) => _sendComment(),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.sm - 2),
                     GestureDetector(
                       onTap: _sendComment,
                       child: Container(
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
+                          color: context.colors.primary,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.send_rounded,
-                          color: Colors.white,
+                          color: context.semantic.textOnPrimary,
                           size: 20,
                         ),
                       ),
@@ -251,23 +254,18 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
 
 class _CommentListItem extends StatelessWidget {
   final CommentItemData item;
-  final bool isDark;
   final VoidCallback onLike;
 
   const _CommentListItem({
     required this.item,
-    required this.isDark,
     required this.onLike,
   });
 
   @override
   Widget build(BuildContext context) {
-    final primaryText = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimaryLight;
-    final secondaryText = isDark
-        ? AppColors.textSecondaryDark
-        : AppColors.textSecondaryLight;
+    final semantic = context.semantic;
+    final primaryText = context.colors.onSurface;
+    final secondaryText = semantic.textMuted;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,11 +276,13 @@ class _CommentListItem extends StatelessWidget {
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isDark ? const Color(0xFF16204A) : const Color(0xFFEFF6FF),
+            color: semantic.infoContainer.withValues(
+              alpha: context.isDarkMode ? 0.5 : 1,
+            ),
           ),
-          child: const Icon(Icons.person, color: AppColors.primary, size: 20),
+          child: Icon(Icons.person, color: context.colors.primary, size: 20),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm - 2),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -323,13 +323,13 @@ class _CommentListItem extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Row(
                 textDirection: TextDirection.rtl,
                 children: [
                   InkWell(
                     onTap: onLike,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
@@ -344,7 +344,7 @@ class _CommentListItem extends StatelessWidget {
                                 : Icons.favorite_border,
                             size: 15,
                             color: item.isLiked
-                                ? const Color(0xFFEF4444)
+                                ? semantic.sos
                                 : secondaryText,
                           ),
                           const SizedBox(width: 5),
@@ -360,12 +360,15 @@ class _CommentListItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.sm - 2),
                   InkWell(
                     onTap: () {},
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
                       child: Text(
                         'رد',
                         style: TextStyle(
@@ -387,9 +390,7 @@ class _CommentListItem extends StatelessWidget {
 }
 
 class _EmptyCommentsState extends StatelessWidget {
-  final bool isDark;
-
-  const _EmptyCommentsState({required this.isDark});
+  const _EmptyCommentsState();
 
   @override
   Widget build(BuildContext context) {
@@ -402,22 +403,15 @@ class _EmptyCommentsState extends StatelessWidget {
             width: 200,
             height: 200,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             'لا توجد تعليقات بعد',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+              color: context.semantic.textMuted,
             ),
           ),
-          const SizedBox(height: 2),
-          // Text(
-          //   'كن أول من يضيف تعليقًا على هذا البلاغ',
-          //   style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-          // ),
         ],
       ),
     );

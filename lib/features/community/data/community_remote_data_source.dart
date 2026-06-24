@@ -2,6 +2,11 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../models/community_detail.dart';
+import '../models/community_search_result.dart';
+import '../models/enums/community_enums.dart';
+import '../models/join_request.dart';
+import '../models/member_detail.dart';
 
 // ─── SOS History ─────────────────────────────────────────────────────────────
 
@@ -56,48 +61,6 @@ class LocationDto {
   }
 }
 
-// ─── Member status ────────────────────────────────────────────────────────────
-
-enum MemberStatus {
-  active,          // Has location — can use SOS
-  locationPending, // Joined but no location yet
-  inactive;        // No update in 30+ days
-
-  static MemberStatus parse(String? raw) => switch ((raw ?? '').toLowerCase()) {
-    'active'          => MemberStatus.active,
-    'locationpending' => MemberStatus.locationPending,
-    'inactive'        => MemberStatus.inactive,
-    _                 => MemberStatus.locationPending,
-  };
-}
-
-// ─── Community type ───────────────────────────────────────────────────────────
-
-enum CommunityType {
-  neighborhood(0, 'حي', 'قابل للاكتشاف من المستخدمين القريبين', 500),
-  building(1, 'مبنى', 'بكود دعوة فقط', 100),
-  privateGroup(2, 'مجموعة خاصة', 'بدون نطاق جغرافي', null);
-
-  const CommunityType(
-    this.value,
-    this.labelAr,
-    this.descriptionAr,
-    this.defaultRadiusMeters,
-  );
-
-  final int value;
-  final String labelAr;
-  final String descriptionAr;
-  final int? defaultRadiusMeters;
-
-  bool get hasRadius => defaultRadiusMeters != null;
-
-  static CommunityType fromValue(int value) => CommunityType.values.firstWhere(
-        (t) => t.value == value,
-        orElse: () => CommunityType.neighborhood,
-      );
-}
-
 // ─── UserDetailsDto ───────────────────────────────────────────────────────────
 
 class UserDetailsDto {
@@ -130,7 +93,7 @@ class UserDetailsDto {
         lastLocationUpdatedAt:
             DateTime.tryParse(json['lastLocationUpdatedAt']?.toString() ?? '') ??
                 DateTime(1),
-        memberStatus: MemberStatus.parse(json['memberStatus']?.toString()),
+        memberStatus: memberStatusFromJson(json['memberStatus']),
       );
 }
 
@@ -246,7 +209,9 @@ class RegenerateCodeResultDto {
   factory RegenerateCodeResultDto.fromJson(Map<String, dynamic> json) =>
       RegenerateCodeResultDto(
         communityId: json['communityId']?.toString() ?? '',
-        inviteCode: json['inviteCode']?.toString() ?? '',
+        inviteCode: json['newInviteCode']?.toString() ??
+            json['inviteCode']?.toString() ??
+            '',
         inviteCodeExpiresAt: json['inviteCodeExpiresAt'] != null
             ? DateTime.tryParse(json['inviteCodeExpiresAt'].toString())
             : null,
@@ -371,7 +336,7 @@ class CommunityMemberApiModel {
       id: id,
       email: email.isNotEmpty ? email : userName,
       displayName: userName.isNotEmpty ? userName : null,
-      memberStatus: MemberStatus.parse(json['memberStatus']?.toString()),
+      memberStatus: memberStatusFromJson(json['memberStatus']),
       userLocation: location,
     );
   }
@@ -440,7 +405,7 @@ class CommunityRemoteDataSource {
 
   // ── Get community by ID ────────────────────────────────────────────────────
 
-  Future<CommunityApiModel?> fetchCommunityById(String communityId) async {
+  Future<CommunityDetail?> fetchCommunityById(String communityId) async {
     final token = await _requiredToken();
     final response = await _client.getJson(
       ApiEndpoints.communityById(communityId),
@@ -448,7 +413,36 @@ class CommunityRemoteDataSource {
     );
     final map = _extractMap(response);
     if (map == null) return null;
-    return CommunityApiModel.fromApiJson(map);
+    return CommunityDetail.fromJson(map);
+  }
+
+  Future<void> updateCommunity({
+    required String communityId,
+    required String name,
+    String? description,
+    required CommunityType type,
+    int? coverageRadiusMeters,
+  }) async {
+    final token = await _requiredToken();
+    await _client.putJson(
+      ApiEndpoints.communityById(communityId),
+      token: token,
+      body: {
+        'name': name,
+        'description': description,
+        'communityType': type.value,
+        if (coverageRadiusMeters != null)
+          'coverageRadiusMeters': coverageRadiusMeters,
+      },
+    );
+  }
+
+  Future<void> archiveCommunity(String communityId) async {
+    final token = await _requiredToken();
+    await _client.deleteJson(
+      ApiEndpoints.communityById(communityId),
+      token: token,
+    );
   }
 
   // ── Join by invite code ────────────────────────────────────────────────────
@@ -464,6 +458,111 @@ class CommunityRemoteDataSource {
         (response is Map ? Map<String, dynamic>.from(response) : null);
     if (map == null) throw Exception('Invalid join response');
     return CommunityJoinResultDto.fromJson(map);
+  }
+
+  // ── Submit join request (Neighborhood only) ────────────────────────────────
+
+  Future<CommunityJoinResultDto> requestToJoin(String communityId) async {
+    final token = await _requiredToken();
+    final response = await _client.postJson(
+      ApiEndpoints.communityJoinRequest(communityId),
+      token: token,
+      body: {},
+    );
+    final map = _extractMap(response) ??
+        (response is Map ? Map<String, dynamic>.from(response) : null);
+    if (map == null) throw Exception('Invalid join-request response');
+    return CommunityJoinResultDto.fromJson(map);
+  }
+
+  // ── Get community members (role-aware, server-filtered fields) ─────────────
+
+  Future<List<MemberDetailDto>> getMembers(String communityId) async {
+    final token = await _requiredToken();
+    final response = await _client.getJson(
+      ApiEndpoints.communityMembersList(communityId),
+      token: token,
+    );
+    final list = _extractList(response);
+    if (list == null) return const [];
+    return list
+        .whereType<Map>()
+        .map((item) =>
+            MemberDetailDto.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.userId.isNotEmpty)
+        .toList();
+  }
+
+  // ── Admin: pending join requests ───────────────────────────────────────────
+
+  Future<List<JoinRequestDto>> getPendingRequests(String communityId) async {
+    final token = await _requiredToken();
+    final response = await _client.getJson(
+      ApiEndpoints.communityJoinRequests(communityId),
+      token: token,
+    );
+    final list = _extractList(response);
+    if (list == null) return const [];
+    return list
+        .whereType<Map>()
+        .map((item) =>
+            JoinRequestDto.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.userId.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> approveRequest(String communityId, String userId) async {
+    final token = await _requiredToken();
+    await _client.putEmpty(
+      ApiEndpoints.communityJoinRequestApprove(communityId, userId),
+      token: token,
+    );
+  }
+
+  Future<void> rejectRequest(String communityId, String userId) async {
+    final token = await _requiredToken();
+    await _client.putEmpty(
+      ApiEndpoints.communityJoinRequestReject(communityId, userId),
+      token: token,
+    );
+  }
+
+  // ── Admin: member management ───────────────────────────────────────────────
+
+  Future<void> kickMember(String communityId, String userId) async {
+    final token = await _requiredToken();
+    await _client.deleteJson(
+      ApiEndpoints.communityMemberById(communityId, userId),
+      token: token,
+    );
+  }
+
+  Future<void> changeMemberRole(
+    String communityId,
+    String userId,
+    CommunityRole newRole,
+  ) async {
+    if (newRole == CommunityRole.owner) {
+      throw ArgumentError('Use transferOwnership instead');
+    }
+    final token = await _requiredToken();
+    await _client.putRaw(
+      ApiEndpoints.communityMemberRole(communityId, userId),
+      token: token,
+      body: newRole.value,
+    );
+  }
+
+  Future<void> transferOwnership(
+    String communityId,
+    String newOwnerUserId,
+  ) async {
+    final token = await _requiredToken();
+    await _client.postRaw(
+      ApiEndpoints.communityTransferOwnership(communityId),
+      token: token,
+      body: newOwnerUserId,
+    );
   }
 
   // ── Regenerate invite code ─────────────────────────────────────────────────
@@ -489,6 +588,36 @@ class CommunityRemoteDataSource {
       ApiEndpoints.communityRevokeCode(communityId),
       token: token,
     );
+  }
+
+  // ── Search / discover communities ──────────────────────────────────────────
+
+  Future<List<CommunitySearchResult>> searchCommunities({
+    String? nameQuery,
+    int? type,
+    double? radiusKm,
+  }) async {
+    final token = await _requiredToken();
+    final query = <String, dynamic>{};
+    if (nameQuery != null && nameQuery.trim().isNotEmpty) {
+      query['nameQuery'] = nameQuery.trim();
+    }
+    if (type != null) query['type'] = type;
+    if (radiusKm != null) query['radiusKm'] = radiusKm;
+
+    final response = await _client.getJson(
+      ApiEndpoints.communitySearch,
+      token: token,
+      query: query.isEmpty ? null : query,
+    );
+    final list = _extractList(response);
+    if (list == null) return const [];
+    return list
+        .whereType<Map>()
+        .map((item) =>
+            CommunitySearchResult.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.id.isNotEmpty)
+        .toList();
   }
 
   // ── Discover nearby communities ────────────────────────────────────────────

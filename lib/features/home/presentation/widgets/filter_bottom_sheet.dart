@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../providers/categories_provider.dart';
 import '../providers/home_feed_provider.dart';
 
@@ -31,7 +33,6 @@ class _FilterSheet extends ConsumerStatefulWidget {
 }
 
 class _FilterSheetState extends ConsumerState<_FilterSheet> {
-  // Local selections — will be applied on "تطبيق"
   final Set<String> _selectedCategoryIds = {};
   String? _selectedStatus;
 
@@ -47,10 +48,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? const Color(0xFF0D1530) : Colors.white;
-    final titleColor =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final semantic = context.semantic;
     final categories = ref.watch(categoriesProvider).valueOrNull ?? [];
 
     return DraggableScrollableSheet(
@@ -60,46 +58,47 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: sheetBg,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            color: semantic.surfaceContainer,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xxl),
+            ),
           ),
           child: Column(
             children: [
-              // Handle
               Center(
                 child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 16),
+                  margin: const EdgeInsets.only(
+                    top: AppSpacing.sm,
+                    bottom: AppSpacing.md,
+                  ),
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF2A3A7C)
-                        : Colors.grey[300],
+                    color: semantic.borderStrong,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              // Title row
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                ),
                 child: Row(
                   textDirection: TextDirection.rtl,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'تصفية البلاغات',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: context.text.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: titleColor,
+                        color: context.colors.onSurface,
                       ),
                     ),
                     TextButton(
                       onPressed: _clearAll,
-                      child: const Text(
+                      child: Text(
                         'مسح الكل',
-                        style: TextStyle(color: AppColors.primary),
+                        style: TextStyle(color: context.colors.primary),
                       ),
                     ),
                   ],
@@ -108,30 +107,23 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               Expanded(
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
                   children: [
-                    // ---- Categories ----
-                    _SectionLabel(
-                      label: 'الفئات',
-                      isDark: isDark,
-                      titleColor: titleColor,
-                    ),
-                    const SizedBox(height: 10),
+                    _SectionLabel(label: 'الفئات'),
+                    const SizedBox(height: AppSpacing.sm - 2),
                     if (categories.isEmpty)
                       Center(
                         child: Text(
                           'جاري تحميل الفئات...',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
+                          style: TextStyle(color: semantic.textMuted),
                         ),
                       )
                     else
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
                         textDirection: TextDirection.rtl,
                         children: categories
                             .map(
@@ -147,22 +139,16 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                                     _selectedCategoryIds.add(cat.id);
                                   }
                                 }),
-                                isDark: isDark,
                               ),
                             )
                             .toList(),
                       ),
-                    const SizedBox(height: 24),
-                    // ---- Status ----
-                    _SectionLabel(
-                      label: 'الحالة',
-                      isDark: isDark,
-                      titleColor: titleColor,
-                    ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SectionLabel(label: 'الحالة'),
+                    const SizedBox(height: AppSpacing.sm - 2),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
                       textDirection: TextDirection.rtl,
                       children: _statusOptions
                           .map(
@@ -173,29 +159,31 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                                 _selectedStatus =
                                     _selectedStatus == s.$1 ? null : s.$1;
                               }),
-                              isDark: isDark,
                             ),
                           )
                           .toList(),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xxl),
                   ],
                 ),
               ),
-              // Apply button
               Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                ),
                 child: SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
                     onPressed: _applyFilter,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: context.colors.primary,
+                      foregroundColor: context.semantic.textOnPrimary,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                     ),
                     child: const Text(
@@ -223,7 +211,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
   }
 
   void _applyFilter() {
-    // Only pass first selected category (API takes single categoryId)
     final categoryId = _selectedCategoryIds.isEmpty
         ? null
         : _selectedCategoryIds.first;
@@ -241,24 +228,17 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({
-    required this.label,
-    required this.isDark,
-    required this.titleColor,
-  });
+  const _SectionLabel({required this.label});
 
   final String label;
-  final bool isDark;
-  final Color titleColor;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: TextStyle(
-        fontSize: 15,
+      style: context.text.titleSmall?.copyWith(
         fontWeight: FontWeight.w600,
-        color: titleColor,
+        color: context.colors.onSurface,
       ),
       textDirection: TextDirection.rtl,
     );
@@ -270,48 +250,43 @@ class _FilterChip extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
-    required this.isDark,
   });
 
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final semantic = context.semantic;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm + 2,
+          vertical: AppSpacing.xs,
+        ),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary
-              : (isDark
-                    ? const Color(0xFF1A255C)
-                    : const Color(0xFFF0F4FF)),
-          borderRadius: BorderRadius.circular(20),
+              ? context.colors.primary
+              : semantic.chipBackground,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary
-                : (isDark
-                      ? const Color(0xFF2A3A8C)
-                      : const Color(0xFFD6E4FF)),
+                ? context.colors.primary
+                : semantic.borderSubtle,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight:
-                isSelected ? FontWeight.w600 : FontWeight.w400,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
             color: isSelected
-                ? Colors.white
-                : (isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight),
+                ? context.semantic.textOnPrimary
+                : semantic.textMuted,
           ),
         ),
       ),

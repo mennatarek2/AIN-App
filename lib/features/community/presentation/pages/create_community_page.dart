@@ -3,7 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/enums/community_enums.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../../../../core/widgets/app_page_header.dart';
 import '../../data/community_remote_data_source.dart';
 import '../providers/communities_provider.dart';
 import 'confirm_community_added_page.dart';
@@ -12,7 +17,8 @@ class CreateCommunityPage extends ConsumerStatefulWidget {
   const CreateCommunityPage({super.key});
 
   @override
-  ConsumerState<CreateCommunityPage> createState() => _CreateCommunityPageState();
+  ConsumerState<CreateCommunityPage> createState() =>
+      _CreateCommunityPageState();
 }
 
 class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
@@ -60,9 +66,9 @@ class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
     }
 
     if (community.userDetails.userLocation == null) {
-      ref.read(communitiesProvider.notifier).showLocationPendingBanner(
-            communityId: community.id,
-          );
+      ref
+          .read(communitiesProvider.notifier)
+          .showLocationPendingBanner(communityId: community.id);
     }
   }
 
@@ -79,12 +85,13 @@ class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
     });
 
     final description = _descriptionController.text.trim();
-    final result = await ref.read(communitiesProvider.notifier).createCommunity(
+    final result = await ref
+        .read(communitiesProvider.notifier)
+        .createCommunity(
           name: _nameController.text.trim(),
           description: description.isEmpty ? null : description,
           communityType: _selectedType.value,
-          coverageRadiusMeters:
-              _selectedType.hasRadius ? _radiusMeters : null,
+          coverageRadiusMeters: _selectedType.hasRadius ? _radiusMeters : null,
         );
 
     if (!mounted) return;
@@ -94,10 +101,7 @@ class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
       final err = ref.read(communitiesProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            _humanizeError(err),
-            textDirection: TextDirection.rtl,
-          ),
+          content: Text(_humanizeError(err), textDirection: TextDirection.rtl),
         ),
       );
       return;
@@ -107,9 +111,7 @@ class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
 
     if (!mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ConfirmCommunityAddedPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const ConfirmCommunityAddedPage()),
     );
   }
 
@@ -127,152 +129,156 @@ class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageBackground =
-        isDark ? const Color(0xFF060C3A) : AppColors.backgroundLight;
-    final textPrimary =
-        isDark ? const Color(0xFFF3F6F9) : AppColors.textPrimaryLight;
-    final textSecondary =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-
     return Scaffold(
-      backgroundColor: pageBackground,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
-          _Header(
+          AppPageHeader(
             title: 'إنشاء مجتمع جديد',
             onBack: () => Navigator.of(context).pop(),
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _SectionLabel('اسم المجتمع', textPrimary),
-                  const SizedBox(height: 8),
-                  _TextField(
-                    controller: _nameController,
-                    hintText: 'مثال: حي الزمالك',
-                    errorText: _nameError,
-                    onChanged: (_) {
-                      if (_nameError != null) {
-                        setState(() => _nameError = null);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _SectionLabel('الوصف (اختياري)', textPrimary),
-                  const SizedBox(height: 8),
-                  _TextField(
-                    controller: _descriptionController,
-                    hintText: 'وصف قصير عن المجتمع',
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 24),
-                  _SectionLabel('نوع المجتمع', textPrimary),
-                  const SizedBox(height: 10),
-                  ...CommunityType.values.map(
-                    (type) => _TypeOptionCard(
-                      type: type,
-                      isSelected: _selectedType == type,
-                      textPrimary: textPrimary,
-                      textSecondary: textSecondary,
-                      onTap: () => _onTypeChanged(type),
-                    ),
-                  ),
-                  if (_selectedType.hasRadius) ...[
-                    const SizedBox(height: 24),
-                    _SectionLabel('نطاق التغطية', textPrimary),
-                    const SizedBox(height: 4),
-                    Text(
-                      'المسافة التي يمكن للأعضاء القريبين اكتشاف المجتمع ضمنها',
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(fontSize: 12, color: textSecondary),
-                    ),
-                    const SizedBox(height: 12),
-                    _RadiusSelector(
-                      value: _radiusMeters,
-                      min: _selectedType == CommunityType.building ? 50 : 200,
-                      max: _selectedType == CommunityType.building ? 500 : 2000,
-                      onChanged: (v) => setState(() => _radiusMeters = v),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                      textDirection: TextDirection.rtl,
+                  AppFormCard(
+                    title: 'معلومات أساسية',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Icon(
-                          Icons.key_rounded,
-                          color: AppColors.primary,
-                          size: 20,
+                        _FieldLabel('اسم المجتمع'),
+                        const SizedBox(height: AppSpacing.xs),
+                        _TextField(
+                          controller: _nameController,
+                          hintText: 'مثال: حي الزمالك',
+                          errorText: _nameError,
+                          onChanged: (_) {
+                            if (_nameError != null) {
+                              setState(() => _nameError = null);
+                            }
+                          },
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'بعد الإنشاء ستظهر لك كود دعوة لمشاركته مع الأعضاء',
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: textSecondary,
-                              height: 1.4,
-                            ),
-                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        _FieldLabel('الوصف (اختياري)'),
+                        const SizedBox(height: AppSpacing.xs),
+                        _TextField(
+                          controller: _descriptionController,
+                          hintText: 'وصف قصير عن المجتمع',
+                          maxLines: 3,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    height: 52,
-                    child: DecoratedBox(
+                  const SizedBox(height: AppSpacing.md),
+                  AppFormCard(
+                    title: 'نوع المجتمع',
+                    child: Column(
+                      children: CommunityType.values
+                          .map(
+                            (type) => _TypeOptionCard(
+                              type: type,
+                              isSelected: _selectedType == type,
+                              onTap: () => _onTypeChanged(type),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                  if (_selectedType.hasRadius) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    AppFormCard(
+                      title: 'نطاق التغطية',
+                      subtitle:
+                          'المسافة التي يمكن للأعضاء القريبين اكتشاف المجتمع ضمنها',
+                      child: _RadiusSelector(
+                        value: _radiusMeters,
+                        min: _selectedType == CommunityType.building ? 50 : 200,
+                        max: _selectedType == CommunityType.building ? 500 : 2000,
+                        onChanged: (v) => setState(() => _radiusMeters = v),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.screenHorizontal,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        gradient: const LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [AppColors.primary, AppColors.primarySoft],
+                        color: context.colors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(
+                          color: context.colors.primary.withValues(alpha: 0.25),
                         ),
                       ),
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      child: Row(
+                        textDirection: TextDirection.rtl,
+                        children: [
+                          Icon(
+                            Icons.key_rounded,
+                            color: context.colors.primary,
+                            size: 20,
                           ),
-                        ),
-                        onPressed: _isSubmitting ? null : _submitCreate,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                'إنشاء المجتمع',
-                                textDirection: TextDirection.rtl,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? const Color(0xFFF3F6F9)
-                                      : AppColors.backgroundLight,
-                                ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'بعد الإنشاء ستظهر لك كود دعوة لمشاركته مع الأعضاء',
+                              textDirection: TextDirection.rtl,
+                              style: context.text.bodySmall?.copyWith(
+                                color: context.semantic.textMuted,
+                                height: 1.4,
                               ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.xl),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.screenHorizontal,
+                    ),
+                    child: SizedBox(
+                      height: 52,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          gradient: context.primaryGradient,
+                        ),
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                          ),
+                          onPressed: _isSubmitting ? null : _submitCreate,
+                          child: _isSubmitting
+                              ? SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: context.semantic.textOnPrimary,
+                                  ),
+                                )
+                              : Text(
+                                  'إنشاء المجتمع',
+                                  textDirection: TextDirection.rtl,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.semantic.textOnPrimary,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
                 ],
               ),
             ),
@@ -283,57 +289,10 @@ class _CreateCommunityPageState extends ConsumerState<CreateCommunityPage> {
   }
 }
 
-// ─── Shared widgets ───────────────────────────────────────────────────────────
-
-class _Header extends StatelessWidget {
-  const _Header({required this.title, required this.onBack});
-
-  final String title;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor =
-        isDark ? const Color(0xFFF3F6F9) : AppColors.textPrimaryLight;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      child: Row(
-        textDirection: TextDirection.rtl,
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: onBack,
-            child: Icon(
-              Icons.arrow_forward_ios,
-              color: textColor,
-              size: 22,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label, this.color);
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.label);
 
   final String label;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -342,11 +301,7 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         label,
         textDirection: TextDirection.rtl,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
+        style: context.text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -369,17 +324,6 @@ class _TextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fieldBackground = isDark ? const Color(0xFF0D1445) : Colors.white;
-    final fieldBorderColor = isDark
-        ? const Color(0xFFF3F6F9).withValues(alpha: 0.3)
-        : const Color(0x4D060C3A);
-    final hintColor = isDark
-        ? const Color(0xE6F3F6F9)
-        : const Color(0xB3060C3A);
-    final textColor =
-        isDark ? const Color(0xFFF3F6F9) : AppColors.textPrimaryLight;
-
     return TextField(
       controller: controller,
       onChanged: onChanged,
@@ -390,36 +334,30 @@ class _TextField extends StatelessWidget {
         hintText: hintText,
         hintTextDirection: TextDirection.rtl,
         errorText: errorText,
-        hintStyle: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w400,
-          color: hintColor,
-        ),
         filled: true,
-        fillColor: fieldBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        fillColor: context.semantic.surfaceInput,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm + 2,
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: fieldBorderColor, width: 1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: context.semantic.borderSubtle),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.3),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: context.colors.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: context.semantic.error),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.3),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: context.semantic.error, width: 1.5),
         ),
       ),
-      style: TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w400,
-        color: textColor,
-      ),
+      style: context.text.bodyMedium,
     );
   }
 }
@@ -428,87 +366,96 @@ class _TypeOptionCard extends StatelessWidget {
   const _TypeOptionCard({
     required this.type,
     required this.isSelected,
-    required this.textPrimary,
-    required this.textSecondary,
     required this.onTap,
   });
 
   final CommunityType type;
   final bool isSelected;
-  final Color textPrimary;
-  final Color textSecondary;
   final VoidCallback onTap;
 
   IconData get _icon => switch (type) {
-        CommunityType.neighborhood => Icons.location_city_rounded,
-        CommunityType.building => Icons.apartment_rounded,
-        CommunityType.privateGroup => Icons.lock_rounded,
-      };
+    CommunityType.neighborhood => Icons.location_city_rounded,
+    CommunityType.building => Icons.apartment_rounded,
+    CommunityType.privateGroup => Icons.lock_rounded,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isSelected
-        ? AppColors.primary.withValues(alpha: 0.12)
-        : (isDark ? const Color(0xFF0D1445) : Colors.white);
-    final border = isSelected
-        ? AppColors.primary
-        : (isDark
-            ? const Color(0xFFF3F6F9).withValues(alpha: 0.2)
-            : const Color(0xFFE5E7EB));
-
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
+        color: isSelected
+            ? context.colors.primary.withValues(alpha: 0.1)
+            : context.semantic.surfaceInput,
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: border, width: isSelected ? 1.5 : 1),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(
+                color: isSelected
+                    ? context.colors.primary
+                    : context.semantic.borderSubtle,
+                width: isSelected ? 1.5 : 1,
+              ),
             ),
             child: Row(
               textDirection: TextDirection.rtl,
               children: [
-                Icon(
-                  _icon,
-                  color: isSelected ? AppColors.primary : textSecondary,
-                  size: 24,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: (isSelected
+                            ? context.colors.primary
+                            : context.semantic.textMuted)
+                        .withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _icon,
+                    color: isSelected
+                        ? context.colors.primary
+                        : context.semantic.textMuted,
+                    size: 22,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         type.labelAr,
                         textDirection: TextDirection.rtl,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: textPrimary,
+                        style: context.text.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 2),
                       Text(
                         type.descriptionAr,
                         textDirection: TextDirection.rtl,
-                        style: TextStyle(fontSize: 12, color: textSecondary),
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.semantic.textMuted,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
                 Icon(
                   isSelected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                  color: isSelected ? AppColors.primary : textSecondary,
-                  size: 20,
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
+                  color: isSelected
+                      ? context.colors.primary
+                      : context.semantic.textMuted,
+                  size: 22,
                 ),
               ],
             ),
@@ -534,30 +481,25 @@ class _RadiusSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF0D1445) : Colors.white;
-    final textColor =
-        isDark ? const Color(0xFFF3F6F9) : AppColors.textPrimaryLight;
-
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xxs,
+      ),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? const Color(0xFFF3F6F9).withValues(alpha: 0.2)
-              : const Color(0xFFE5E7EB),
-        ),
+        color: context.semantic.surfaceInput,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: context.semantic.borderSubtle),
       ),
       child: Column(
         children: [
           Text(
             '$value متر',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+            style: context.text.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: context.colors.primary,
             ),
           ),
           Slider(
@@ -566,14 +508,20 @@ class _RadiusSelector extends StatelessWidget {
             max: max.toDouble(),
             divisions: ((max - min) ~/ 50).clamp(1, 40),
             label: '$value م',
-            activeColor: AppColors.primary,
+            activeColor: context.colors.primary,
             onChanged: (v) => onChanged(v.round()),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('$min م', style: TextStyle(fontSize: 11, color: textColor)),
-              Text('$max م', style: TextStyle(fontSize: 11, color: textColor)),
+              Text(
+                '$min م',
+                style: context.text.labelSmall,
+              ),
+              Text(
+                '$max م',
+                style: context.text.labelSmall,
+              ),
             ],
           ),
         ],
@@ -581,8 +529,6 @@ class _RadiusSelector extends StatelessWidget {
     );
   }
 }
-
-// ─── Invite Code Dialog ───────────────────────────────────────────────────────
 
 class _InviteCodeDialog extends StatelessWidget {
   const _InviteCodeDialog({required this.code, required this.communityName});
@@ -592,51 +538,63 @@ class _InviteCodeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AlertDialog(
-      backgroundColor: isDark ? const Color(0xFF121A5C) : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: context.semantic.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+      ),
       title: Column(
         children: [
-          const Icon(Icons.group_add_rounded, size: 48, color: Color(0xFF498EF4)),
-          const SizedBox(height: 8),
+          Icon(
+            Icons.group_add_rounded,
+            size: 48,
+            color: context.colors.primary,
+          ),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             'تم إنشاء "$communityName"',
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            style: context.text.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'شارك كود الدعوة مع من تريد إضافتهم',
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+            style: context.text.bodySmall?.copyWith(
+              color: context.semantic.textMuted,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.sm + 2,
+            ),
             decoration: BoxDecoration(
-              color: const Color(0xFF498EF4).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF498EF4), width: 1.5),
+              color: context.colors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: context.colors.primary, width: 1.5),
             ),
             child: Text(
               code,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 6,
-                color: Color(0xFF498EF4),
+                color: context.colors.primary,
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           TextButton.icon(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: code));
@@ -652,9 +610,8 @@ class _InviteCodeDialog extends StatelessWidget {
             label: const Text('نسخ الكود'),
           ),
           TextButton.icon(
-            onPressed: () => Share.share(
-              'Join my community on AIN! Use code: $code',
-            ),
+            onPressed: () =>
+                Share.share('Join my community on AIN! Use code: $code'),
             icon: const Icon(Icons.share, size: 16),
             label: const Text('مشاركة الكود'),
           ),

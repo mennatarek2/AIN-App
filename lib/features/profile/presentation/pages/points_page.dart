@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_page_header.dart';
 import '../providers/profile_provider.dart';
 
 class PointsPage extends ConsumerWidget {
@@ -10,16 +13,6 @@ class PointsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageBackground = isDark
-        ? const Color(0xFF060C3A)
-        : AppColors.backgroundLight;
-    final primaryTextColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
-    final cardTextColor = isDark
-        ? const Color(0xFF060C3A)
-        : AppColors.textPrimaryLight;
 
     final pts = profile?.points ?? 0;
     final badge = TrustBadge.fromString(profile?.badge);
@@ -28,40 +21,30 @@ class PointsPage extends ConsumerWidget {
     final isMax = badge == TrustBadge.guardian;
 
     return Scaffold(
-      backgroundColor: pageBackground,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
           child: Column(
             children: [
-              _PointsHeader(onBack: () => Navigator.of(context).pop()),
-              const SizedBox(height: 32),
+              AppPageHeader(
+                title: 'النقاط',
+                onBack: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFFF3F6F9) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isDark
-                        ? const Color(0xFFF3F6F9)
-                        : const Color(0x66415789),
-                    width: 1,
-                  ),
-                  boxShadow: isDark
-                      ? const [
-                          BoxShadow(
-                            color: Color(0x26000000),
-                            blurRadius: 3,
-                            offset: Offset(0, 1),
-                          ),
-                          BoxShadow(
-                            color: Color(0x4D000000),
-                            blurRadius: 2,
-                            offset: Offset(0, 1),
-                          ),
-                        ]
-                      : null,
+                  color: context.semantic.surfaceContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: context.semantic.borderSubtle),
+                  boxShadow: context.cardShadows,
                 ),
                 child: Column(
                   children: [
@@ -71,7 +54,7 @@ class PointsPage extends ConsumerWidget {
                       height: 186,
                       fit: BoxFit.contain,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       textDirection: TextDirection.rtl,
@@ -81,64 +64,58 @@ class PointsPage extends ConsumerWidget {
                           size: 12,
                           color: profile?.levelDotColor ?? badge.color,
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.xs),
                         Text(
                           badge.label,
                           textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w400,
-                            color: cardTextColor,
+                          style: context.text.titleSmall?.copyWith(
+                            color: context.colors.onSurface,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(
                       isMax
                           ? '🏆 أعلى مستوى — حارس\nاستمر في المشاركة'
                           : 'متبقي $toNext نقطة للمستوى التالي!\nاستمر في المشاركة',
                       textDirection: TextDirection.rtl,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 36 * 0.525,
+                      style: context.text.titleSmall?.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: cardTextColor,
+                        color: context.colors.onSurface,
                         height: 1.45,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(100),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
                       child: LinearProgressIndicator(
                         minHeight: 16,
                         value: progress,
-                        backgroundColor: isDark
-                            ? const Color(0xFFD9D9D9)
-                            : const Color(0xFFE0E2E6),
+                        backgroundColor: context.semantic.chipBackground,
                         valueColor: AlwaysStoppedAnimation<Color>(badge.color),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: AppSpacing.xxl),
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 30),
+                padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Text(
                     'المستويات المحققة',
                     textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                      fontSize: 40 * 0.525,
+                    style: context.text.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: primaryTextColor,
+                      color: context.colors.onSurface,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Column(
@@ -148,77 +125,31 @@ class PointsPage extends ConsumerWidget {
                       dotColor: TrustBadge.newcomer.color,
                       achieved: pts >= 0,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm),
                     _LevelItem(
                       label: TrustBadge.contributor.label,
                       dotColor: TrustBadge.contributor.color,
                       achieved: pts >= 20,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm),
                     _LevelItem(
                       label: TrustBadge.trusted.label,
                       dotColor: TrustBadge.trusted.color,
                       achieved: pts >= 50,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm),
                     _LevelItem(
                       label: TrustBadge.guardian.label,
                       dotColor: TrustBadge.guardian.color,
                       achieved: pts >= 100,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xl),
                   ],
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PointsHeader extends StatelessWidget {
-  const _PointsHeader({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
-
-    return Container(
-      width: double.infinity,
-      height: 100,
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 16,
-            top: 52,
-            child: GestureDetector(
-              onTap: onBack,
-              child: Icon(Icons.arrow_forward_ios, color: titleColor, size: 24),
-            ),
-          ),
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment(0, 0.32),
-              child: Text(
-                'النقاط',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 40 * 0.525,
-                  fontWeight: FontWeight.w600,
-                  color: titleColor,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -237,20 +168,16 @@ class _LevelItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final levelLabelColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
     final rowBackground = achieved
-        ? (isDark ? const Color(0xFF243C6B) : const Color(0xFFD0E6F5))
-        : (isDark ? const Color(0xFF464B73) : const Color(0xFFD2D5DD));
+        ? context.semantic.infoContainer
+        : context.semantic.chipBackground;
 
     return Container(
       height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       decoration: BoxDecoration(
         color: rowBackground,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         textDirection: TextDirection.ltr,
@@ -260,21 +187,20 @@ class _LevelItem extends StatelessWidget {
                 ? Icons.check_circle_outline_rounded
                 : Icons.lock_outline_rounded,
             size: 30,
-            color: const Color(0xFF0F9DFA),
+            color: context.colors.primary,
           ),
           const Spacer(),
           Row(
             textDirection: TextDirection.rtl,
             children: [
               Icon(Icons.circle, size: 16, color: dotColor),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 label,
                 textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 36 * 0.525,
+                style: context.text.titleSmall?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: levelLabelColor,
+                  color: context.colors.onSurface,
                 ),
               ),
             ],

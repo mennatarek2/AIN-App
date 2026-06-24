@@ -1,9 +1,16 @@
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/auth_token_utils.dart';
 import '../models/user_model.dart';
 
 class AuthSession {
-  const AuthSession({this.user, this.authToken, this.signupToken, this.refreshToken});
+  const AuthSession({
+    this.user,
+    this.authToken,
+    this.signupToken,
+    this.refreshToken,
+  });
 
   final UserModel? user;
   final String? authToken;
@@ -102,7 +109,10 @@ class AuthRemoteDataSource {
     return _parseSession(response);
   }
 
-  Future<void> signOut({required String authToken, required String refreshToken}) async {
+  Future<void> signOut({
+    required String authToken,
+    required String refreshToken,
+  }) async {
     await _client.postJson(
       ApiEndpoints.signOut,
       token: authToken,
@@ -127,16 +137,76 @@ class AuthRemoteDataSource {
     );
   }
 
+  Future<String?> sendForgotPasswordOtp({required String email}) async {
+    final response = await _client.postJson(
+      ApiEndpoints.resendForgotPasswordOtp,
+      body: {'email': email.trim()},
+    );
+    _assertAuthSuccess(response);
+    return _extractAuthToken(response);
+  }
+
+  Future<void> resendForgotPasswordOtp({
+    String? forgotPasswordToken,
+    String? email,
+  }) async {
+    await _client.postJson(
+      ApiEndpoints.resendForgotPasswordOtp,
+      token: forgotPasswordToken,
+      body: email != null && email.trim().isNotEmpty
+          ? {'email': email.trim()}
+          : null,
+    );
+  }
+
+  Future<String> verifyForgotPasswordOtp({
+    required String otpCode,
+    String? forgotPasswordToken,
+    String? email,
+  }) async {
+    final response = await _client.postJson(
+      ApiEndpoints.verifyForgotPasswordOtp,
+      token: forgotPasswordToken,
+      body: {
+        'otpCode': otpCode.trim(),
+        if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      },
+    );
+    _assertAuthSuccess(response);
+
+    final token = _extractAuthToken(response);
+    if (token == null || token.isEmpty) {
+      throw ApiException(
+        'Password reset verification succeeded but no access token was returned',
+        statusCode: 500,
+      );
+    }
+    return token;
+  }
+
+  Future<AuthSession> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    final response = await _client.postJson(
+      ApiEndpoints.resetPassword,
+      body: {
+        'email': email.trim(),
+        'token': token.trim(),
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      },
+    );
+    return _parseSession(response);
+  }
+
   AuthSession _parseSession(dynamic payload) {
-    final authToken = _findToken(payload, [
-      'token',
-      'authToken',
-      'accessToken',
-    ]);
-    final refreshToken = _findToken(payload, [
-      'refreshToken',
-      'refresh_token',
-    ]);
+    _assertAuthSuccess(payload);
+
+    final authToken = _extractAuthToken(payload);
+    final refreshToken = _extractRefreshToken(payload);
     final signupToken = _findToken(payload, [
       'signupToken',
       'registrationToken',
@@ -151,14 +221,61 @@ class AuthRemoteDataSource {
     );
   }
 
+  void _assertAuthSuccess(dynamic payload) {
+    if (payload is! Map) return;
+
+    final isSuccess = payload['isSuccess'] ?? payload['IsSuccess'];
+    if (isSuccess == false) {
+      final message =
+          payload['message'] ??
+          payload['Message'] ??
+          payload['error'] ??
+          payload['Error'] ??
+          'Authentication failed';
+      throw ApiException(message.toString(), statusCode: 401);
+    }
+  }
+
+  String? _extractAuthToken(dynamic payload) {
+    if (payload is Map) {
+      final user = payload['user'] ?? payload['User'];
+      if (user is Map) {
+        final fromUser = _findToken(user, [
+          'token',
+          'accessToken',
+          'authToken',
+        ]);
+        if (fromUser != null) return fromUser;
+      }
+    }
+
+    return _findToken(payload, ['accessToken', 'token', 'authToken']);
+  }
+
+  String? _extractRefreshToken(dynamic payload) {
+    if (payload is Map) {
+      final user = payload['user'] ?? payload['User'];
+      if (user is Map) {
+        final fromUser = _findToken(user, ['refreshToken', 'refresh_token']);
+        if (fromUser != null) return fromUser;
+      }
+    }
+
+    return _findToken(payload, ['refreshToken', 'refresh_token']);
+  }
+
   Map<String, dynamic>? _findUserMap(dynamic payload) {
     if (payload == null) return null;
     if (payload is Map<String, dynamic>) {
       final direct =
           payload['user'] ??
+          payload['User'] ??
           payload['profile'] ??
+          payload['Profile'] ??
           payload['data'] ??
-          payload['result'];
+          payload['Data'] ??
+          payload['result'] ??
+          payload['Result'];
       if (direct is Map) {
         return Map<String, dynamic>.from(direct);
       }
@@ -174,10 +291,14 @@ class AuthRemoteDataSource {
   String? _findToken(dynamic payload, List<String> keys) {
     if (payload == null) return null;
     if (payload is Map) {
-      for (final key in keys) {
-        final value = payload[key];
-        if (value is String && value.trim().isNotEmpty) {
-          return value.trim();
+      final normalizedKeys = keys.map((key) => key.toLowerCase()).toSet();
+      for (final entry in payload.entries) {
+        if (!normalizedKeys.contains(entry.key.toString().toLowerCase())) {
+          continue;
+        }
+        final text = entry.value?.toString().trim();
+        if (text != null && text.isNotEmpty) {
+          return AuthTokenUtils.normalize(text) ?? text;
         }
       }
       for (final value in payload.values) {

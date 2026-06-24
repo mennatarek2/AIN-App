@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../providers/auth_provider.dart';
 import '../notifiers/password_reset_notifier.dart';
 import '../state/form_state_simple.dart' as auth_form;
 
 class ResetPasswordArgs {
-  final String token;
-  const ResetPasswordArgs({required this.token});
+  final String email;
+  const ResetPasswordArgs({required this.email});
 }
 
 class ResetPasswordPage extends ConsumerStatefulWidget {
@@ -21,14 +26,16 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  String _token = '';
+  String _email = '';
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final args =
         ModalRoute.of(context)?.settings.arguments as ResetPasswordArgs?;
-    _token = args?.token ?? '';
+    _email = args?.email ?? '';
   }
 
   @override
@@ -43,11 +50,11 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
       return;
     }
 
-    if (_token.isEmpty) {
+    if (_email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('رمز التحقق غير متاح'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('البريد الإلكتروني غير متاح'),
+          backgroundColor: context.semantic.error,
         ),
       );
       return;
@@ -55,18 +62,19 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
 
     final notifier = ref.read(passwordResetNotifierProvider.notifier);
     final success = await notifier.resetPassword(
-      token: _token,
       newPassword: _passwordController.text,
+      confirmPassword: _confirmPasswordController.text,
     );
 
     if (success && mounted) {
+      await ref.read(authNotifierProvider.notifier).refreshSession();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.passwordChanged);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final formState = ref.watch(passwordResetNotifierProvider);
     final isLoading = formState is auth_form.FormLoading;
 
@@ -78,7 +86,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.failure.message),
-            backgroundColor: Colors.red,
+            backgroundColor: context.semantic.error,
           ),
         );
         Future.microtask(
@@ -93,85 +101,143 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 72),
-                Center(
-                  child: Image.asset(
-                    'assets/images/resetPassword.png',
-                    height: 220,
-                    width: 220,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 36),
-                Text(
-                  'إعادة تعيين كلمة المرور',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onBackground,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'أدخل كلمة المرور الجديدة الخاصة بك',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 18,
-                    height: 1.6,
-                    color: colorScheme.outline,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      _PasswordField(
-                        hint: 'كلمة المرور',
-                        controller: _passwordController,
-                        enabled: !isLoading,
-                        isConfirm: false,
-                        iconColor: colorScheme.outline,
-                        hintColor: colorScheme.outline,
-                        fillColor: colorScheme.surface,
-                        borderColor: colorScheme.outlineVariant,
-                        focusedBorderColor: colorScheme.primary,
+                _buildHero(context),
+                Transform.translate(
+                  offset: const Offset(0, -AppSpacing.xxxl),
+                  child: AppFormCard(
+                    title: 'إعادة تعيين كلمة المرور',
+                    subtitle: 'أدخل كلمة المرور الجديدة الخاصة بك',
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildProgressIndicator(context, activeSteps: 3),
+                          const SizedBox(height: AppSpacing.lg),
+                          _PasswordField(
+                            hint: 'كلمة المرور',
+                            controller: _passwordController,
+                            enabled: !isLoading,
+                            isConfirm: false,
+                            obscureText: _obscurePassword,
+                            onToggleVisibility: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _PasswordField(
+                            hint: 'تأكيد كلمة المرور',
+                            controller: _confirmPasswordController,
+                            enabled: !isLoading,
+                            isConfirm: true,
+                            compareWith: _passwordController,
+                            obscureText: _obscureConfirmPassword,
+                            onToggleVisibility: () => setState(
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _PrimaryButton(
+                            label: 'استمرار',
+                            isLoading: isLoading,
+                            onPressed: isLoading ? null : _handleReset,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      _PasswordField(
-                        hint: 'تأكيد كلمة المرور',
-                        controller: _confirmPasswordController,
-                        enabled: !isLoading,
-                        isConfirm: true,
-                        compareWith: _passwordController,
-                        iconColor: colorScheme.outline,
-                        hintColor: colorScheme.outline,
-                        fillColor: colorScheme.surface,
-                        borderColor: colorScheme.outlineVariant,
-                        focusedBorderColor: colorScheme.primary,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 40),
-                _PrimaryButton(
-                  label: 'استمرار',
-                  isLoading: isLoading,
-                  startColor: colorScheme.secondary,
-                  endColor: colorScheme.primary,
-                  onPressed: isLoading ? null : _handleReset,
-                ),
-                const SizedBox(height: 40),
+                const SizedBox(height: AppSpacing.xxl),
+                const AppTrustIndicators(),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHero(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xxl,
+        AppSpacing.xl,
+        AppSpacing.huge + AppSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        gradient: context.headerGradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AppRadius.xxl),
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: context.semantic.textOnPrimary.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+            child: Icon(
+              Icons.password_rounded,
+              size: 36,
+              color: context.semantic.textOnPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'كلمة مرور جديدة',
+            style: context.text.headlineMedium?.copyWith(
+              color: context.semantic.textOnPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'الخطوة 3 من 3 — اختر كلمة مرور قوية',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator(BuildContext context, {required int activeSteps}) {
+    Widget bar(bool active) {
+      return Expanded(
+        child: Container(
+          height: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            color: active
+                ? context.colors.primary
+                : context.colors.primary.withValues(alpha: 0.2),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        bar(activeSteps >= 1),
+        bar(activeSteps >= 2),
+        bar(activeSteps >= 3),
+      ],
     );
   }
 }
@@ -182,11 +248,8 @@ class _PasswordField extends StatelessWidget {
     required this.controller,
     required this.enabled,
     required this.isConfirm,
-    required this.iconColor,
-    required this.hintColor,
-    required this.fillColor,
-    required this.borderColor,
-    required this.focusedBorderColor,
+    required this.obscureText,
+    required this.onToggleVisibility,
     this.compareWith,
   });
 
@@ -194,11 +257,8 @@ class _PasswordField extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
   final bool isConfirm;
-  final Color iconColor;
-  final Color hintColor;
-  final Color fillColor;
-  final Color borderColor;
-  final Color focusedBorderColor;
+  final bool obscureText;
+  final VoidCallback onToggleVisibility;
   final TextEditingController? compareWith;
 
   @override
@@ -207,7 +267,9 @@ class _PasswordField extends StatelessWidget {
       controller: controller,
       enabled: enabled,
       textAlign: TextAlign.right,
-      obscureText: true,
+      textDirection: TextDirection.rtl,
+      obscureText: obscureText,
+      style: context.text.bodyLarge,
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
           return 'هذا الحقل مطلوب';
@@ -224,34 +286,22 @@ class _PasswordField extends StatelessWidget {
       },
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: hintColor, fontSize: 16),
+        prefixIcon: Icon(
+          Icons.lock_outline_rounded,
+          color: context.colors.primary,
+          size: 22,
+        ),
+        suffixIcon: IconButton(
+          onPressed: onToggleVisibility,
+          icon: Icon(
+            obscureText
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            color: context.semantic.textMuted,
+          ),
+        ),
         filled: true,
-        fillColor: fillColor,
-        prefixIcon: Icon(Icons.lock_outline, color: iconColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: focusedBorderColor, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+        fillColor: context.semantic.surfaceInput,
       ),
     );
   }
@@ -262,55 +312,50 @@ class _PrimaryButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     required this.isLoading,
-    required this.startColor,
-    required this.endColor,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
-  final Color startColor;
-  final Color endColor;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 49, vertical: 90),
-      child: SizedBox(
-        height: 56,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [startColor, endColor],
+    return SizedBox(
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          gradient: context.primaryGradient,
+          boxShadow: [
+            BoxShadow(
+              color: context.colors.primary.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onPressed,
-              child: Center(
-                child: isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                        ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            onTap: onPressed,
+            child: Center(
+              child: isLoading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: context.semantic.textOnPrimary,
+                        strokeWidth: 2.5,
                       ),
-              ),
+                    )
+                  : Text(
+                      label,
+                      style: context.text.titleMedium?.copyWith(
+                        color: context.semantic.textOnPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ),

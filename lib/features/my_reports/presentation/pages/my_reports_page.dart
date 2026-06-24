@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../../../../core/widgets/app_state_views.dart';
 import '../../../reports/domain/report_model.dart';
 import '../../../reports/presentation/pages/report_detail_page.dart';
 import '../providers/my_reports_provider.dart';
@@ -39,70 +43,89 @@ class _MyReportsPageState extends ConsumerState<MyReportsPage> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(myReportsProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
-          // ── Header ──
-          _Header(isDark: isDark),
-          // ── Status filter chips ──
-          _FilterChips(
-            selected: s.filter,
-            onSelected: (f) =>
-                ref.read(myReportsProvider.notifier).setFilter(f),
-            isDark: isDark,
+          AppDashboardHeader(
+            title: 'البلاغات الخاصة بي',
+            subtitle: s.reports.isEmpty && !s.isLoading
+                ? 'تابع حالة بلاغاتك من هنا'
+                : '${s.reports.length} بلاغ',
+            compact: true,
+            trailing: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: context.semantic.textOnPrimary,
+                  size: 20,
+                ),
+                tooltip: 'رجوع',
+              ),
+            ],
+            bottom: _SegmentedFilterTabs(
+              selected: s.filter,
+              onSelected: (f) =>
+                  ref.read(myReportsProvider.notifier).setFilter(f),
+            ),
           ),
-          // ── Content ──
           Expanded(
             child: s.isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const AppLoadingView()
                 : s.error != null
-                    ? _ErrorState(
-                        message: s.error!,
-                        onRetry: () =>
-                            ref.read(myReportsProvider.notifier).refresh(),
-                      )
-                    : s.reports.isEmpty
-                        ? const _EmptyState()
-                        : RefreshIndicator(
-                            onRefresh: () =>
-                                ref.read(myReportsProvider.notifier).refresh(),
-                            child: ListView.separated(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-                              itemCount:
-                                  s.reports.length + (s.isLoadingMore ? 1 : 0),
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (context, index) {
-                                if (index >= s.reports.length) {
-                                  return const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(16),
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  );
-                                }
-                                final report = s.reports[index];
-                                return _DismissibleReportCard(
-                                  report: report,
-                                  isDark: isDark,
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => ReportDetailPage(
-                                        reportId: report.id,
-                                      ),
-                                    ),
-                                  ),
-                                  onDelete: () => _confirmDelete(report),
-                                  onVisibilityChange: () =>
-                                      _showVisibilitySheet(report),
-                                );
-                              },
+                ? AppErrorView(
+                    message: 'فشل تحميل البلاغات',
+                    onRetry: () =>
+                        ref.read(myReportsProvider.notifier).refresh(),
+                  )
+                : s.reports.isEmpty
+                ? const AppEmptyView(
+                    icon: Icons.assignment_outlined,
+                    title: 'لم تقدم أي بلاغات بعد',
+                    subtitle:
+                        'اضغط على زر "بلاغ" في الأسفل لتقديم بلاغك الأول.',
+                  )
+                : RefreshIndicator(
+                    onRefresh: () =>
+                        ref.read(myReportsProvider.notifier).refresh(),
+                    child: ListView.separated(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.screenHorizontal,
+                        AppSpacing.md,
+                        AppSpacing.screenHorizontal,
+                        AppSpacing.lg,
+                      ),
+                      itemCount: s.reports.length + (s.isLoadingMore ? 1 : 0),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        if (index >= s.reports.length) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+                        final report = s.reports[index];
+                        return _DismissibleReportCard(
+                          report: report,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ReportDetailPage(reportId: report.id),
                             ),
                           ),
+                          onDelete: () => _confirmDelete(report),
+                          onVisibilityChange: () =>
+                              _showVisibilitySheet(report),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -135,8 +158,8 @@ class _MyReportsPageState extends ConsumerState<MyReportsPage> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
+              backgroundColor: context.semantic.error,
+              foregroundColor: context.semantic.textOnPrimary,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('حذف'),
@@ -160,7 +183,7 @@ class _MyReportsPageState extends ConsumerState<MyReportsPage> {
                 : 'فشل حذف البلاغ، يرجى المحاولة مرة أخرى.',
             textDirection: TextDirection.rtl,
           ),
-          backgroundColor: success ? Colors.green : Colors.redAccent,
+          backgroundColor: success ? context.semantic.success : context.semantic.error,
         ),
       );
     }
@@ -203,11 +226,11 @@ class _MyReportsPageState extends ConsumerState<MyReportsPage> {
                 ('Anonymous', 'مجهول', Icons.person_off_outlined),
               ])
                 ListTile(
-                  leading: Icon(opt.$3, color: AppColors.primary),
+                  leading: Icon(opt.$3, color: context.colors.primary),
                   title: Text(opt.$2, textDirection: TextDirection.rtl),
-                  trailing: report.visibility?.toLowerCase() ==
-                          opt.$1.toLowerCase()
-                      ? const Icon(Icons.check, color: AppColors.primary)
+                  trailing:
+                      report.visibility?.toLowerCase() == opt.$1.toLowerCase()
+                      ? Icon(Icons.check, color: context.colors.primary)
                       : null,
                   onTap: () async {
                     Navigator.of(ctx).pop();
@@ -216,9 +239,7 @@ class _MyReportsPageState extends ConsumerState<MyReportsPage> {
                         .updateVisibility(report.id, opt.$1);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تم تحديث ظهور البلاغ'),
-                        ),
+                        const SnackBar(content: Text('تم تحديث ظهور البلاغ')),
                       );
                     }
                   },
@@ -233,134 +254,93 @@ class _MyReportsPageState extends ConsumerState<MyReportsPage> {
 }
 
 // =============================================================================
-// Header
+// Segmented filter tabs
 // =============================================================================
 
-class _Header extends StatelessWidget {
-  const _Header({required this.isDark});
-  final bool isDark;
+class _SegmentedFilterTabs extends StatelessWidget {
+  const _SegmentedFilterTabs({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final MyReportsFilter selected;
+  final void Function(MyReportsFilter) onSelected;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      height: 100,
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      child: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            // Back button
-            Positioned(
-              left: 12,
-              bottom: 8,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: context.semantic.textOnPrimary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(
+          color: context.semantic.textOnPrimary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        reverse: true,
+        child: Row(
+          children: MyReportsFilter.values.map((f) {
+            final isSelected = f == selected;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                    size: 22,
+                onTap: () => onSelected(f),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? context.semantic.textOnPrimary
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: context.semantic.shadow,
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    f.label,
+                    textDirection: TextDirection.rtl,
+                    style: context.text.labelSmall?.copyWith(
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? context.colors.primary
+                          : context.semantic.textOnPrimary.withValues(
+                              alpha: 0.85,
+                            ),
+                    ),
                   ),
                 ),
               ),
-            ),
-            // Title
-            Align(
-              alignment: const Alignment(0, 0.32),
-              child: Text(
-                'البلاغات الخاصة بي',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                ),
-              ),
-            ),
-          ],
+            );
+          }).toList(),
         ),
       ),
     );
   }
 }
 
-// =============================================================================
-// Filter chips
-// =============================================================================
-
-class _FilterChips extends StatelessWidget {
-  const _FilterChips({
-    required this.selected,
-    required this.onSelected,
-    required this.isDark,
-  });
-
-  final MyReportsFilter selected;
-  final void Function(MyReportsFilter) onSelected;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        reverse: true, // RTL ordering
-        children: MyReportsFilter.values.map((f) {
-          final isSelected = f == selected;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: Text(
-                f.label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight),
-                ),
-              ),
-              selected: isSelected,
-              onSelected: (_) => onSelected(f),
-              selectedColor: AppColors.primary,
-              backgroundColor: isDark
-                  ? const Color(0xFF1A2070)
-                  : const Color(0xFFF0F4FF),
-              side: BorderSide(
-                color: isSelected
-                    ? AppColors.primary
-                    : (isDark
-                        ? const Color(0xFF2A3580)
-                        : const Color(0xFFD1D9F0)),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// Dismissible report card
-// =============================================================================
-
 class _DismissibleReportCard extends StatelessWidget {
   const _DismissibleReportCard({
     required this.report,
-    required this.isDark,
     required this.onTap,
     required this.onDelete,
     required this.onVisibilityChange,
   });
 
   final ReportModel report;
-  final bool isDark;
   final VoidCallback onTap;
   final Future<bool> Function() onDelete;
   final VoidCallback onVisibilityChange;
@@ -373,171 +353,188 @@ class _DismissibleReportCard extends StatelessWidget {
       confirmDismiss: (_) => onDelete(),
       background: Container(
         alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
+        padding: const EdgeInsets.only(left: AppSpacing.lg),
         decoration: BoxDecoration(
-          color: Colors.redAccent,
-          borderRadius: BorderRadius.circular(12),
+          color: context.semantic.error,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
+        child: Icon(
+          Icons.delete_outline_rounded,
+          color: context.semantic.textOnPrimary,
+          size: 28,
+        ),
       ),
       child: GestureDetector(
         onLongPress: onVisibilityChange,
-        child: _MyReportCard(
-          report: report,
-          isDark: isDark,
-          onTap: onTap,
-        ),
+        child: _MyReportCard(report: report, onTap: onTap),
       ),
     );
   }
 }
 
-// =============================================================================
-// Report card
-// =============================================================================
-
 class _MyReportCard extends StatelessWidget {
   const _MyReportCard({
     required this.report,
-    required this.isDark,
     required this.onTap,
   });
 
   final ReportModel report;
-  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor =
-        isDark ? AppColors.textPrimaryDark : const Color(0x66415789);
-    final titleColor =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final subColor =
-        isDark ? AppColors.textSecondaryDark : const Color(0x80909090);
+    final statusColor = report.statusColor;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor, width: 1),
-          color: isDark ? const Color(0xFF0D1347) : Colors.white,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Top row: title + status chip ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-              child: Row(
-                textDirection: TextDirection.rtl,
-                children: [
-                  Expanded(
-                    child: Text(
-                      report.title,
-                      textDirection: TextDirection.rtl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: titleColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _StatusChip(
-                    label: report.statusLabel,
-                    color: report.statusColor,
-                  ),
-                ],
-              ),
-            ),
-            // ── Category / subcategory ──
-            if (report.categoryName != null || report.subCategoryName != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  textDirection: TextDirection.rtl,
-                  children: [
-                    Icon(Icons.category_outlined, size: 13, color: subColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      [
-                        if (report.categoryName != null) report.categoryName!,
-                        if (report.subCategoryName != null)
-                          report.subCategoryName!,
-                      ].join(' / '),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(fontSize: 12, color: subColor),
-                    ),
-                  ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: context.semantic.borderSubtle),
+            color: context.semantic.surfaceContainer,
+            boxShadow: context.cardShadows,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: IntrinsicHeight(
+            child: Row(
+              textDirection: TextDirection.rtl,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 4,
+                  color: statusColor,
                 ),
-              ),
-            const SizedBox(height: 6),
-            // ── Location ──
-            if (report.locationAddress != null &&
-                report.locationAddress!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  textDirection: TextDirection.rtl,
-                  children: [
-                    Icon(Icons.location_on_outlined, size: 13, color: subColor),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        report.locationAddress!,
-                        textDirection: TextDirection.rtl,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: subColor),
-                      ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          textDirection: TextDirection.rtl,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                report.title,
+                                textDirection: TextDirection.rtl,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: context.text.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: context.colors.onSurface,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            _StatusChip(
+                              label: report.statusLabel,
+                              color: statusColor,
+                            ),
+                          ],
+                        ),
+                        if (report.categoryName != null ||
+                            report.subCategoryName != null) ...[
+                          const SizedBox(height: AppSpacing.xxs),
+                          _MetaChip(
+                            icon: Icons.category_outlined,
+                            label: [
+                              if (report.categoryName != null)
+                                report.categoryName!,
+                              if (report.subCategoryName != null)
+                                report.subCategoryName!,
+                            ].join(' · '),
+                          ),
+                        ],
+                        if (report.locationAddress != null &&
+                            report.locationAddress!.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.xxs),
+                          _MetaChip(
+                            icon: Icons.location_on_outlined,
+                            label: report.locationAddress!,
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xs),
+                        _StatusProgress(report: report),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Row(
+                          textDirection: TextDirection.rtl,
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 13,
+                              color: context.semantic.textMuted,
+                            ),
+                            const SizedBox(width: AppSpacing.xxs),
+                            Text(
+                              report.submittedAgo,
+                              style: context.text.labelSmall?.copyWith(
+                                color: context.semantic.textMuted,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (report.visibility != null) ...[
+                              Icon(
+                                _visibilityIcon(report.visibility!),
+                                size: 13,
+                                color: context.colors.primary,
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                              Text(
+                                _visibilityLabel(report.visibility!),
+                                style: context.text.labelSmall?.copyWith(
+                                  color: context.colors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                            ],
+                            if (report.attachments.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.xxs,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: context.semantic.chipBackground,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.xs),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.attach_file_rounded,
+                                      size: 12,
+                                      color: context.semantic.textMuted,
+                                    ),
+                                    Text(
+                                      '${report.attachments.length}',
+                                      style: context.text.labelSmall?.copyWith(
+                                        color: context.semantic.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            Icon(
+                              Icons.chevron_left_rounded,
+                              size: 18,
+                              color: context.semantic.textMuted
+                                  .withValues(alpha: 0.5),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            // ── Progress stepper ──
-            _StatusProgress(report: report),
-            // ── Bottom row: timestamp + visibility + attachments ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-              child: Row(
-                textDirection: TextDirection.rtl,
-                children: [
-                  Icon(Icons.access_time_rounded, size: 13, color: subColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    report.submittedAgo,
-                    style: TextStyle(fontSize: 11, color: subColor),
                   ),
-                  const Spacer(),
-                  if (report.visibility != null) ...[
-                    Icon(_visibilityIcon(report.visibility!),
-                        size: 13, color: AppColors.primary),
-                    const SizedBox(width: 4),
-                    Text(
-                      _visibilityLabel(report.visibility!),
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.primary),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  if (report.attachments.isNotEmpty) ...[
-                    Icon(Icons.attach_file_rounded,
-                        size: 13, color: subColor),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${report.attachments.length}',
-                      style: TextStyle(fontSize: 11, color: subColor),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -568,9 +565,34 @@ class _MyReportCard extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// Status progress stepper
-// =============================================================================
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      textDirection: TextDirection.rtl,
+      children: [
+        Icon(icon, size: 13, color: context.semantic.textMuted),
+        const SizedBox(width: AppSpacing.xxs),
+        Expanded(
+          child: Text(
+            label,
+            textDirection: TextDirection.rtl,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.bodySmall?.copyWith(
+              color: context.semantic.textMuted,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _StatusProgress extends StatelessWidget {
   const _StatusProgress({required this.report});
@@ -579,28 +601,28 @@ class _StatusProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final steps = ['قيد المراجعة', 'موزع', 'منتهي'];
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Map progressIndex (0-3) to display index
     final progress = report.progressIndex.clamp(0, 3);
+    final inactiveColor = context.semantic.borderSubtle;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: context.semantic.chipBackground,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
       child: Row(
         textDirection: TextDirection.rtl,
         children: List.generate(steps.length * 2 - 1, (i) {
           if (i.isOdd) {
-            // Connector line
             final stepIndex = (i + 1) ~/ 2;
             final isComplete = progress > stepIndex;
             return Expanded(
               child: Container(
                 height: 2,
-                color: isComplete
-                    ? AppColors.primary
-                    : (isDark
-                        ? const Color(0xFF2A3580)
-                        : const Color(0xFFD1D9F0)),
+                color: isComplete ? context.colors.primary : inactiveColor,
               ),
             );
           }
@@ -612,17 +634,18 @@ class _StatusProgress extends StatelessWidget {
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                width: 10,
-                height: 10,
+                width: isCurrent ? 12 : 8,
+                height: isCurrent ? 12 : 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isComplete || isCurrent
-                      ? AppColors.primary
-                      : (isDark
-                          ? const Color(0xFF2A3580)
-                          : const Color(0xFFD1D9F0)),
+                      ? context.colors.primary
+                      : inactiveColor,
                   border: isCurrent
-                      ? Border.all(color: AppColors.primary, width: 2)
+                      ? Border.all(
+                          color: context.colors.primary.withValues(alpha: 0.3),
+                          width: 2,
+                        )
                       : null,
                 ),
               ),
@@ -630,13 +653,11 @@ class _StatusProgress extends StatelessWidget {
               Text(
                 steps[stepIndex],
                 textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 9,
+                style: context.text.labelSmall?.copyWith(
+                  fontSize: 8,
                   color: isComplete || isCurrent
-                      ? AppColors.primary
-                      : (isDark
-                          ? AppColors.textSecondaryDark
-                          : const Color(0xFF9CA3AF)),
+                      ? context.colors.primary
+                      : context.semantic.textMuted,
                 ),
               ),
             ],
@@ -647,10 +668,6 @@ class _StatusProgress extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// Status chip
-// =============================================================================
-
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.label, required this.color});
   final String label;
@@ -659,97 +676,31 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.xxs,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.circle, size: 7, color: color),
-          const SizedBox(width: 4),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: AppSpacing.xxs),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: color,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// Empty / Error states
-// =============================================================================
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.assignment_outlined,
-            size: 80,
-            color: isDark ? AppColors.textSecondaryDark : const Color(0xFFB8C4D9),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'لم تقدم أي بلاغات بعد',
-            textDirection: TextDirection.rtl,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'اضغط على زر "بلاغ" في الأسفل لتقديم بلاغك الأول.',
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: isDark ? AppColors.textSecondaryDark : const Color(0xFF9CA3AF),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.wifi_off_rounded, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
-          const Text(
-            'فشل تحميل البلاغات',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: onRetry,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('إعادة المحاولة', textDirection: TextDirection.rtl),
           ),
         ],
       ),

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../../../../core/network/connectivity_service.dart';
+import '../../../auth/data/data_sources/user_local_data_source.dart';
+import '../../../auth/domain/utils/username_utils.dart';
 import '../../domain/profile_model.dart';
 import '../../domain/repositories/profile_repository.dart';
 import '../data_sources/profile_local_data_source.dart';
@@ -24,11 +26,13 @@ class ProfileRepositoryImpl implements ProfileRepository {
     required this.localDataSource,
     required this.remoteDataSource,
     required this.connectivityService,
+    required this.userLocalDataSource,
   });
 
   final ProfileLocalDataSource localDataSource;
   final ProfileRemoteDataSource remoteDataSource;
   final ConnectivityService connectivityService;
+  final UserLocalDataSource userLocalDataSource;
 
   static const _maxRetries = 2;
   static const _retryDelay = Duration(milliseconds: 400);
@@ -143,7 +147,14 @@ class ProfileRepositoryImpl implements ProfileRepository {
       }
     }
 
-    // All retries exhausted
+    // All retries exhausted — seed from auth session if profile API is not ready
+    final fallback = await _buildFallbackProfileFromAuth();
+    if (fallback != null) {
+      await localDataSource.saveProfile(fallback);
+      print('[ProfileRepo] Seeded profile from auth session after API 404');
+      return;
+    }
+
     if (cached != null) {
       print(
         '[ProfileRepo] All retries failed, using cached profile as fallback',
@@ -250,5 +261,30 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<void> syncProfile() async {
     print('[ProfileRepo] Manual profile sync requested');
     await fetchMyProfile();
+  }
+
+  Future<ProfileModel?> _buildFallbackProfileFromAuth() async {
+    final user = await userLocalDataSource.getCachedUser();
+    if (user == null) return null;
+
+    final pending = await userLocalDataSource.getPendingRegistration();
+    final email = user.email.trim();
+    final userName =
+        UsernameUtils.fromEmail(email) ?? email.split('@').first;
+
+    return ProfileModel(
+      id: user.id.trim().isNotEmpty ? user.id : email,
+      displayName: user.name.trim().isNotEmpty ? user.name : userName,
+      email: email,
+      phoneNumber: user.phoneNumber?.trim().isNotEmpty == true
+          ? user.phoneNumber!.trim()
+          : (pending?['phoneNumber'] ?? ''),
+      userName: userName,
+      ssn: pending?['ssn'] ?? '',
+      isVerified: user.isVerified,
+      trustPoints: 0,
+      badge: 'Newcomer',
+      profilePhotoUrl: user.profileImageUrl,
+    );
   }
 }

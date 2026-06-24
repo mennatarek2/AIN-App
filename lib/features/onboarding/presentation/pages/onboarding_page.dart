@@ -4,6 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
 import '../../../../core/state/app_flow_provider.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_brand_logo.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -22,7 +27,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     // Onboarding 1
     PageViewModel(
       titleWidget: Text(
-        'من عَيْنك يبدأ الحل',
+        'بلغ عن المشكلات',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
           fontSize: 26,
@@ -34,9 +39,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       bodyWidget: Padding(
         padding: const EdgeInsets.only(left: 8, right: 8),
         child: Text(
-          'منصة واحدة وشاملة تتيح لك الإبلاغ عن أي\n'
-          'مشكلة أو ملاحظة تواجهها بسهولة، \n'
-          'لضمان سلامة وأمان الجميع',
+          'ساهم في جعل منطقتك أكثر أماناً من خلال الإبلاغ عن\n المشكلات العامة',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontSize: 20,
@@ -46,14 +49,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           ),
         ),
       ),
-      image: SizedBox(
-        height: 360,
-        child: Image.asset(
-          'assets/images/onboarding1.png',
-          width: double.infinity,
-          fit: BoxFit.contain,
-        ),
-      ),
+      image: _OnboardingHeroImage(assetPath: 'assets/images/onboarding1.png'),
       decoration: const PageDecoration(
         imagePadding: EdgeInsets.only(top: 144, bottom: 24),
         titlePadding: EdgeInsets.only(top: 16, bottom: 12),
@@ -65,7 +61,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     // Onboarding 2
     PageViewModel(
       titleWidget: Text(
-        'يصل بلاغك للجهات المختصّة',
+        'هوية مواطن موثقة',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
           fontSize: 26,
@@ -77,7 +73,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       bodyWidget: Padding(
         padding: const EdgeInsets.only(left: 8, right: 8),
         child: Text(
-          'بلاغك يصل مباشرةً إلى الجهات المختصة لضمان أعلى سرعة في الاستجابة وحل المشكلة، ويمكنك متابعة حالته خطوة بخطوة.',
+          'نظام نقاط الثقة يضمن مصداقية البلاغات وحماية المجتمع',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontSize: 20,
@@ -87,14 +83,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           ),
         ),
       ),
-      image: SizedBox(
-        height: 360,
-        child: Image.asset(
-          'assets/images/onboarding2.png',
-          width: double.infinity,
-          fit: BoxFit.contain,
-        ),
-      ),
+      image: _OnboardingHeroImage(assetPath: 'assets/images/onboarding2.png'),
       decoration: const PageDecoration(
         imagePadding: EdgeInsets.only(top: 144, bottom: 24),
         titlePadding: EdgeInsets.only(top: 16, bottom: 12),
@@ -106,7 +95,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     // Onboarding 3
     PageViewModel(
       titleWidget: Text(
-        'مساعد ذكي',
+        'استغاثة فورية SOS',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
           fontSize: 26,
@@ -118,7 +107,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       bodyWidget: Padding(
         padding: const EdgeInsets.only(left: 8, right: 8),
         child: Text(
-          'مساعد ذكي موجود دائما للرد على استفساراتك وتقديم الإرشادات اللي تحتاجها في أي وقت',
+          'اطلب المساعدة في حالات الطوارئ وشارك موقعك مع\n مجتمعك الموثوق',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontSize: 20,
@@ -128,14 +117,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           ),
         ),
       ),
-      image: SizedBox(
-        height: 360,
-        child: Image.asset(
-          'assets/images/onboarding3.png',
-          width: double.infinity,
-          fit: BoxFit.contain,
-        ),
-      ),
+      image: _OnboardingHeroImage(assetPath: 'assets/images/onboarding3.png'),
       decoration: const PageDecoration(
         imagePadding: EdgeInsets.only(top: 144, bottom: 24),
         titlePadding: EdgeInsets.only(top: 16, bottom: 12),
@@ -169,14 +151,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           ),
         ),
       ),
-      image: SizedBox(
-        height: 360,
-        child: Image.asset(
-          'assets/images/onboarding4.png',
-          width: double.infinity,
-          fit: BoxFit.contain,
-        ),
-      ),
+      image: _OnboardingHeroImage(assetPath: 'assets/images/onboarding4.png'),
       decoration: const PageDecoration(
         imagePadding: EdgeInsets.only(top: 144, bottom: 24),
         titlePadding: EdgeInsets.only(top: 16, bottom: 12),
@@ -191,10 +166,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         'مرحبًا بك في عَيْن',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-          fontSize: 34,
+          fontSize: 26,
           fontWeight: FontWeight.w700,
           color: Theme.of(context).colorScheme.onBackground,
-          height: 1.4,
+          height: 1.35,
         ),
       ),
       bodyWidget: Padding(
@@ -203,20 +178,20 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           'عَيْن  هو أداة التواصل الفعّالة بينك وبين الجهات المسؤولة ، ووجهتُك للإبلاغ عن المشكلات بدقة وبخطوات بسيطة.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontSize: 20,
+            fontSize: 16,
             fontWeight: FontWeight.w400,
-            height: 1.7,
+            height: 1.6,
             color: Theme.of(context).colorScheme.outline,
           ),
         ),
       ),
-      image: const SizedBox(height: 24),
+      image: const AppBrandLogo(compact: true),
       decoration: const PageDecoration(
-        imagePadding: EdgeInsets.only(top: 222, bottom: 24),
-        titlePadding: EdgeInsets.only(top: 16, bottom: 12),
-        contentMargin: EdgeInsets.symmetric(horizontal: 24),
-        imageFlex: 0,
-        bodyFlex: 2,
+        imagePadding: EdgeInsets.only(top: 32, bottom: 8),
+        titlePadding: EdgeInsets.only(top: 4, bottom: 6),
+        contentMargin: EdgeInsets.symmetric(horizontal: 20),
+        imageFlex: 1,
+        bodyFlex: 1,
       ),
     ),
   ];
@@ -248,16 +223,22 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
+        body: Column(
+          children: [
+            if (_currentPage != _pages.length - 1)
+              Container(
+                width: double.infinity,
+                height: 6,
+                decoration: BoxDecoration(gradient: context.heroGradient),
+              ),
+            Expanded(
+              child: SafeArea(
+                top: _currentPage == _pages.length - 1,
                 child: IntroductionScreen(
                   key: _introKey,
                   globalBackgroundColor: theme.scaffoldBackgroundColor,
@@ -265,7 +246,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   onChange: (index) => setState(() => _currentPage = index),
                   freeze: true,
                   isProgressTap: false,
-                  scrollPhysics: const NeverScrollableScrollPhysics(),
+                  scrollPhysics: const ClampingScrollPhysics(),
                   showBackButton: false,
                   showNextButton: false,
                   showDoneButton: false,
@@ -275,27 +256,31 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       : Align(
                           alignment: Alignment.topRight,
                           child: Padding(
-                            padding: const EdgeInsets.only(top: 24, right: 24),
+                            padding: const EdgeInsets.only(
+                              top: AppSpacing.xl,
+                              right: AppSpacing.xl,
+                            ),
                             child: InkWell(
                               onTap: () {
                                 _introKey.currentState?.skipToEnd();
                               },
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
                                     Icons.arrow_back_ios_rounded,
                                     size: 20,
-                                    color: colorScheme.outline,
+                                    color: context.semantic.textMuted,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xxs),
                                   Text(
                                     'تخطي',
-                                    style: TextStyle(
-                                      color: colorScheme.outline,
+                                    style: context.text.titleSmall?.copyWith(
+                                      color: context.semantic.textMuted,
                                       fontWeight: FontWeight.w500,
-                                      fontSize: 20,
                                     ),
                                   ),
                                 ],
@@ -309,33 +294,59 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   dotsDecorator: DotsDecorator(
                     size: const Size(8, 8),
                     activeSize: const Size(16, 8),
-                    color: colorScheme.outlineVariant,
-                    activeColor: colorScheme.primary,
+                    color: context.semantic.borderSubtle,
+                    activeColor: context.colors.primary,
                     activeShape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
                     ),
                   ),
                   controlsMargin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.md,
                   ),
                   controlsPadding: const EdgeInsets.all(0),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 62,
-                  vertical: 10,
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.xxl,
+                  AppSpacing.xs,
+                  AppSpacing.xxl,
+                  AppSpacing.sm + MediaQuery.of(context).padding.bottom,
                 ),
                 child: _currentPage == _pages.length - 1
-                    ? _WelcomeButtons(onSignUp: _onSignUp, onLogin: _onLogin)
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const AppTrustIndicators(),
+                          const SizedBox(height: AppSpacing.xs),
+                          _WelcomeButtons(
+                            onSignUp: _onSignUp,
+                            onLogin: _onLogin,
+                          ),
+                        ],
+                      )
                     : _NextButton(onPressed: _onNextPressed),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+}
+
+class _OnboardingHeroImage extends StatelessWidget {
+  const _OnboardingHeroImage({required this.assetPath});
+
+  final String assetPath;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(assetPath, width: 700, height: 700, fit: BoxFit.contain);
   }
 }
 
@@ -346,32 +357,25 @@ class _NextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [colorScheme.secondary, colorScheme.primary],
-          ),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          gradient: context.primaryGradient,
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             onTap: onPressed,
-            child: const Center(
+            child: Center(
               child: Text(
                 'التالي',
-                style: TextStyle(
-                  color: Colors.white,
+                style: context.text.titleMedium?.copyWith(
+                  color: context.semantic.textOnPrimary,
                   fontWeight: FontWeight.w600,
-                  fontSize: 21,
                 ),
               ),
             ),
@@ -390,36 +394,28 @@ class _WelcomeButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // إنشاء حساب جديد - gradient
         SizedBox(
           width: double.infinity,
           height: 56,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [colorScheme.secondary, colorScheme.primary],
-              ),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              gradient: context.primaryGradient,
             ),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 onTap: onSignUp,
-                child: const Center(
+                child: Center(
                   child: Text(
                     'إنشاء حساب جديد',
-                    style: TextStyle(
-                      color: Colors.white,
+                    style: context.text.titleMedium?.copyWith(
+                      color: context.semantic.textOnPrimary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 21,
                     ),
                   ),
                 ),
@@ -427,23 +423,24 @@ class _WelcomeButtons extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        // تسجيل الدخول - outline
+        const SizedBox(height: AppSpacing.md),
         SizedBox(
           width: double.infinity,
           height: 56,
           child: OutlinedButton(
             onPressed: onLogin,
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: colorScheme.onBackground, width: 2),
+              side: BorderSide(color: context.colors.onSurface, width: 2),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              foregroundColor: colorScheme.onBackground,
+              foregroundColor: context.colors.onSurface,
             ),
-            child: const Text(
+            child: Text(
               'تسجيل الدخول',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 21),
+              style: context.text.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),

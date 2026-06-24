@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../providers/categories_provider.dart';
 import '../providers/home_feed_provider.dart';
 
@@ -16,13 +18,15 @@ class CategoryFilterRow extends ConsumerWidget {
     final selectedCategoryId = feedAsync.valueOrNull?.filter.categoryId;
 
     return SizedBox(
-      height: 44,
+      height: 48,
       child: categoriesAsync.when(
         loading: () => const _ShimmerChipRow(),
         error: (e, s) => const SizedBox.shrink(),
         data: (categories) => ListView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+          ),
           children: [
             _CategoryChip(
               label: 'الكل',
@@ -70,41 +74,59 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final semantic = context.semantic;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(left: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.only(left: AppSpacing.xs),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs + 2,
+        ),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary
-              : (isDark
-                    ? const Color(0xFF1A255C)
-                    : const Color(0xFFF0F4FF)),
-          borderRadius: BorderRadius.circular(20),
+          gradient: isSelected ? context.primaryGradient : null,
+          color: isSelected ? null : semantic.surfaceContainer,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary
-                : (isDark
-                      ? const Color(0xFF2A3A8C)
-                      : const Color(0xFFD6E4FF)),
+                ? Colors.transparent
+                : semantic.borderSubtle,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: context.colors.primary.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : context.cardShadows,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight:
-                isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected
-                ? Colors.white
-                : (isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected) ...[
+              Icon(
+                Icons.check_rounded,
+                size: 14,
+                color: context.semantic.textOnPrimary,
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? context.semantic.textOnPrimary
+                    : semantic.textMuted,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -116,19 +138,21 @@ class _ShimmerChipRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = isDark ? const Color(0xFF1A255C) : const Color(0xFFE8EDF2);
+    final semantic = context.semantic;
 
     return ListView.builder(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+      ),
       itemCount: 5,
       itemBuilder: (_, i) => Container(
-        margin: const EdgeInsets.only(left: 8),
+        margin: const EdgeInsets.only(left: AppSpacing.xs),
         width: 70 + (i.isEven ? 20 : 0).toDouble(),
+        height: 36,
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
+          color: semantic.shimmerBase,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
       ),
     );

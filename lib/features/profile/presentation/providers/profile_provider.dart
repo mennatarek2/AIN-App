@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/connectivity_service.dart';
 import '../../../../core/network/api_providers.dart';
-import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/widgets/cached_app_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/state/auth_state_simple.dart';
@@ -240,20 +239,18 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
   final GetProfileUseCase _getProfileUseCase;
   final UpdateProfileUseCase _updateProfileUseCase;
 
-  /// Initialize profile by fetching from cache or API
+  /// Initialize profile by loading cache; API fetch runs after auth is ready.
   Future<void> _initialize() async {
     try {
       print('[ProfileNotifier] Initializing profile');
 
-      // Try to get cached profile first
       final cached = await _getProfileUseCase.getCached();
       if (cached != null) {
         print('[ProfileNotifier] Loaded cached profile, photoUrl: ${cached.profilePhotoUrl}');
         state = AsyncValue.data(UserProfile.fromModel(cached));
+      } else {
+        state = const AsyncValue.loading();
       }
-
-      // Fetch latest from API
-      await _fetchProfile();
     } catch (e, st) {
       print('[ProfileNotifier] Error during initialization: $e');
       state = AsyncValue.error(e, st);
@@ -462,6 +459,7 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
     localDataSource: ref.watch(profileLocalDataSourceProvider),
     remoteDataSource: ref.watch(profileRemoteDataSourceProvider),
     connectivityService: ConnectivityService(),
+    userLocalDataSource: ref.watch(userLocalDataSourceProvider),
   );
 });
 
@@ -490,12 +488,34 @@ final profileAsyncProvider =
 
       // Listen for auth state changes and refresh profile
       // This handles post-signup profile loading, profile picture sync, etc.
-      ref.listen<AuthState>(authNotifierProvider, (previous, next) {
-        // Refresh profile when transitioning to authenticated state
+      ref.listen<AuthState>(authNotifierProvider, (previous, next) async {
+        if (next is! AuthAuthenticated) return;
+
+        final hasSession = await ref
+            .read(userLocalDataSourceProvider)
+            .hasValidSession();
+        if (!hasSession) {
+          print(
+            '[ProfileProvider] Skipping profile refresh — no valid auth session',
+          );
+          return;
+        }
+
         final wasAuthenticated = previous is AuthAuthenticated;
-        final nowAuthenticated = next is AuthAuthenticated;
-        if (!wasAuthenticated && nowAuthenticated) {
-          print('[ProfileProvider] Auth state changed to authenticated, refreshing profile');
+        if (!wasAuthenticated || previous is AuthLoading) {
+          print(
+            '[ProfileProvider] Auth session ready, refreshing profile',
+          );
+          notifier.refresh();
+        }
+      });
+
+      Future.microtask(() async {
+        if (ref.read(authNotifierProvider) is! AuthAuthenticated) return;
+        final hasSession = await ref
+            .read(userLocalDataSourceProvider)
+            .hasValidSession();
+        if (hasSession) {
           notifier.refresh();
         }
       });
@@ -536,37 +556,5 @@ final profileErrorProvider = Provider<String?>((ref) {
   return async.maybeWhen(
     error: (error, st) => error.toString(),
     orElse: () => null,
-  );
-});
-
-// ─── Trust info provider (GET /api/social/me/trust) ─────────────────────────
-
-/// Fetches accurate trust data including badge, totalReports, resolvedReports.
-/// Falls back gracefully — a 404 means the endpoint isn't deployed yet.
-final myTrustProvider = FutureProvider.autoDispose<TrustInfo>((ref) async {
-  final dataSource = ref.watch(profileRemoteDataSourceProvider);
-  final token = await dataSource.readToken();
-  if (token == null || token.isEmpty) return const TrustInfo();
-
-  final client = ref.watch(apiClientProvider);
-  try {
-    final response = await client.getJson(ApiEndpoints.myTrust, token: token);
-    if (response is Map<String, dynamic>) {
-      return TrustInfo.fromJson(response);
-    }
-    if (response is Map) {
-      return TrustInfo.fromJson(Map<String, dynamic>.from(response));
-    }
-  } catch (e) {
-    // Endpoint may not be available yet — fall back to profile points
-    print('[TrustProvider] /api/social/me/trust failed: $e — using profile fallback');
-  }
-
-  // Fallback: derive from profile points
-  final profile = ref.read(profileProvider);
-  final pts = profile?.points ?? 0;
-  return TrustInfo(
-    trustPoints: pts,
-    badge: TrustBadge.fromPoints(pts),
   );
 });

@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../../../../core/widgets/app_otp_input.dart';
 import '../notifiers/email_verification_notifier.dart';
 import '../notifiers/password_reset_notifier.dart';
 import 'email_verification_success_page.dart';
@@ -65,7 +70,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('يرجى إدخال رمز التحقق المكون من $_otpLength أرقام'),
-          backgroundColor: Colors.red,
+          backgroundColor: context.semantic.error,
         ),
       );
       return;
@@ -74,9 +79,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     if (isSignUpFlow) {
       if (email == null || email.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('البريد الإلكتروني غير متاح للتحقق'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('البريد الإلكتروني غير متاح للتحقق'),
+            backgroundColor: context.semantic.error,
           ),
         );
         return;
@@ -96,9 +101,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
 
     if (email == null || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('البريد الإلكتروني غير متاح للتحقق'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('البريد الإلكتروني غير متاح للتحقق'),
+          backgroundColor: context.semantic.error,
         ),
       );
       return;
@@ -121,7 +126,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
           : 'رمز التحقق غير صالح أو منتهي الصلاحية';
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: context.semantic.error,
+        ),
       );
       Future.microtask(
         () => ref.read(passwordResetNotifierProvider.notifier).reset(),
@@ -132,16 +140,27 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     if (mounted) {
       Navigator.of(context).pushReplacementNamed(
         nextRoute,
-        arguments: ResetPasswordArgs(token: _normalizeDigits(_code)),
+        arguments: ResetPasswordArgs(email: email),
       );
     }
   }
 
-  Future<void> _handleResend(bool isSignUpFlow) async {
-    if (!isSignUpFlow) return;
+  Future<void> _handleResend(bool isSignUpFlow, String? email) async {
+    if (isSignUpFlow) {
+      final notifier = ref.read(emailVerificationNotifierProvider.notifier);
+      final success = await notifier.resendOtp();
+      if (!mounted) return;
 
-    final notifier = ref.read(emailVerificationNotifierProvider.notifier);
-    final success = await notifier.resendOtp();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success ? 'تم إعادة إرسال الرمز' : 'تعذر إعادة الإرسال'),
+        ),
+      );
+      return;
+    }
+
+    final resetNotifier = ref.read(passwordResetNotifierProvider.notifier);
+    final success = await resetNotifier.resendForgotPasswordOtp();
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -149,6 +168,11 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
         content: Text(success ? 'تم إعادة إرسال الرمز' : 'تعذر إعادة الإرسال'),
       ),
     );
+    if (!success) {
+      Future.microtask(
+        () => ref.read(passwordResetNotifierProvider.notifier).reset(),
+      );
+    }
   }
 
   @override
@@ -170,7 +194,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.failure.message),
-            backgroundColor: Colors.red,
+            backgroundColor: context.semantic.error,
           ),
         );
         Future.microtask(
@@ -183,20 +207,172 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: isSignUpFlow
-            ? _buildSignUpVerification(
-                context,
-                nextRoute,
-                isLoading,
-                email,
-                isSignUpFlow,
-              )
-            : _buildForgotPasswordVerification(
-                context,
-                nextRoute,
-                isLoading,
-                email,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildHero(
+                  context,
+                  isSignUpFlow: isSignUpFlow,
+                  email: email,
+                ),
+                Transform.translate(
+                  offset: const Offset(0, -AppSpacing.xxxl),
+                  child: AppFormCard(
+                    title: 'التحقق من البريد الإلكتروني',
+                    subtitle:
+                        'أدخل رمز التحقق المكون من 6 أرقام المرسل إلى بريدك',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (email != null && email.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.colors.primary
+                                  .withValues(alpha: 0.08),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.lg),
+                              border: Border.all(
+                                color: context.colors.primary
+                                    .withValues(alpha: 0.18),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.mark_email_read_outlined,
+                                  size: 18,
+                                  color: context.colors.primary,
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                Flexible(
+                                  child: Text(
+                                    email,
+                                    textAlign: TextAlign.center,
+                                    style: context.text.bodySmall?.copyWith(
+                                      color: context.colors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                        AppOtpInput(
+                          length: _otpLength,
+                          enabled: !isLoading,
+                          onChanged: _handleCodeChanged,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _PrimaryButton(
+                          label: isSignUpFlow ? 'التحقق' : 'استمرار',
+                          isLoading: isLoading,
+                          onPressed: isLoading
+                              ? null
+                              : () => _handleVerify(
+                                    isSignUpFlow: isSignUpFlow,
+                                    nextRoute: nextRoute,
+                                    email: email,
+                                  ),
+                        ),
+                        if (isSignUpFlow) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          OutlinedButton(
+                            onPressed: isLoading
+                                ? null
+                                : () => _handleResend(isSignUpFlow, email),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 52),
+                              side: BorderSide(
+                                color: context.semantic.borderSubtle,
+                              ),
+                            ),
+                            child: const Text('إعادة إرسال الرمز'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const AppTrustIndicators(),
+                const SizedBox(height: AppSpacing.xxl),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHero(
+    BuildContext context, {
+    required bool isSignUpFlow,
+    String? email,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xxl,
+        AppSpacing.xl,
+        AppSpacing.huge + AppSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        gradient: context.headerGradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AppRadius.xxl),
+        ),
+      ),
+      child: Column(
+        children: [
+          if (!isSignUpFlow) ...[
+            _buildProgressIndicator(context: context, activeSteps: 2),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: context.semantic.textOnPrimary.withValues(alpha: 0.3),
+                width: 2,
               ),
+            ),
+            child: Icon(
+              Icons.mark_email_unread_outlined,
+              size: 36,
+              color: context.semantic.textOnPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            isSignUpFlow ? 'تحقق من بريدك' : 'الخطوة 2 من 3',
+            style: context.text.headlineMedium?.copyWith(
+              color: context.semantic.textOnPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            isSignUpFlow
+                ? 'أدخل الرمز المرسل إلى بريدك الإلكتروني'
+                : 'تحقق من بريدك لإعادة تعيين كلمة المرور',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -205,369 +381,30 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     required BuildContext context,
     required int activeSteps,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     Widget bar(bool active) {
-      return Container(
-        width: 60,
-        height: 4,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          color: active
-              ? colorScheme.primary
-              : colorScheme.primary.withOpacity(0.2),
+      return Expanded(
+        child: Container(
+          height: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            color: active
+                ? context.semantic.textOnPrimary
+                : context.semantic.textOnPrimary.withValues(alpha: 0.25),
+          ),
         ),
       );
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        bar(activeSteps >= 1),
-        const SizedBox(width: 8),
-        bar(activeSteps >= 2),
-        const SizedBox(width: 8),
-        bar(activeSteps >= 3),
-      ],
-    );
-  }
-
-  Widget _buildForgotPasswordVerification(
-    BuildContext context,
-    String nextRoute,
-    bool isLoading,
-    String? email,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 72),
-            Center(
-              child: Image.asset(
-                'assets/images/enterOTP.png',
-                height: 270,
-                width: 270,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 36),
-            _buildProgressIndicator(context: context, activeSteps: 2),
-            const SizedBox(height: 20),
-            Text(
-              'التحقق من البريد الإلكتروني',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                color: colorScheme.onBackground,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'أدخل رمز التحقق المكون من 6 أرقام الذي تم إرساله إلى بريدك الإلكتروني',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontSize: 18,
-                height: 1.6,
-                color: colorScheme.outline,
-              ),
-            ),
-            const SizedBox(height: 32),
-            _OtpFields(
-              onChanged: _handleCodeChanged,
-              enabled: !isLoading,
-              length: _otpLength,
-            ),
-            const SizedBox(height: 40),
-            _PrimaryButton(
-              label: 'استمرار',
-              isLoading: isLoading,
-              onPressed: isLoading
-                  ? null
-                  : () => _handleVerify(
-                      isSignUpFlow: false,
-                      nextRoute: nextRoute,
-                      email: email,
-                    ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSignUpVerification(
-    BuildContext context,
-    String nextRoute,
-    bool isLoading,
-    String? email,
-    bool isSignUpFlow,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SafeArea(
-      child: Stack(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+      child: Row(
         children: [
-          Container(
-            height: 350,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.35),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(100),
-                bottomRight: Radius.circular(100),
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.topCenter,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(30, 197, 30, 75),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(24, 40, 24, 40),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'التحقق من البريد الإلكتروني',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface,
-                          ),
-                    ),
-                    const SizedBox(height: 28),
-                    Text(
-                      'أدخل رمز التحقق المكون من 6 أرقام الذي تم إرساله إلى بريدك الإلكتروني',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 18,
-                        height: 1.6,
-                        color: colorScheme.outline,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    _OtpFields(
-                      onChanged: _handleCodeChanged,
-                      enabled: !isLoading,
-                      length: _otpLength,
-                    ),
-                    const SizedBox(height: 172),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 13),
-                      child: SizedBox(
-                        height: 52,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                colorScheme.secondary,
-                                colorScheme.primary,
-                              ],
-                            ),
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: isLoading
-                                  ? null
-                                  : () => _handleVerify(
-                                      isSignUpFlow: true,
-                                      nextRoute: nextRoute,
-                                      email: email,
-                                    ),
-                              child: Center(
-                                child: isLoading
-                                    ? const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2.5,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'التحقق',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 20,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 13),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 13),
-                      child: SizedBox(
-                        height: 52,
-                        child: OutlinedButton(
-                          onPressed: isLoading
-                              ? null
-                              : () {
-                                  _handleResend(isSignUpFlow);
-                                },
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: BorderSide(
-                              color: colorScheme.onSurface,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Text(
-                            'إعادة إرسال الرمز',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          bar(activeSteps >= 1),
+          bar(activeSteps >= 2),
+          bar(activeSteps >= 3),
         ],
       ),
-    );
-  }
-}
-
-class _OtpFields extends StatefulWidget {
-  const _OtpFields({
-    required this.onChanged,
-    required this.enabled,
-    required this.length,
-  });
-
-  final ValueChanged<String> onChanged;
-  final bool enabled;
-  final int length;
-
-  @override
-  State<_OtpFields> createState() => _OtpFieldsState();
-}
-
-class _OtpFieldsState extends State<_OtpFields> {
-  late final List<TextEditingController> _controllers = List.generate(
-    widget.length,
-    (_) => TextEditingController(),
-    growable: false,
-  );
-
-  @override
-  void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 6.0;
-        const maxFieldWidth = 44.0;
-        const minFieldWidth = 32.0;
-        const fieldHeight = 56.0;
-
-        final totalSpacing = spacing * (widget.length - 1);
-        final availableWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : MediaQuery.sizeOf(context).width;
-        final fieldWidth = ((availableWidth - totalSpacing) / widget.length)
-            .clamp(minFieldWidth, maxFieldWidth)
-            .toDouble();
-
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(widget.length, (index) {
-            return Padding(
-              padding: EdgeInsetsDirectional.only(
-                end: index == widget.length - 1 ? 0 : spacing,
-              ),
-              child: SizedBox(
-                width: fieldWidth,
-                height: fieldHeight,
-                child: TextField(
-                  controller: _controllers[index],
-                  enabled: widget.enabled,
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  maxLength: 1,
-                  style: const TextStyle(
-                    color: Color(0xFF060C3A),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
-                  ),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: colorScheme.primary,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    if (value.isNotEmpty && index < _controllers.length - 1) {
-                      FocusScope.of(context).nextFocus();
-                    }
-                    final code = _controllers.map((c) => c.text).join();
-                    widget.onChanged(code);
-                  },
-                ),
-              ),
-            );
-          }),
-        );
-      },
     );
   }
 }
@@ -585,45 +422,42 @@ class _PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 49),
-      child: SizedBox(
-        height: 52,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [colorScheme.secondary, colorScheme.primary],
+    return SizedBox(
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          gradient: context.primaryGradient,
+          boxShadow: [
+            BoxShadow(
+              color: context.colors.primary.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onPressed,
-              child: Center(
-                child: isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 20,
-                        ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            onTap: onPressed,
+            child: Center(
+              child: isLoading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: context.semantic.textOnPrimary,
+                        strokeWidth: 2.5,
                       ),
-              ),
+                    )
+                  : Text(
+                      label,
+                      style: context.text.titleMedium?.copyWith(
+                        color: context.semantic.textOnPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ),

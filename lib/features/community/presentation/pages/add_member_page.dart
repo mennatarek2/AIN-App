@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../../../../core/widgets/app_page_header.dart';
 import '../providers/communities_provider.dart';
 import 'add_member_success_page.dart';
 
@@ -16,6 +20,8 @@ class AddMemberPage extends ConsumerStatefulWidget {
 
 class _AddMemberPageState extends ConsumerState<AddMemberPage> {
   final _emailController = TextEditingController();
+  bool _isSubmitting = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -23,168 +29,145 @@ class _AddMemberPageState extends ConsumerState<AddMemberPage> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageBackground = isDark
-        ? const Color(0xFF060C3A)
-        : AppColors.backgroundLight;
-    final fieldBackground = isDark ? const Color(0xFF060C3A) : Colors.white;
-    final fieldBorder = isDark
-        ? const Color(0xFFF3F6F9)
-        : const Color(0x66060C3A);
-    final hintColor = isDark
-        ? const Color(0xE6F3F6F9)
-        : const Color(0xB3060C3A);
-    final inputTextColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
+  String? _validateEmail(String value) {
+    if (value.isEmpty) return 'البريد الإلكتروني مطلوب';
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value)) {
+      return 'أدخل بريداً إلكترونياً صالحاً';
+    }
+    return null;
+  }
 
-    return Scaffold(
-      backgroundColor: pageBackground,
-      body: Column(
-        children: [
-          _Header(onBack: () => Navigator.of(context).pop()),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 64, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _emailController,
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.right,
-                    decoration: InputDecoration(
-                      hintText: 'اكتب البريد الالكتروني الخاص بالعضو الجديد',
-                      hintTextDirection: TextDirection.rtl,
-                      hintStyle: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w400,
-                        color: hintColor,
-                      ),
-                      filled: true,
-                      fillColor: fieldBackground,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 14,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: fieldBorder, width: 1),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 1.3,
-                        ),
-                      ),
-                    ),
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w400,
-                      color: inputTextColor,
-                    ),
-                  ),
-                  const Spacer(),
-                  Center(
-                    child: SizedBox(
-                      width: 300,
-                      height: 52,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          gradient: const LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [AppColors.primary, AppColors.primarySoft],
-                          ),
-                        ),
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final email = _emailController.text.trim();
-                            if (email.isEmpty) return;
-                            await ref
-                                .read(communitiesProvider.notifier)
-                                .addMemberByEmail(
-                                  communityId: widget.communityId,
-                                  email: email,
-                                );
-                            if (!context.mounted) return;
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const AddMemberSuccessPage(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'إضافة',
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? const Color(0xFFF3F6F9)
-                                  : AppColors.backgroundLight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 220),
-                ],
-              ),
-            ),
-          ),
-        ],
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final validationError = _validateEmail(email);
+    if (validationError != null) {
+      setState(() => _error = validationError);
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _isSubmitting = true;
+    });
+
+    final error = await ref.read(communitiesProvider.notifier).addMemberByEmail(
+          communityId: widget.communityId,
+          email: email,
+        );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AddMemberSuccessPage(),
       ),
     );
   }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.onBack});
-
-  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
-
-    return Container(
-      width: double.infinity,
-      height: 100,
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      child: Stack(
+    return Scaffold(
+      backgroundColor: context.colors.surface,
+      body: Column(
         children: [
-          Positioned(
-            left: 16,
-            top: 52,
-            child: GestureDetector(
-              onTap: onBack,
-              child: Icon(Icons.arrow_forward_ios, color: textColor, size: 24),
-            ),
+          AppPageHeader(
+            title: 'إضافة عضو جديد',
+            subtitle: 'أدخل البريد الإلكتروني للعضو',
+            onBack: () => Navigator.of(context).pop(),
           ),
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment(0, 0.32),
-              child: Text(
-                'إضافة عضو جديد',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: AppFormCard(
+                  title: 'دعوة عضو',
+                  subtitle: 'سيتلقى العضو دعوة للانضمام إلى المجتمع',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.right,
+                        decoration: InputDecoration(
+                          hintText: 'البريد الإلكتروني للعضو الجديد',
+                          hintTextDirection: TextDirection.rtl,
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            color: context.colors.primary,
+                          ),
+                          filled: true,
+                          fillColor: context.semantic.surfaceInput,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm + 2,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.md),
+                            borderSide: BorderSide(
+                              color: context.semantic.borderSubtle,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.md),
+                            borderSide: BorderSide(
+                              color: context.colors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          errorText: _error,
+                        ),
+                        style: context.text.bodyMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      SizedBox(
+                        height: 52,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.md),
+                            gradient: context.primaryGradient,
+                          ),
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                              ),
+                            ),
+                            onPressed: _isSubmitting ? null : _submit,
+                            child: _isSubmitting
+                                ? SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: context.semantic.textOnPrimary,
+                                    ),
+                                  )
+                                : Text(
+                                    'إضافة',
+                                    textDirection: TextDirection.rtl,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.semantic.textOnPrimary,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

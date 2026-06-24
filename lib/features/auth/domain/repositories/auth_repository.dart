@@ -24,17 +24,22 @@ abstract class AuthRepository {
     required String email,
   });
 
-  /// Reset password with token
-  Future<Either<AuthFailure, void>> resetPassword({
+  /// Reset password with token from OTP verification
+  Future<Either<AuthFailure, User>> resetPassword({
+    required String email,
     required String token,
     required String newPassword,
+    required String confirmPassword,
   });
 
-  /// Verify password reset token before allowing new password entry
-  Future<Either<AuthFailure, void>> verifyPasswordResetCode({
+  /// Verify password reset OTP and return the reset access token
+  Future<Either<AuthFailure, String>> verifyPasswordResetCode({
     required String email,
     required String code,
   });
+
+  /// Resend forgot-password OTP
+  Future<Either<AuthFailure, void>> resendForgotPasswordOtp();
 
   /// Verify email with code
   Future<Either<AuthFailure, void>> verifyEmail({

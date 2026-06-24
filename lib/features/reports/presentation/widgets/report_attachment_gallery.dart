@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../../domain/attachment_model.dart';
 import '../pages/fullscreen_photo_page.dart';
 
@@ -73,51 +76,83 @@ class _ImageGallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 180,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: images.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          final attachment = images[index];
-          return GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => FullscreenPhotoPage(
-                    attachments: images,
-                    initialIndex: index,
-                  ),
-                ),
-              );
-            },
-            child: Hero(
-              tag: 'attachment_${attachment.id}',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  attachment.fullUrl,
-                  width: 180,
-                  height: 180,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stack) => Container(
-                    width: 180,
-                    height: 180,
-                    color: Colors.grey.shade300,
-                    child: const Icon(
-                      Icons.broken_image_outlined,
-                      size: 40,
-                      color: Colors.grey,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 520 ? 3 : 2;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: images.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
+            childAspectRatio: 1,
+          ),
+          itemBuilder: (context, index) {
+            final attachment = images[index];
+            return GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FullscreenPhotoPage(
+                      attachments: images,
+                      initialIndex: index,
                     ),
+                  ),
+                );
+              },
+              child: Hero(
+                tag: 'attachment_${attachment.id}',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        attachment.fullUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stack) => Container(
+                          color: context.semantic.chipBackground,
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: context.semantic.textMuted,
+                          ),
+                        ),
+                      ),
+                      if (images.length > 1 && index == 0)
+                        Positioned(
+                          left: AppSpacing.xs,
+                          bottom: AppSpacing.xs,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.semantic.overlay,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.pill),
+                            ),
+                            child: Text(
+                              '+${images.length - 1}',
+                              style: TextStyle(
+                                color: context.semantic.textOnPrimary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -157,9 +192,9 @@ class _VideoAttachmentState extends State<_VideoAttachment> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: _initialized
             ? Column(
                 children: [
@@ -211,31 +246,35 @@ class _FileRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+        vertical: AppSpacing.xxs,
+      ),
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(
-            color:
-                isDark ? const Color(0xFF2A3580) : const Color(0xFFD1D9F0),
-          ),
-          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: context.semantic.borderSubtle),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: ListTile(
-          leading: const Icon(Icons.attach_file_rounded, color: Color(0xFF0099FF)),
+          leading: Icon(
+            Icons.attach_file_rounded,
+            color: context.colors.primary,
+          ),
           title: Text(
             attachment.fileName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? const Color(0xFFF3F6F9) : const Color(0xFF060C3A),
+            style: context.text.bodyMedium?.copyWith(
+              color: context.colors.onSurface,
             ),
           ),
           trailing: IconButton(
             tooltip: 'تحميل',
-            icon: const Icon(Icons.download_rounded, color: Color(0xFF0099FF)),
+            icon: Icon(
+              Icons.download_rounded,
+              color: context.colors.primary,
+            ),
             onPressed: () async {
               final uri = Uri.parse(attachment.fullUrl);
               if (await canLaunchUrl(uri)) {

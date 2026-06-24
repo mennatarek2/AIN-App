@@ -7,6 +7,7 @@ class HomeNavigationNotifier extends StateNotifier<int> {
   HomeNavigationNotifier() : super(0);
 
   void setSelectedIndex(int index) {
+    if (index == 2) return;
     state = index;
   }
 }
@@ -16,8 +17,7 @@ final homeNavigationProvider =
       return HomeNavigationNotifier();
     });
 
-/// Maps tab index to named route.
-/// Index 2 (Report) is a special action — not in this map.
+/// Maps tab index to named route (legacy deep links).
 const Map<int, String> bottomNavRoutes = {
   0: AppRoutes.home,
   1: AppRoutes.community,
@@ -25,8 +25,20 @@ const Map<int, String> bottomNavRoutes = {
   4: AppRoutes.profile,
 };
 
-void navigateFromBottomNav(BuildContext context, int index) {
-  final routeName = bottomNavRoutes[index];
-  if (routeName == null) return;
-  Navigator.of(context).pushReplacementNamed(routeName);
+/// Switches the main shell tab, resetting to [MainShellPage] when needed.
+void navigateFromBottomNav(
+  BuildContext context,
+  WidgetRef ref,
+  int index,
+) {
+  if (index == 2) return;
+  ref.read(homeNavigationProvider.notifier).setSelectedIndex(index);
+
+  final current = ModalRoute.of(context)?.settings.name;
+  if (current == AppRoutes.home) return;
+
+  Navigator.of(context).pushNamedAndRemoveUntil(
+    AppRoutes.home,
+    (route) => false,
+  );
 }

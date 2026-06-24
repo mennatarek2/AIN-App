@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../../../../config/routes/app_routes.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 
 class VerificationProgressPage extends StatefulWidget {
   const VerificationProgressPage({super.key});
@@ -12,12 +14,19 @@ class VerificationProgressPage extends StatefulWidget {
       _VerificationProgressPageState();
 }
 
-class _VerificationProgressPageState extends State<VerificationProgressPage> {
+class _VerificationProgressPageState extends State<VerificationProgressPage>
+    with SingleTickerProviderStateMixin {
   Timer? _navigationTimer;
+  late final AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
     _navigationTimer = Timer(const Duration(seconds: 4), () {
       if (!mounted) {
         return;
@@ -30,109 +39,168 @@ class _VerificationProgressPageState extends State<VerificationProgressPage> {
   @override
   void dispose() {
     _navigationTimer?.cancel();
+    _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final subtitleColor =
-        (isDark ? AppColors.textPrimaryDark : AppColors.textSecondaryLight)
-            .withValues(alpha: isDark ? 0.95 : 1);
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    SizedBox(height: constraints.maxHeight * 0.26),
-                    Text(
-                      'جاري التحقق ...',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            fontSize: 29,
-                            fontWeight: FontWeight.w700,
-                            color: isDark
-                                ? AppColors.textPrimaryDark
-                                : AppColors.textPrimaryLight,
-                          ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'نقوم الآن بمراجعة بياناتك. تستغرق العملية ثوانٍ قليلة.\nيرجى الانتظار حتى اكتمال التحقق',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w400,
-                        height: 1.4,
-                        color: subtitleColor,
+          child: Column(
+            children: [
+              _buildHero(context),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'جاري التحقق ...',
+                        textAlign: TextAlign.center,
+                        style: context.text.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 34),
-                      child: _VerificationLoadingBar(isDark: isDark),
-                    ),
-                  ],
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'نقوم الآن بمراجعة بياناتك. تستغرق العملية ثوانٍ قليلة.\nيرجى الانتظار حتى اكتمال التحقق',
+                        textAlign: TextAlign.center,
+                        style: context.text.bodyMedium?.copyWith(
+                          height: 1.5,
+                          color: context.semantic.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxxl),
+                      const _VerificationLoadingBar(),
+                    ],
+                  ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildHero(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xxxl,
+        AppSpacing.xl,
+        AppSpacing.huge,
+      ),
+      decoration: BoxDecoration(
+        gradient: context.headerGradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AppRadius.xxl),
+        ),
+      ),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              final scale = 1.0 + (_pulseController.value * 0.08);
+              return Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: context.semantic.textOnPrimary
+                        .withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: context.semantic.textOnPrimary
+                          .withValues(alpha: 0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.hourglass_top_rounded,
+                    size: 44,
+                    color: context.semantic.textOnPrimary,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'التحقق جارٍ',
+            style: context.text.headlineMedium?.copyWith(
+              color: context.semantic.textOnPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _VerificationLoadingBar extends StatelessWidget {
-  const _VerificationLoadingBar({required this.isDark});
+class _VerificationLoadingBar extends StatefulWidget {
+  const _VerificationLoadingBar();
 
-  final bool isDark;
+  @override
+  State<_VerificationLoadingBar> createState() =>
+      _VerificationLoadingBarState();
+}
+
+class _VerificationLoadingBarState extends State<_VerificationLoadingBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 320,
-        height: 25,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 320,
-              height: 25,
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          height: 8,
+          decoration: BoxDecoration(
+            color: context.semantic.borderStrong,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
+          child: Align(
+            alignment: Alignment(_controller.value * 2 - 1, 0),
+            child: Container(
+              width: 80,
+              height: 8,
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFFE3E3E3)
-                    : const Color(0xFFD1D5DB),
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                gradient: context.primaryGradient,
               ),
             ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                width: 25,
-                height: 25,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [AppColors.primary, AppColors.primarySoft],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

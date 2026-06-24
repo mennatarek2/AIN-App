@@ -2,177 +2,218 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
+import '../../../../core/widgets/app_state_views.dart';
 import '../../../../core/widgets/profile_photo_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../social/presentation/providers/social_providers.dart';
+import '../../../social/presentation/widgets/trust_profile_card.dart';
 import '../providers/profile_provider.dart';
 import 'edit_profile_page.dart';
 import 'points_page.dart';
+import 'settings_page.dart';
+import 'chatbot_page.dart';
 
 class ProfilePage extends ConsumerWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final profileAsync = ref.watch(profileAsyncProvider);
     final profile = ref.watch(profileProvider);
     final trustAsync = ref.watch(myTrustProvider);
-
-    // Derive trust info from profile API response
     final trust = trustAsync.valueOrNull;
-    final pts = profile?.points ?? trust?.trustPoints ?? 0;
-    final badge = trust?.badge ?? TrustBadge.fromString(profile?.badge);
-    final totalReports = trust?.totalReports ?? 0;
-    final resolvedReports = trust?.resolvedReports ?? 0;
-    final pendingReports = trust?.pendingReports ?? 0;
+    final badge = TrustBadge.fromString(trust?.badge ?? profile?.badge);
     final photoUrl = ref.watch(profilePhotoUrlProvider);
 
-    final bg = isDark ? const Color(0xFF060C3A) : const Color(0xFFF5F7FA);
-    final cardBg = isDark ? const Color(0xFF0D1445) : Colors.white;
-    final cardBorder = isDark ? const Color(0xFF1E2D6B) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? const Color(0xFFF3F6F9) : AppColors.textPrimaryLight;
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: textSecondary),
-              const SizedBox(height: 12),
-              Text('تعذر تحميل الملف الشخصي',
-                  style: TextStyle(color: textPrimary, fontSize: 15)),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: () =>
-                    ref.read(profileAsyncProvider.notifier).refresh(),
-                icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
-                label: const Text('إعادة المحاولة',
-                    style: TextStyle(color: AppColors.primary)),
-              ),
-            ],
-          ),
+        loading: () =>
+            const AppLoadingView(message: 'جاري تحميل الملف الشخصي...'),
+        error: (_, __) => AppErrorView(
+          message: 'تعذر تحميل الملف الشخصي',
+          onRetry: () => ref.read(profileAsyncProvider.notifier).refresh(),
         ),
         data: (userProfile) => CustomScrollView(
           slivers: [
-            // ── Header (SliverAppBar) ──────────────────────────────────
-            SliverAppBar(
-              expandedHeight: 240,
-              pinned: true,
-              backgroundColor:
-                  isDark ? const Color(0xFF0A0F2E) : AppColors.primary,
-              automaticallyImplyLeading: false,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined,
-                      color: Colors.white, size: 22),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const EditProfilePage()),
-                  ),
-                  tooltip: 'تعديل الملف',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios_rounded,
-                      color: Colors.white, size: 20),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                background: _ProfileHero(
-                  profile: userProfile,
-                  photoUrl: photoUrl,
-                  badge: badge,
-                  isDark: isDark,
-                ),
-              ),
-            ),
-
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: Column(
-                  children: [
-                    // ── Trust Points Progress Card ─────────────────────
-                    _TrustProgressCard(
-                      pts: pts,
-                      badge: badge,
-                      cardBg: cardBg,
-                      cardBorder: cardBorder,
-                      textPrimary: textPrimary,
-                      textSecondary: textSecondary,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const PointsPage()),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    height: 180,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: context.heroGradient,
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(AppRadius.xxl),
                       ),
                     ),
-
-                    const SizedBox(height: 14),
-
-                    // ── Stats Row ──────────────────────────────────────
-                    _StatsRow(
-                      total: totalReports,
-                      resolved: resolvedReports,
-                      pending: pendingReports,
-                      cardBg: cardBg,
-                      cardBorder: cardBorder,
-                      textPrimary: textPrimary,
-                      textSecondary: textSecondary,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned(
+                          top: -30,
+                          left: -20,
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: context.semantic.textOnPrimary
+                                  .withValues(alpha: 0.08),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 20,
+                          right: -10,
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: context.semantic.textOnPrimary
+                                  .withValues(alpha: 0.06),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: -40,
+                          left: 40,
+                          child: Container(
+                            width: 140,
+                            height: 140,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: context.semantic.textOnPrimary
+                                  .withValues(alpha: 0.05),
+                            ),
+                          ),
+                        ),
+                        SafeArea(
+                          bottom: false,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.screenHorizontal,
+                            ),
+                            child: Row(
+                              textDirection: TextDirection.rtl,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'حسابي',
+                                    style: context.text.titleLarge?.copyWith(
+                                      color: context.semantic.textOnPrimary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                            if (!embeddedInShell)
+                              IconButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                icon: Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  color: context.semantic.textOnPrimary,
+                                  size: 20,
+                                ),
+                              ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // ── Settings: Account ─────────────────────────────
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 120,
+                    child: _ProfileIdentityCard(
+                      profile: userProfile,
+                      photoUrl: photoUrl,
+                      badge: badge,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenHorizontal,
+                  110,
+                  AppSpacing.screenHorizontal,
+                  AppSpacing.xxl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PointsPage(),
+                        ),
+                      ),
+                      child: const TrustProfileCard(userId: 'me'),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
                     _SettingsSection(
                       title: 'الحساب',
-                      isDark: isDark,
-                      cardBg: cardBg,
-                      cardBorder: cardBorder,
-                      textPrimary: textPrimary,
-                      textSecondary: textSecondary,
                       tiles: [
                         _SettingsTileData(
                           icon: Icons.person_outline_rounded,
                           label: 'تعديل الملف الشخصي',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                                builder: (_) => const EditProfilePage()),
+                              builder: (_) => const EditProfilePage(),
+                            ),
                           ),
                         ),
                         _SettingsTileData(
                           icon: Icons.lock_outline_rounded,
                           label: 'تغيير كلمة المرور',
-                          onTap: () => Navigator.of(context)
-                              .pushNamed(AppRoutes.changePassword),
+                          onTap: () => Navigator.of(
+                            context,
+                          ).pushNamed(AppRoutes.changePassword),
                         ),
                         _SettingsTileData(
                           icon: Icons.assignment_outlined,
                           label: 'بلاغاتي',
-                          onTap: () =>
-                              Navigator.of(context).pushNamed(AppRoutes.myReports),
+                          onTap: () => Navigator.of(
+                            context,
+                          ).pushNamed(AppRoutes.myReports),
+                        ),
+                        _SettingsTileData(
+                          icon: Icons.settings_outlined,
+                          label: 'الإعدادات',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const SettingsPage(),
+                            ),
+                          ),
+                        ),
+                        _SettingsTileData(
+                          icon: Icons.smart_toy_outlined,
+                          label: 'المساعد الذكي',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ChatbotPage(),
+                            ),
+                          ),
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // ── Settings: App ─────────────────────────────────
+                    const SizedBox(height: AppSpacing.sectionGap),
                     _SettingsSection(
                       title: 'التطبيق',
-                      isDark: isDark,
-                      cardBg: cardBg,
-                      cardBorder: cardBorder,
-                      textPrimary: textPrimary,
-                      textSecondary: textSecondary,
                       tiles: [
-                        _SettingsTileData(
-                          icon: Icons.notifications_outlined,
-                          label: 'الإشعارات',
-                          onTap: () => Navigator.of(context)
-                              .pushNamed('/notifications'),
-                        ),
                         _SettingsTileData(
                           icon: Icons.info_outline_rounded,
                           label: 'عن التطبيق',
@@ -186,28 +227,18 @@ class ProfilePage extends ConsumerWidget {
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // ── Settings: Security ────────────────────────────
+                    const SizedBox(height: AppSpacing.sectionGap),
                     _SettingsSection(
                       title: 'الأمان',
-                      isDark: isDark,
-                      cardBg: cardBg,
-                      cardBorder: cardBorder,
-                      textPrimary: textPrimary,
-                      textSecondary: textSecondary,
                       tiles: [
                         _SettingsTileData(
                           icon: Icons.logout_rounded,
                           label: 'تسجيل الخروج',
-                          color: const Color(0xFFEF4444),
+                          color: context.semantic.error,
                           onTap: () => _showLogoutDialog(context, ref),
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -218,432 +249,196 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  // ── Logout dialog ────────────────────────────────────────────────────────
-
   Future<void> _showLogoutDialog(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'تسجيل الخروج',
-          textDirection: TextDirection.rtl,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.xxl),
         ),
-        content: const Text(
-          'هل تريد تسجيل الخروج من حسابك؟',
-          textDirection: TextDirection.rtl,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('إلغاء',
-                style: TextStyle(color: AppColors.primary, fontSize: 15)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    context.colors.primary,
+                    context.colors.primary.withValues(alpha: 0.5),
+                  ],
+                ),
+              ),
             ),
-            child: const Text('خروج',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.lg,
+                AppSpacing.xl,
+                AppSpacing.xl,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: context.semantic.errorContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.logout_rounded,
+                      color: context.semantic.error,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'تسجيل الخروج',
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.center,
+                    style: context.text.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'هل تريد تسجيل الخروج من حسابك؟',
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.center,
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.semantic.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('إلغاء'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: context.semantic.error,
+                          ),
+                          child: const Text('خروج'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
     if (confirmed == true) {
       await ref.read(authNotifierProvider.notifier).logout();
       if (!context.mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.login,
-        (route) => false,
-      );
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
     }
   }
 }
 
-// ─── Profile Hero (collapsible header) ───────────────────────────────────────
-
-class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({
+class _ProfileIdentityCard extends StatelessWidget {
+  const _ProfileIdentityCard({
     required this.profile,
     required this.photoUrl,
     required this.badge,
-    required this.isDark,
   });
 
   final dynamic profile;
   final String? photoUrl;
   final TrustBadge badge;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [const Color(0xFF0A0F2E), const Color(0xFF1E2D6B)]
-              : [AppColors.primary, AppColors.primaryDark],
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(height: 8),
-            // Avatar
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: ProfilePhotoImage(
-                imagePath: photoUrl,
-                fit: BoxFit.cover,
-                width: 90,
-                height: 90,
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // Name
-            Text(
-              profile?.name ?? '',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-
-            if (profile?.username.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 4),
-              Text(
-                '@${profile!.username}',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.85),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 4),
-
-            // Email
-            Text(
-              profile?.email ?? '',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.white.withValues(alpha: 0.75),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // Trust badge chip
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-              decoration: BoxDecoration(
-                color: badge.color.withValues(alpha: 0.20),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: badge.color.withValues(alpha: 0.50), width: 1.2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(badge.emoji,
-                      style: const TextStyle(fontSize: 14)),
-                  const SizedBox(width: 6),
-                  Text(
-                    badge.label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: badge.color,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Trust Progress Card ──────────────────────────────────────────────────────
-
-class _TrustProgressCard extends StatelessWidget {
-  const _TrustProgressCard({
-    required this.pts,
-    required this.badge,
-    required this.cardBg,
-    required this.cardBorder,
-    required this.textPrimary,
-    required this.textSecondary,
-    this.onTap,
-  });
-
-  final int pts;
-  final TrustBadge badge;
-  final Color cardBg;
-  final Color cardBorder;
-  final Color textPrimary;
-  final Color textSecondary;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = badge.progressFor(pts);
-    final toNext = badge.pointsToNext(pts);
-    final isMax = badge == TrustBadge.guardian;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: context.semantic.surfaceContainer,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        border: Border.all(color: context.semantic.borderSubtle),
+        boxShadow: context.cardShadows,
       ),
       child: Column(
         children: [
-          Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Icon(Icons.workspace_premium_rounded,
-                  color: badge.color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'نقاط الثقة',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: textPrimary,
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: context.colors.primary, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: context.colors.primary.withValues(alpha: 0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: badge.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$pts نقطة',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: badge.color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              backgroundColor: badge.color.withValues(alpha: 0.12),
-              valueColor: AlwaysStoppedAnimation<Color>(badge.color),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ProfilePhotoImage(
+              imagePath: photoUrl,
+              fit: BoxFit.cover,
+              width: 88,
+              height: 88,
             ),
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              isMax
-                  ? '🏆 أعلى مستوى — حارس'
-                  : '$toNext نقطة للمستوى التالي',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 12,
-                color: textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Stats Row ────────────────────────────────────────────────────────────────
-
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({
-    required this.total,
-    required this.resolved,
-    required this.pending,
-    required this.cardBg,
-    required this.cardBorder,
-    required this.textPrimary,
-    required this.textSecondary,
-  });
-
-  final int total;
-  final int resolved;
-  final int pending;
-  final Color cardBg;
-  final Color cardBorder;
-  final Color textPrimary;
-  final Color textSecondary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            label: 'البلاغات المقدمة',
-            value: total,
-            icon: Icons.assignment_outlined,
-            color: AppColors.primary,
-            cardBg: cardBg,
-            cardBorder: cardBorder,
-            textPrimary: textPrimary,
-            textSecondary: textSecondary,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            label: 'تم الحل',
-            value: resolved,
-            icon: Icons.check_circle_outline_rounded,
-            color: const Color(0xFF10B981),
-            cardBg: cardBg,
-            cardBorder: cardBorder,
-            textPrimary: textPrimary,
-            textSecondary: textSecondary,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            label: 'قيد المراجعة',
-            value: pending,
-            icon: Icons.hourglass_bottom_rounded,
-            color: const Color(0xFFF59E0B),
-            cardBg: cardBg,
-            cardBorder: cardBorder,
-            textPrimary: textPrimary,
-            textSecondary: textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.cardBg,
-    required this.cardBorder,
-    required this.textPrimary,
-    required this.textSecondary,
-  });
-
-  final String label;
-  final int value;
-  final IconData icon;
-  final Color color;
-  final Color cardBg;
-  final Color cardBorder;
-  final Color textPrimary;
-  final Color textSecondary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            '$value',
-            style: TextStyle(
-              fontSize: 20,
+            profile?.name ?? '',
+            style: context.text.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
-              color: textPrimary,
             ),
           ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(fontSize: 10, color: textSecondary),
-            maxLines: 2,
+          if (profile?.username.trim().isNotEmpty == true)
+            Text('@${profile!.username}', style: context.text.bodySmall),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(profile?.email ?? '', style: context.text.bodySmall),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: badge.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(color: badge.color.withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(badge.emoji),
+                const SizedBox(width: 6),
+                Text(
+                  badge.label,
+                  style: TextStyle(
+                    color: badge.color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 }
-
-// ─── Settings Section ─────────────────────────────────────────────────────────
 
 class _SettingsTileData {
   const _SettingsTileData({
@@ -660,68 +455,36 @@ class _SettingsTileData {
 }
 
 class _SettingsSection extends StatelessWidget {
-  const _SettingsSection({
-    required this.title,
-    required this.tiles,
-    required this.isDark,
-    required this.cardBg,
-    required this.cardBorder,
-    required this.textPrimary,
-    required this.textSecondary,
-  });
+  const _SettingsSection({required this.title, required this.tiles});
 
   final String title;
   final List<_SettingsTileData> tiles;
-  final bool isDark;
-  final Color cardBg;
-  final Color cardBorder;
-  final Color textPrimary;
-  final Color textSecondary;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 4, bottom: 8),
-          child: Text(
-            title,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: textSecondary,
-              letterSpacing: 0.5,
-            ),
-          ),
+        AppSectionHeader(
+          title: title,
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
         ),
         Container(
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-              ),
-            ],
+            color: context.semantic.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: context.semantic.borderSubtle),
           ),
           child: Column(
             children: [
               for (int i = 0; i < tiles.length; i++) ...[
-                _SettingsTile(
-                  data: tiles[i],
-                  textPrimary: textPrimary,
-                  textSecondary: textSecondary,
-                ),
+                _SettingsTile(data: tiles[i]),
                 if (i < tiles.length - 1)
                   Divider(
                     height: 1,
                     indent: 52,
-                    endIndent: 16,
-                    color: cardBorder,
+                    endIndent: AppSpacing.md,
+                    color: context.semantic.divider,
                   ),
               ],
             ],
@@ -733,56 +496,33 @@ class _SettingsSection extends StatelessWidget {
 }
 
 class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.data,
-    required this.textPrimary,
-    required this.textSecondary,
-  });
+  const _SettingsTile({required this.data});
 
   final _SettingsTileData data;
-  final Color textPrimary;
-  final Color textSecondary;
 
   @override
   Widget build(BuildContext context) {
-    final color = data.color ?? textPrimary;
+    final color = data.color ?? context.colors.onSurface;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: data.onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(data.icon, color: color, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  data.label,
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: color,
-                  ),
-                ),
-              ),
-              Icon(Icons.chevron_left_rounded,
-                  color: textSecondary.withValues(alpha: 0.5), size: 20),
-            ],
-          ),
+    return ListTile(
+      onTap: data.onTap,
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
+        child: Icon(data.icon, color: color, size: 20),
+      ),
+      title: Text(
+        data.label,
+        textDirection: TextDirection.rtl,
+        style: TextStyle(color: color, fontWeight: FontWeight.w500),
+      ),
+      trailing: Icon(
+        Icons.chevron_left_rounded,
+        color: context.semantic.textMuted,
       ),
     );
   }

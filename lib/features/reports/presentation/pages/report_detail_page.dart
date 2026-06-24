@@ -6,7 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../config/routes/app_routes.dart';
 import '../../../../core/network/api_exception.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_state_views.dart';
 import '../../../../core/widgets/cached_app_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../home/presentation/providers/home_feed_provider.dart';
@@ -14,8 +17,8 @@ import '../../../my_reports/presentation/providers/my_reports_provider.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../domain/report_model.dart';
 import '../providers/report_data_providers.dart';
-import '../providers/social_provider.dart';
-import '../widgets/comment_tile.dart';
+import '../../../social/presentation/widgets/comment_section.dart';
+import '../../../social/presentation/widgets/like_button.dart';
 import '../widgets/report_attachment_gallery.dart';
 
 class ReportDetailPage extends ConsumerStatefulWidget {
@@ -28,13 +31,11 @@ class ReportDetailPage extends ConsumerStatefulWidget {
 }
 
 class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
-  final _commentController = TextEditingController();
   final _scrollController = ScrollController();
   final _commentSectionKey = GlobalKey();
 
   @override
   void dispose() {
-    _commentController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -63,8 +64,12 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
 
   Widget _buildLoading() {
     return Scaffold(
-      appBar: AppBar(backgroundColor: AppColors.primarySoft),
-      body: const Center(child: CircularProgressIndicator()),
+      backgroundColor: context.colors.surface,
+      appBar: AppBar(
+        backgroundColor: context.semantic.surfaceHeader,
+        foregroundColor: context.colors.onSurface,
+      ),
+      body: const AppLoadingView(),
     );
   }
 
@@ -109,138 +114,172 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
   // ---------------------------------------------------------------------------
 
   Widget _buildDetail(ReportModel report) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentProfile = ref.watch(profileProvider);
-    final currentUserId = currentProfile?.id ?? ref.watch(currentUserProvider)?.id;
-    final isOwner = currentUserId != null &&
+    final currentUserId =
+        currentProfile?.id ?? ref.watch(currentUserProvider)?.id;
+    final isOwner =
+        currentUserId != null &&
         report.createdById != null &&
         report.createdById == currentUserId;
+    final heroImage = report.imageUrls.isNotEmpty
+        ? report.imageUrls.first
+        : report.imagePath;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: context.colors.surface,
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // ----- SliverAppBar -----
           SliverAppBar(
-            expandedHeight: report.imagePath.isNotEmpty ? 220 : 100,
+            expandedHeight: heroImage.isNotEmpty ? 320 : 160,
             pinned: true,
-            backgroundColor: isDark
-                ? AppColors.backgroundDark
-                : AppColors.primarySoft,
-            foregroundColor: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimaryLight,
+            stretch: true,
+            backgroundColor: context.semantic.surfaceHeader,
+            foregroundColor: context.semantic.textOnPrimary,
             flexibleSpace: FlexibleSpaceBar(
-              background: report.imagePath.isNotEmpty
-                  ? Image.network(
-                      report.imagePath,
+              stretchModes: const [
+                StretchMode.zoomBackground,
+                StretchMode.blurBackground,
+              ],
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (heroImage.isNotEmpty)
+                    CachedAppImage(
+                      imagePath: heroImage,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) => Container(
-                        color: AppColors.primarySoft,
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorWidget: Container(
+                        decoration: BoxDecoration(
+                          gradient: context.heroGradient,
+                        ),
                       ),
                     )
-                  : null,
-              title: Text(
-                report.title,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                  else
+                    Container(
+                      decoration: BoxDecoration(gradient: context.heroGradient),
+                    ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.25),
+                          Colors.black.withValues(alpha: 0.05),
+                          Colors.black.withValues(alpha: 0.72),
+                        ],
+                        stops: const [0, 0.45, 1],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: AppSpacing.screenHorizontal,
+                    left: AppSpacing.screenHorizontal,
+                    bottom: AppSpacing.lg,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          report.title,
+                          textDirection: TextDirection.rtl,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.text.headlineSmall?.copyWith(
+                            color: context.semantic.textOnPrimary,
+                            fontWeight: FontWeight.w800,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        _StatusRow(report: report),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
-              // Share
               IconButton(
                 icon: const Icon(Icons.share_outlined),
                 tooltip: 'مشاركة',
                 onPressed: () => _share(report),
               ),
-              // Visibility (owner only)
               if (isOwner)
                 IconButton(
                   icon: const Icon(Icons.visibility_outlined),
                   tooltip: 'تعديل الظهور',
                   onPressed: () => _showVisibilitySheet(report),
                 ),
-              // Delete (owner only)
               if (isOwner)
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded),
                   tooltip: 'حذف البلاغ',
-                  color: Colors.redAccent,
                   onPressed: () => _confirmDelete(report),
                 ),
             ],
           ),
-
-          // ----- Body content -----
           SliverToBoxAdapter(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 16),
-                // Status + Visibility chips
-                _StatusRow(report: report),
-                const SizedBox(height: 16),
-                // Metadata
-                _MetadataSection(report: report),
-                const SizedBox(height: 16),
-                // Reporter
-                _ReporterSection(
-                  report: report,
-                  isOwner: isOwner,
+                const SizedBox(height: AppSpacing.md),
+                _DetailCard(
+                  child: _OverviewSection(report: report, isOwner: isOwner),
                 ),
-                const SizedBox(height: 16),
-                // Description
-                _DescriptionSection(report: report),
-                const SizedBox(height: 16),
-                // Attachments
-                if (report.attachments.isNotEmpty) ...[
-                  _SectionLabel(label: 'المرفقات'),
-                  ReportAttachmentGallery(attachments: report.attachments),
-                  const SizedBox(height: 16),
+                if (report.fullDescription.isNotEmpty ||
+                    report.description.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _DetailCard(child: _DescriptionSection(report: report)),
                 ],
-                // Map
-                _MapSection(report: report),
-                const SizedBox(height: 16),
-                // Social bar
-                _SocialBar(
-                  reportId: report.id,
-                  onCommentsTap: _scrollToComments,
+                if (report.latitude != 0 || report.longitude != 0) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _DetailCard(child: _MapSection(report: report)),
+                ],
+                if (report.attachments.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _DetailCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SectionHeader(
+                          icon: Icons.photo_library_outlined,
+                          label: 'المرفقات',
+                          trailing: '${report.attachments.length}',
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        ReportAttachmentGallery(
+                          attachments: report.attachments,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.screenHorizontal,
+                  ),
+                  child: LikeButton(reportId: report.id),
                 ),
-                const Divider(height: 32),
-                // Comments section
-                _CommentsSection(
-                  key: _commentSectionKey,
-                  reportId: report.id,
+                const SizedBox(height: AppSpacing.sm),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.screenHorizontal,
+                  ),
+                  child: CommentSection(
+                    key: _commentSectionKey,
+                    reportId: report.id,
+                  ),
                 ),
-                const SizedBox(height: 100),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
           ),
         ],
       ),
-      // Comment compose bar
-      bottomNavigationBar: _CommentCompose(
-        controller: _commentController,
-        reportId: widget.reportId,
-      ),
     );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Scroll to comments
-  // ---------------------------------------------------------------------------
-
-  void _scrollToComments() {
-    final ctx = _commentSectionKey.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -287,7 +326,7 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade400,
+                color: context.semantic.borderStrong,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -299,11 +338,11 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
             const SizedBox(height: 8),
             ...options.map(
               (opt) => ListTile(
-                leading: Icon(opt.icon, color: AppColors.primary),
+                leading: Icon(opt.icon, color: context.colors.primary),
                 title: Text(opt.label, textDirection: TextDirection.rtl),
-                trailing: report.visibility?.toLowerCase() ==
-                        opt.value.toLowerCase()
-                    ? const Icon(Icons.check, color: AppColors.primary)
+                trailing:
+                    report.visibility?.toLowerCase() == opt.value.toLowerCase()
+                    ? Icon(Icons.check, color: context.colors.primary)
                     : null,
                 onTap: () async {
                   Navigator.of(ctx).pop();
@@ -329,9 +368,9 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('فشل التحديث: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
       }
     }
   }
@@ -362,8 +401,8 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
+              backgroundColor: context.semantic.error,
+              foregroundColor: context.semantic.textOnPrimary,
             ),
             onPressed: () async {
               Navigator.of(ctx).pop();
@@ -393,7 +432,7 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('فشل الحذف: $e'),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: context.semantic.error,
           ),
         );
       }
@@ -405,47 +444,201 @@ class _ReportDetailPageState extends ConsumerState<ReportDetailPage> {
 // Sub-widgets
 // =============================================================================
 
+class _OverviewSection extends StatelessWidget {
+  const _OverviewSection({required this.report, required this.isOwner});
+
+  final ReportModel report;
+  final bool isOwner;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ReporterSection(report: report, isOwner: isOwner),
+        const SizedBox(height: AppSpacing.md),
+        Divider(color: context.semantic.borderSubtle.withValues(alpha: 0.7)),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          textDirection: TextDirection.rtl,
+          children: [
+            if (report.categoryName != null)
+              _InfoTile(
+                icon: Icons.category_outlined,
+                label: 'التصنيف',
+                value: report.categoryName!,
+              ),
+            if (report.subCategoryName != null)
+              _InfoTile(
+                icon: Icons.label_outline,
+                label: 'التصنيف الفرعي',
+                value: report.subCategoryName!,
+              ),
+            _InfoTile(
+              icon: Icons.access_time_rounded,
+              label: 'تاريخ الإرسال',
+              value: report.submittedAgo.isNotEmpty
+                  ? report.submittedAgo
+                  : 'الآن',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: context.semantic.chipBackground,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        textDirection: TextDirection.rtl,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: context.colors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Icon(icon, size: 18, color: context.colors.primary),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  textDirection: TextDirection.rtl,
+                  style: context.text.labelSmall?.copyWith(
+                    color: context.semantic.textMuted,
+                  ),
+                ),
+                Text(
+                  value,
+                  textDirection: TextDirection.rtl,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      textDirection: TextDirection.rtl,
+      children: [
+        Icon(icon, size: 20, color: context.colors.primary),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            label,
+            textDirection: TextDirection.rtl,
+            style: context.text.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        if (trailing != null)
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xxs,
+            ),
+            decoration: BoxDecoration(
+              color: context.colors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              trailing!,
+              style: context.text.labelSmall?.copyWith(
+                color: context.colors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DetailCard extends StatelessWidget {
+  const _DetailCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: context.semantic.surfaceContainer,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: context.semantic.borderSubtle),
+          boxShadow: context.cardShadows,
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
 class _StatusRow extends StatelessWidget {
   const _StatusRow({required this.report});
   final ReportModel report;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Wrap(
-        spacing: 8,
-        children: [
-          _Chip(
-            label: report.statusLabel,
-            color: report.statusColor,
-          ),
-          if (report.visibility != null)
-            _Chip(
-              label: _visibilityLabel(report.visibility!),
-              color: AppColors.primary,
-              icon: _visibilityIcon(report.visibility!),
-            ),
-        ],
-      ),
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xxs,
+      children: [_Chip(label: report.statusLabel, color: report.statusColor)],
     );
-  }
-
-  String _visibilityLabel(String v) {
-    switch (v.toLowerCase()) {
-      case 'public': return 'عام';
-      case 'anonymous': return 'مجهول';
-      case 'confidential': return 'سري';
-      default: return v;
-    }
-  }
-
-  IconData _visibilityIcon(String v) {
-    switch (v.toLowerCase()) {
-      case 'anonymous': return Icons.person_off_outlined;
-      case 'confidential': return Icons.lock_outline;
-      default: return Icons.public;
-    }
   }
 }
 
@@ -486,82 +679,6 @@ class _Chip extends StatelessWidget {
   }
 }
 
-class _MetadataSection extends StatelessWidget {
-  const _MetadataSection({required this.report});
-  final ReportModel report;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor =
-        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final subColor =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            report.title,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: 6),
-          if (report.categoryName != null)
-            _MetaRow(
-              icon: Icons.category_outlined,
-              label: report.categoryName!,
-              color: subColor,
-            ),
-          if (report.subCategoryName != null)
-            _MetaRow(
-              icon: Icons.label_outline,
-              label: report.subCategoryName!,
-              color: subColor,
-            ),
-          _MetaRow(
-            icon: Icons.access_time_rounded,
-            label: report.submittedAgo.isNotEmpty ? report.submittedAgo : 'الآن',
-            color: subColor,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetaRow extends StatelessWidget {
-  const _MetaRow({required this.icon, required this.label, required this.color});
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Text(
-            label,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(fontSize: 13, color: color),
-          ),
-          const SizedBox(width: 6),
-          Icon(icon, size: 15, color: color),
-        ],
-      ),
-    );
-  }
-}
-
 class _ReporterSection extends StatelessWidget {
   const _ReporterSection({required this.report, required this.isOwner});
   final ReportModel report;
@@ -580,59 +697,107 @@ class _ReporterSection extends StatelessWidget {
     final reporterName = report.reporter?.name ?? report.createdByName;
     final displayName = isMasked
         ? 'مجهول الهوية'
-        : (reporterName?.trim().isNotEmpty == true ? reporterName!.trim() : '');
+        : (reporterName?.trim().isNotEmpty == true
+              ? reporterName!.trim()
+              : 'مُبلّغ');
     final photoUrl = report.reporter?.resolvedPhotoUrl;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+          colors: [
+            context.colors.primary.withValues(alpha: 0.08),
+            context.semantic.chipBackground,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: context.colors.primary.withValues(alpha: 0.12),
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+        textDirection: TextDirection.rtl,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (displayName.isNotEmpty)
-                Text(
-                  displayName,
-                  textDirection: TextDirection.rtl,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              const Text(
-                'المُبلِّغ',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-            ],
-          ),
-          const SizedBox(width: 10),
           CircleAvatar(
-            radius: 22,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+            radius: 26,
+            backgroundColor: context.colors.primary.withValues(alpha: 0.15),
             child: isMasked
-                ? const Icon(
-                    Icons.person_off_outlined,
-                    color: AppColors.primary,
-                  )
+                ? Icon(Icons.person_off_outlined, color: context.colors.primary)
                 : photoUrl != null && photoUrl.isNotEmpty
                 ? ClipOval(
                     child: CachedAppImage(
                       imagePath: photoUrl,
-                      width: 44,
-                      height: 44,
+                      width: 52,
+                      height: 52,
                       fit: BoxFit.cover,
-                      errorWidget: const Icon(
+                      errorWidget: Icon(
                         Icons.person_outline,
-                        color: AppColors.primary,
+                        color: context.colors.primary,
                       ),
                     ),
                   )
-                : const Icon(Icons.person_outline, color: AppColors.primary),
+                : Icon(Icons.person_outline, color: context.colors.primary),
           ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  displayName,
+                  textDirection: TextDirection.rtl,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  'المُبلِّغ',
+                  style: context.text.labelSmall?.copyWith(
+                    color: context.semantic.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (report.visibility != null)
+            _Chip(
+              label: _visibilityLabel(report.visibility!),
+              color: context.colors.primary,
+              icon: _visibilityIcon(report.visibility!),
+            ),
         ],
       ),
     );
+  }
+
+  String _visibilityLabel(String v) {
+    switch (v.toLowerCase()) {
+      case 'public':
+        return 'عام';
+      case 'anonymous':
+        return 'مجهول';
+      case 'confidential':
+        return 'سري';
+      default:
+        return v;
+    }
+  }
+
+  IconData _visibilityIcon(String v) {
+    switch (v.toLowerCase()) {
+      case 'anonymous':
+        return Icons.person_off_outlined;
+      case 'confidential':
+        return Icons.lock_outline;
+      default:
+        return Icons.public;
+    }
   }
 }
 
@@ -642,32 +807,25 @@ class _DescriptionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final text = report.fullDescription.isNotEmpty
         ? report.fullDescription
         : report.description;
     if (text.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          const _SectionLabel(label: 'الوصف'),
-          const SizedBox(height: 6),
-          Text(
-            text,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.6,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        const _SectionLabel(label: 'الوصف'),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          text,
+          textDirection: TextDirection.rtl,
+          style: context.text.bodyMedium?.copyWith(
+            height: 1.6,
+            color: context.semantic.textMuted,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -684,272 +842,98 @@ class _MapSection extends StatelessWidget {
 
     final latLng = LatLng(report.latitude, report.longitude);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          const _SectionLabel(label: 'الموقع'),
-          if (report.displayLocation != null &&
-              report.displayLocation!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (report.mapsUrl != null && report.mapsUrl!.isNotEmpty)
-                    TextButton.icon(
-                      onPressed: () async {
-                        final uri = Uri.parse(report.mapsUrl!);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(
-                            uri,
-                            mode: LaunchMode.externalApplication,
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.map_outlined, size: 16),
-                      label: const Text('فتح في Google Maps'),
-                    ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      report.displayLocation!,
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.location_on_outlined,
-                    size: 14,
-                    color: Colors.red,
-                  ),
-                ],
-              ),
-            ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              height: 200,
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: latLng,
-                  zoom: 15,
-                ),
-                markers: {
-                  Marker(markerId: const MarkerId('report'), position: latLng),
-                },
-                // Make map read-only
-                zoomControlsEnabled: false,
-                zoomGesturesEnabled: false,
-                scrollGesturesEnabled: false,
-                tiltGesturesEnabled: false,
-                rotateGesturesEnabled: false,
-                myLocationButtonEnabled: false,
-                liteModeEnabled: true,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SocialBar extends ConsumerWidget {
-  const _SocialBar({required this.reportId, required this.onCommentsTap});
-  final String reportId;
-  final VoidCallback onCommentsTap;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final likeState = ref.watch(likeProvider(reportId));
-    final commentsAsync = ref.watch(commentsProvider(reportId));
-    final commentCount = commentsAsync.valueOrNull?.length ?? 0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          // Comments
-          InkWell(
-            onTap: onCommentsTap,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  const Icon(Icons.comment_outlined, size: 20, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$commentCount',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          // Like
-          InkWell(
-            onTap: () => ref.read(likeProvider(reportId).notifier).toggle(),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  Icon(
-                    likeState.isLiked
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    size: 20,
-                    color: likeState.isLiked ? Colors.red : Colors.grey,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${likeState.count}',
-                    style: TextStyle(
-                      color: likeState.isLiked ? Colors.red : Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CommentsSection extends ConsumerWidget {
-  const _CommentsSection({super.key, required this.reportId});
-  final String reportId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(commentsProvider(reportId));
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          const _SectionLabel(label: 'التعليقات'),
-          const SizedBox(height: 12),
-          async.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text(
-              'تعذر تحميل التعليقات',
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
-            data: (comments) {
-              if (comments.isEmpty) {
-                return Text(
-                  'لا توجد تعليقات بعد. كن أول من يعلّق!',
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(color: Colors.grey.shade500),
-                );
-              }
-              return Column(
-                children: comments
-                    .map((c) => CommentTile(comment: c, reportId: reportId))
-                    .toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CommentCompose extends ConsumerWidget {
-  const _CommentCompose({
-    required this.controller,
-    required this.reportId,
-  });
-
-  final TextEditingController controller;
-  final String reportId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final commentState = ref.watch(commentNotifierProvider(reportId));
-
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isDark
-              ? AppColors.backgroundDark
-              : Theme.of(context).scaffoldBackgroundColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          textDirection: TextDirection.rtl,
           children: [
-            commentState.isLoading
-                ? const SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Padding(
-                      padding: EdgeInsets.all(8),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : IconButton(
-                    icon: const Icon(
-                      Icons.send_rounded,
-                      color: AppColors.primary,
-                    ),
-                    onPressed: () {
-                      final text = controller.text.trim();
-                      if (text.isEmpty) return;
-                      ref
-                          .read(commentNotifierProvider(reportId).notifier)
-                          .submit(text);
-                      controller.clear();
-                    },
-                  ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                textDirection: TextDirection.rtl,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                decoration: InputDecoration(
-                  hintText: 'اكتب تعليقاً...',
-                  hintTextDirection: TextDirection.rtl,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDark
-                      ? const Color(0xFF1A2060)
-                      : const Color(0xFFF0F4FF),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                ),
+            Icon(Icons.map_outlined, size: 18, color: context.colors.primary),
+            const SizedBox(width: AppSpacing.xxs),
+            Text(
+              'الموقع',
+              textDirection: TextDirection.rtl,
+              style: context.text.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
         ),
-      ),
+        if (report.displayLocation != null &&
+            report.displayLocation!.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              Expanded(
+                child: Text(
+                  report.displayLocation!,
+                  textDirection: TextDirection.rtl,
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.semantic.textMuted,
+                  ),
+                ),
+              ),
+              if (report.mapsUrl != null && report.mapsUrl!.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.parse(report.mapsUrl!);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('فتح الخريطة'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: AppSpacing.sm),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: context.semantic.borderSubtle),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: SizedBox(
+                height: 180,
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: latLng,
+                    zoom: 15,
+                  ),
+                  markers: {
+                    Marker(
+                      markerId: const MarkerId('report'),
+                      position: latLng,
+                    ),
+                  },
+                  zoomControlsEnabled: false,
+                  zoomGesturesEnabled: false,
+                  scrollGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
+                  rotateGesturesEnabled: false,
+                  myLocationButtonEnabled: false,
+                  liteModeEnabled: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -976,39 +960,34 @@ class _FullPageMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: AppColors.primarySoft),
+      backgroundColor: context.colors.surface,
+      appBar: AppBar(backgroundColor: context.semantic.surfaceHeader),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 72, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
+              Icon(icon, size: 72, color: context.semantic.textMuted),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 title,
                 textDirection: TextDirection.rtl,
-                style: const TextStyle(
-                  fontSize: 20,
+                style: context.text.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 body,
                 textDirection: TextDirection.rtl,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: onAction,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.semantic.textMuted,
                 ),
-                child: Text(actionLabel),
               ),
+              const SizedBox(height: AppSpacing.xl),
+              ElevatedButton(onPressed: onAction, child: Text(actionLabel)),
             ],
           ),
         ),
@@ -1026,7 +1005,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       label,
       textDirection: TextDirection.rtl,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      style: context.text.titleMedium?.copyWith(fontWeight: FontWeight.bold),
     );
   }
 }

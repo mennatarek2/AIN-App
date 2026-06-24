@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_layout_primitives.dart';
 import '../../domain/utils/username_utils.dart';
 import 'email_verification_page.dart';
 import '../providers/auth_provider.dart';
@@ -22,6 +26,8 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
   final _ssnController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
@@ -42,9 +48,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
     final email = _emailController.text.trim();
     if (UsernameUtils.fromEmail(email) == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('البريد الإلكتروني غير صحيح'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('البريد الإلكتروني غير صحيح'),
+          backgroundColor: context.semantic.error,
         ),
       );
       return;
@@ -72,21 +78,22 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to auth state changes
     ref.listen<AuthState>(authNotifierProvider, (previous, next) {
       if (next is AuthError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.failure.message),
-            backgroundColor: Colors.red,
+            backgroundColor: context.semantic.error,
           ),
         );
-        // Clear error after showing
         Future.microtask(
           () => ref.read(authNotifierProvider.notifier).clearError(),
         );
       }
     });
+
+    final authState = ref.watch(authNotifierProvider);
+    final isLoading = authState is AuthLoading;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -96,11 +103,108 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                _buildBlueHeader(context),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: _buildForm(context),
+                _buildHero(context),
+                Transform.translate(
+                  offset: const Offset(0, -AppSpacing.xxxl),
+                  child: AppFormCard(
+                    title: 'إنشاء حساب جديد',
+                    subtitle: 'أدخل بياناتك لإنشاء حسابك',
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildInput(
+                            hint: 'الاسم الكامل',
+                            icon: Icons.person_outline_rounded,
+                            textInputAction: TextInputAction.next,
+                            controller: _nameController,
+                            enabled: !isLoading,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildInput(
+                            hint: 'البريد الإلكتروني',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            controller: _emailController,
+                            enabled: !isLoading,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildInput(
+                            hint: 'رقم الهاتف المحمول',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.next,
+                            controller: _phoneController,
+                            enabled: !isLoading,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildInput(
+                            hint: 'رقم الهوية الشخصية',
+                            icon: Icons.badge_outlined,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.next,
+                            controller: _ssnController,
+                            enabled: !isLoading,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildInput(
+                            hint: 'كلمة المرور',
+                            icon: Icons.lock_outline_rounded,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.next,
+                            controller: _passwordController,
+                            enabled: !isLoading,
+                            suffix: IconButton(
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: context.semantic.textMuted,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildInput(
+                            hint: 'تأكيد كلمة المرور',
+                            icon: Icons.lock_outline_rounded,
+                            obscureText: _obscureConfirmPassword,
+                            textInputAction: TextInputAction.done,
+                            controller: _confirmPasswordController,
+                            enabled: !isLoading,
+                            suffix: IconButton(
+                              onPressed: () => setState(
+                                () => _obscureConfirmPassword =
+                                    !_obscureConfirmPassword,
+                              ),
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: context.semantic.textMuted,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _buildContinueButton(isLoading),
+                          const SizedBox(height: AppSpacing.lg),
+                          _buildDividerWithOr(context),
+                          const SizedBox(height: AppSpacing.lg),
+                          _buildGoogleButton(context),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+                const SizedBox(height: AppSpacing.md),
+                const AppTrustIndicators(),
+                const SizedBox(height: AppSpacing.lg),
+                _buildLoginLink(context),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
           ),
@@ -109,112 +213,56 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
     );
   }
 
-  Widget _buildBlueHeader(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: 168,
-      child: Stack(
-        children: [
-          ClipPath(
-            clipper: _CurvedBottomHeaderClipper(),
-            child: Container(
-              width: double.infinity,
-              height: double.infinity,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [colorScheme.primary, colorScheme.secondary],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 48, 24, 32),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'إنشاء حساب جديد',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ),
-        ],
+  Widget _buildHero(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xxl,
+        AppSpacing.xl,
+        AppSpacing.huge + AppSpacing.lg,
       ),
-    );
-  }
-
-  Widget _buildForm(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
-    final isLoading = authState is AuthLoading;
-
-    return Form(
-      key: _formKey,
+      decoration: BoxDecoration(
+        gradient: context.headerGradient,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AppRadius.xxl),
+        ),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 28),
-          _buildInput(
-            hint: 'الاسم الكامل',
-            textInputAction: TextInputAction.next,
-            controller: _nameController,
-            enabled: !isLoading,
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: context.semantic.textOnPrimary.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+            child: Icon(
+              Icons.person_add_outlined,
+              size: 36,
+              color: context.semantic.textOnPrimary,
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildInput(
-            hint: 'البريد الإلكتروني',
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-            controller: _emailController,
-            enabled: !isLoading,
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'عين',
+            style: context.text.headlineMedium?.copyWith(
+              color: context.semantic.textOnPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildInput(
-            hint: 'رقم الهاتف المحمول',
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.next,
-            controller: _phoneController,
-            enabled: !isLoading,
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'انضم إلى مجتمع البلاغات والمساعدة',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.semantic.textOnPrimary.withValues(alpha: 0.85),
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildInput(
-            hint: 'رقم الهوية الشخصية',
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.next,
-            controller: _ssnController,
-            enabled: !isLoading,
-          ),
-          const SizedBox(height: 16),
-          _buildInput(
-            hint: 'كلمة المرور',
-            obscureText: true,
-            textInputAction: TextInputAction.next,
-            controller: _passwordController,
-            enabled: !isLoading,
-          ),
-          const SizedBox(height: 16),
-          _buildInput(
-            hint: 'تأكيد كلمة المرور',
-            obscureText: true,
-            textInputAction: TextInputAction.done,
-            controller: _confirmPasswordController,
-            enabled: !isLoading,
-          ),
-          const SizedBox(height: 32),
-          _buildContinueButton(context, isLoading),
-          const SizedBox(height: 28),
-          _buildDividerWithOr(context),
-          const SizedBox(height: 28),
-          _buildGoogleButton(context),
-          const SizedBox(height: 40),
-          _buildLoginLink(context),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -222,14 +270,14 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
   Widget _buildInput({
     required String hint,
+    required IconData icon,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
     bool obscureText = false,
     TextEditingController? controller,
     bool enabled = true,
+    Widget? suffix,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return TextFormField(
       controller: controller,
       enabled: enabled,
@@ -238,7 +286,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       obscureText: obscureText,
-      style: TextStyle(color: colorScheme.onBackground),
+      style: context.text.bodyLarge,
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
           return 'هذا الحقل مطلوب';
@@ -262,76 +310,49 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       },
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(
-          color: colorScheme.outline,
-          fontSize: 18,
-          fontWeight: FontWeight.w400,
-        ),
+        prefixIcon: Icon(icon, color: context.colors.primary, size: 22),
+        suffixIcon: suffix,
         filled: true,
-        fillColor: colorScheme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+        fillColor: context.semantic.surfaceInput,
       ),
     );
   }
 
-  Widget _buildContinueButton(BuildContext context, bool isLoading) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _buildContinueButton(bool isLoading) {
     return SizedBox(
-      height: 56,
+      height: 52,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [colorScheme.primary, colorScheme.secondary],
-          ),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          gradient: context.primaryGradient,
+          boxShadow: [
+            BoxShadow(
+              color: context.colors.primary.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             onTap: isLoading ? null : _handleSignUp,
             child: Center(
               child: isLoading
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(
-                        color: Colors.white,
+                        color: context.semantic.textOnPrimary,
                         strokeWidth: 2.5,
                       ),
                     )
-                  : const Text(
+                  : Text(
                       'المتابعة',
-                      style: TextStyle(
-                        color: Colors.white,
+                      style: context.text.titleMedium?.copyWith(
+                        color: context.semantic.textOnPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 21,
                       ),
                     ),
             ),
@@ -342,61 +363,55 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
   }
 
   Widget _buildDividerWithOr(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Row(
       children: [
-        Expanded(child: Container(height: 1, color: colorScheme.outline)),
+        Expanded(child: Divider(color: context.semantic.divider)),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'أو',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colorScheme.outline,
-              fontSize: 18,
-            ),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          child: Text('أو', style: context.text.bodySmall),
         ),
-        Expanded(child: Container(height: 1, color: colorScheme.outline)),
+        Expanded(child: Divider(color: context.semantic.divider)),
       ],
     );
   }
 
   Widget _buildGoogleButton(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: 56,
-      child: OutlinedButton(
-        onPressed: () {},
-        style: OutlinedButton.styleFrom(
-          backgroundColor: colorScheme.surface,
-          side: BorderSide(color: colorScheme.outlineVariant),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          foregroundColor: colorScheme.onSurface,
+    return OutlinedButton.icon(
+      onPressed: () {},
+      icon: Image.asset(
+        'assets/images/googleIcon.png',
+        width: 22,
+        height: 22,
+        errorBuilder: (_, __, ___) => Icon(
+          Icons.g_mobiledata_rounded,
+          size: 26,
+          color: context.colors.onSurface,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+      ),
+      label: const Text('الاستمرار باستخدام جوجل'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 52),
+        side: BorderSide(color: context.semantic.borderSubtle),
+      ),
+    );
+  }
+
+  Widget _buildLoginLink(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+      },
+      child: RichText(
+        textAlign: TextAlign.center,
+        text: TextSpan(
+          style: context.text.bodyMedium,
           children: [
-            Image.asset(
-              'assets/images/googleIcon.png',
-              width: 24,
-              height: 24,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.g_mobiledata_rounded,
-                size: 28,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'الاستمرار باستخدام جوجل',
+            const TextSpan(text: 'لديك حساب بالفعل؟ '),
+            TextSpan(
+              text: 'تسجيل الدخول',
               style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
+                color: context.colors.primary,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -404,56 +419,4 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       ),
     );
   }
-
-  Widget _buildLoginLink(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Center(
-      child: GestureDetector(
-        onTap: () {
-          Navigator.of(context).pushReplacementNamed(AppRoutes.login);
-        },
-        child: RichText(
-          textAlign: TextAlign.center,
-          text: TextSpan(
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colorScheme.outline,
-              fontSize: 18,
-            ),
-            children: [
-              const TextSpan(text: 'لديك حساب بالفعل؟ '),
-              TextSpan(
-                text: 'تسجيل الدخول',
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// الهيدر بحافة سفلية منحنية بسلاسة عند الزاوية اليسرى السفلية فقط.
-class _CurvedBottomHeaderClipper extends CustomClipper<Path> {
-  static const double _radius = 36;
-
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(0, 0);
-    path.lineTo(size.width, 0);
-    path.lineTo(size.width, size.height);
-    path.lineTo(_radius, size.height);
-    path.quadraticBezierTo(0, size.height, 0, size.height - _radius);
-    path.lineTo(0, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

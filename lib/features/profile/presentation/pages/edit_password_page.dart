@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+import '../../../../core/widgets/app_page_header.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/profile_validators.dart';
 
@@ -56,8 +59,10 @@ class _EditPasswordPageState extends ConsumerState<EditPasswordPage> {
       return;
     }
 
-    final confirmError =
-        ProfileValidators.validateConfirmPassword(confirmPassword, newPassword);
+    final confirmError = ProfileValidators.validateConfirmPassword(
+      confirmPassword,
+      newPassword,
+    );
     if (confirmError != null) {
       _showError(confirmError);
       return;
@@ -68,7 +73,9 @@ class _EditPasswordPageState extends ConsumerState<EditPasswordPage> {
       _errorMessage = null;
     });
 
-    final result = await ref.read(authRepositoryProvider).changePassword(
+    final result = await ref
+        .read(authRepositoryProvider)
+        .changePassword(
           oldPassword: oldPassword,
           newPassword: newPassword,
           confirmPassword: confirmPassword,
@@ -85,7 +92,7 @@ class _EditPasswordPageState extends ConsumerState<EditPasswordPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(failure.message),
-            backgroundColor: Colors.red,
+            backgroundColor: context.semantic.error,
           ),
         );
       },
@@ -99,58 +106,66 @@ class _EditPasswordPageState extends ConsumerState<EditPasswordPage> {
   void _showError(String message) {
     setState(() => _errorMessage = message);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: context.semantic.error,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageBackground = isDark
-        ? const Color(0xFF060C3A)
-        : AppColors.backgroundLight;
-    final forgotTextColor = isDark
-        ? const Color(0xFFD23B3B)
-        : const Color(0xFFEF4444);
-
     return Scaffold(
-      backgroundColor: pageBackground,
+      backgroundColor: context.colors.surface,
       body: Column(
         children: [
-          _TopHeader(onBack: () => Navigator.of(context).pop()),
+          AppPageHeader(
+            title: 'تغيير كلمة المرور',
+            onBack: () => Navigator.of(context).pop(),
+          ),
           if (_isSaving)
-            const LinearProgressIndicator(
-              backgroundColor: Color(0xFFBAD6F4),
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0099FF)),
+            LinearProgressIndicator(
+              backgroundColor: context.semantic.infoContainer,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                context.colors.primary,
+              ),
             ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.lg),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenHorizontal,
+            ),
             child: Column(
               children: [
                 if (_errorMessage != null) ...[
                   Container(
                     width: double.infinity,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.sm,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF1F1),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFFCACA)),
+                      color: context.semantic.errorContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(
+                        color: context.semantic.error.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       textDirection: TextDirection.rtl,
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: Color(0xFFC62828), size: 18),
-                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.error_outline,
+                          color: context.semantic.error,
+                          size: 18,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
                             _errorMessage!,
                             textDirection: TextDirection.rtl,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF7F1D1D),
+                            style: context.text.bodySmall?.copyWith(
+                              color: context.semantic.error,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -158,133 +173,84 @@ class _EditPasswordPageState extends ConsumerState<EditPasswordPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                 ],
                 _PasswordField(
                   hintText: 'كلمة المرور الحالية',
                   controller: _currentPasswordController,
                   enabled: !_isSaving,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.md),
                 _PasswordField(
                   hintText: 'كلمة المرور الجديدة',
                   controller: _newPasswordController,
                   enabled: !_isSaving,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.md),
                 _PasswordField(
                   hintText: 'تأكيد كلمة المرور الجديدة',
                   controller: _confirmPasswordController,
                   enabled: !_isSaving,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
                     onTap: _isSaving
                         ? null
                         : () {
-                            Navigator.of(context)
-                                .pushNamed(AppRoutes.forgotPassword);
+                            Navigator.of(
+                              context,
+                            ).pushNamed(AppRoutes.forgotPassword);
                           },
                     child: Text(
                       'هل نسيت كلمة المرور؟',
                       textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                        fontSize: 40 * 0.525,
-                        fontWeight: FontWeight.w400,
-                        color: forgotTextColor,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: context.semantic.error,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 56),
-                Container(
+                const SizedBox(height: AppSpacing.huge),
+                SizedBox(
                   width: 300,
                   height: 52,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0xFF0099FF), Color(0xFF66C8FF)],
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: context.primaryGradient,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: TextButton(
-                    onPressed: _isSaving ? null : _save,
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFF3F6F9),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                    child: TextButton(
+                      onPressed: _isSaving ? null : _save,
+                      style: TextButton.styleFrom(
+                        foregroundColor: context.semantic.textOnPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
                       ),
+                      child: _isSaving
+                          ? SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  context.semantic.textOnPrimary,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              'حفظ التعديلات',
+                              textDirection: TextDirection.rtl,
+                              style: context.text.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'حفظ التعديلات',
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopHeader extends StatelessWidget {
-  const _TopHeader({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
-
-    return Container(
-      width: double.infinity,
-      height: 100,
-      color: isDark ? const Color(0xFF121A5C) : AppColors.primarySoft,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 16,
-            top: 52,
-            child: GestureDetector(
-              onTap: onBack,
-              child: Icon(Icons.arrow_forward_ios, color: textColor, size: 24),
-            ),
-          ),
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment(0, 0.32),
-              child: Text(
-                'تغيير كلمة المرور',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontSize: 40 * 0.525,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
             ),
           ),
         ],
@@ -306,18 +272,6 @@ class _PasswordField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fieldBackground = isDark ? const Color(0xFF060C3A) : Colors.white;
-    final fieldBorderColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : const Color(0xFF060C3A);
-    final hintColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : const Color(0xB3909090);
-    final textColor = isDark
-        ? const Color(0xFFF3F6F9)
-        : AppColors.textPrimaryLight;
-
     return SizedBox(
       height: 48,
       child: TextField(
@@ -326,42 +280,44 @@ class _PasswordField extends StatelessWidget {
         obscureText: true,
         textDirection: TextDirection.rtl,
         textAlign: TextAlign.right,
-        style: TextStyle(
-          fontSize: 36 * 0.525,
-          fontWeight: FontWeight.w400,
-          color: textColor,
+        style: context.text.bodyLarge?.copyWith(
+          color: context.colors.onSurface,
         ),
         decoration: InputDecoration(
           filled: true,
-          fillColor: fieldBackground,
+          fillColor: context.semantic.surfaceInput,
           hintText: hintText,
           hintTextDirection: TextDirection.rtl,
-          hintStyle: TextStyle(
-            fontSize: 40 * 0.525,
-            fontWeight: FontWeight.w400,
-            color: hintColor,
+          hintStyle: context.text.bodyLarge?.copyWith(
+            color: context.semantic.textMuted,
           ),
           prefixIcon: Padding(
             padding: const EdgeInsets.only(left: 10, right: 10),
-            child: Icon(Icons.lock, color: textColor, size: 24),
+            child: Icon(
+              Icons.lock,
+              color: context.colors.onSurface,
+              size: 24,
+            ),
           ),
           prefixIconConstraints: const BoxConstraints(minWidth: 44),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: fieldBorderColor, width: 1),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(color: context.semantic.borderSubtle),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: fieldBorderColor, width: 1.2),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(
-              color: fieldBorderColor.withValues(alpha: 0.5),
-              width: 1,
+              color: context.colors.primary,
+              width: 1.2,
             ),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(
+              color: context.semantic.borderSubtle.withValues(alpha: 0.5),
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         ),
       ),
     );

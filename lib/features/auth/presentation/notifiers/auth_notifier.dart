@@ -47,8 +47,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = AuthError(failure);
         return false;
       },
-      (user) {
-        state = AuthAuthenticated(user);
+      (_) {
+        // Registration is in progress — no auth session yet.
+        state = const AuthUnauthenticated();
         return true;
       },
     );
@@ -101,6 +102,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _repository.logout();
     state = const AuthUnauthenticated();
+  }
+
+  /// Reload auth state from persisted session (e.g. after password reset).
+  Future<void> refreshSession() async {
+    await _checkAuthStatus();
   }
 
   /// Clear error state

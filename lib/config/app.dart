@@ -22,7 +22,7 @@ import '../features/auth/presentation/pages/verification_success_page.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/auth/presentation/state/auth_state_simple.dart';
 import '../features/community/presentation/pages/community_page.dart';
-import '../features/home/presentation/pages/home_page.dart';
+import '../features/home/presentation/pages/main_shell_page.dart';
 import '../features/home/presentation/pages/map_page.dart';
 import '../features/my_reports/presentation/pages/my_reports_page.dart';
 import '../features/notifications/presentation/pages/notifications_page.dart';
@@ -113,7 +113,7 @@ class _AppState extends ConsumerState<App> {
         AppRoutes.selfieCapture: (_) => const SelfieCapturePage(),
         AppRoutes.verificationProgress: (_) => const VerificationProgressPage(),
         AppRoutes.verificationSuccess: (_) => const VerificationSuccessPage(),
-        AppRoutes.home: (_) => const HomePage(),
+        AppRoutes.home: (_) => const MainShellPage(),
         AppRoutes.map: (_) => const MapPage(),
         AppRoutes.myReports: (_) => const MyReportsPage(),
         AppRoutes.community: (_) => const CommunityPage(),

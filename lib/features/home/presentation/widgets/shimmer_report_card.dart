@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
+
 /// Skeleton shimmer card shown while the public feed is loading.
 class ShimmerReportCard extends StatefulWidget {
   const ShimmerReportCard({super.key});
@@ -34,10 +38,9 @@ class _ShimmerReportCardState extends State<ShimmerReportCard>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF1A2455) : const Color(0xFFE8EDF2);
-    final highlight =
-        isDark ? const Color(0xFF232D60) : const Color(0xFFF2F5F8);
+    final semantic = context.semantic;
+    final base = semantic.shimmerBase;
+    final highlight = semantic.shimmerHighlight;
 
     return AnimatedBuilder(
       animation: _animation,
@@ -46,65 +49,67 @@ class _ShimmerReportCardState extends State<ShimmerReportCard>
             Color.lerp(base, highlight, _animation.value) ?? base;
 
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.sm - 2,
+          ),
+          padding: const EdgeInsets.all(AppSpacing.sm + 2),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0D1530) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: semantic.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            boxShadow: context.cardShadows,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar + name row
               Row(
                 children: [
                   _Bone(width: 30, height: 30, color: shimmerColor, circle: true),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.sm - 2),
                   _Bone(width: 100, height: 12, color: shimmerColor),
                   const Spacer(),
                   _Bone(width: 60, height: 10, color: shimmerColor),
                 ],
               ),
-              const SizedBox(height: 12),
-              // Title
+              const SizedBox(height: AppSpacing.sm),
               _Bone(width: double.infinity, height: 14, color: shimmerColor),
               const SizedBox(height: 6),
               _Bone(width: 200, height: 12, color: shimmerColor),
-              const SizedBox(height: 14),
-              // Image placeholder
+              const SizedBox(height: AppSpacing.sm + 2),
               _Bone(
                 width: double.infinity,
                 height: 160,
                 color: shimmerColor,
-                radius: 12,
+                radius: AppRadius.md,
               ),
-              const SizedBox(height: 14),
-              // Tag row
+              const SizedBox(height: AppSpacing.sm + 2),
               Row(
                 children: [
-                  _Bone(width: 70, height: 24, color: shimmerColor, radius: 12),
-                  const SizedBox(width: 8),
-                  _Bone(width: 80, height: 24, color: shimmerColor, radius: 12),
-                  const SizedBox(width: 8),
-                  _Bone(width: 60, height: 24, color: shimmerColor, radius: 12),
+                  _Bone(
+                    width: 70,
+                    height: 24,
+                    color: shimmerColor,
+                    radius: AppRadius.md,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  _Bone(
+                    width: 80,
+                    height: 24,
+                    color: shimmerColor,
+                    radius: AppRadius.md,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  _Bone(
+                    width: 60,
+                    height: 24,
+                    color: shimmerColor,
+                    radius: AppRadius.md,
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Divider(
-                height: 1,
-                color: isDark
-                    ? const Color(0xFF1E2D6B)
-                    : const Color(0xFFE5E7EB),
-              ),
-              const SizedBox(height: 12),
-              // Action row
+              const SizedBox(height: AppSpacing.sm),
+              Divider(height: 1, color: semantic.divider),
+              const SizedBox(height: AppSpacing.sm),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [

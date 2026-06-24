@@ -1,18 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/auth_failure.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../providers/auth_provider.dart';
 import '../state/form_state_simple.dart';
 
 class PasswordResetNotifier extends StateNotifier<FormState> {
+  PasswordResetNotifier(this._repository) : super(const FormInitial());
+
   final AuthRepository _repository;
   String? _resetEmail;
-
-  PasswordResetNotifier(this._repository) : super(const FormInitial());
+  String? _resetAccessToken;
 
   Future<bool> sendPasswordResetEmail({required String email}) async {
     state = const FormLoading();
-    _resetEmail = email;
+    _resetEmail = email.trim();
+    _resetAccessToken = null;
 
     final result = await _repository.sendPasswordResetEmail(email: email);
 
@@ -29,14 +32,28 @@ class PasswordResetNotifier extends StateNotifier<FormState> {
   }
 
   Future<bool> resetPassword({
-    required String token,
     required String newPassword,
+    required String confirmPassword,
   }) async {
     state = const FormLoading();
 
+    final email = _resetEmail?.trim();
+    final token = _resetAccessToken?.trim();
+    if (email == null ||
+        email.isEmpty ||
+        token == null ||
+        token.isEmpty) {
+      state = const FormError(
+        ServerFailure('Password reset session expired. Please start again.'),
+      );
+      return false;
+    }
+
     final result = await _repository.resetPassword(
+      email: email,
       token: token,
       newPassword: newPassword,
+      confirmPassword: confirmPassword,
     );
 
     return result.fold(
@@ -44,7 +61,8 @@ class PasswordResetNotifier extends StateNotifier<FormState> {
         state = FormError(failure);
         return false;
       },
-      (_) {
+      (user) {
+        _resetAccessToken = null;
         state = const FormSuccess();
         return true;
       },
@@ -56,11 +74,30 @@ class PasswordResetNotifier extends StateNotifier<FormState> {
     required String code,
   }) async {
     state = const FormLoading();
+    _resetEmail = email.trim();
 
     final result = await _repository.verifyPasswordResetCode(
       email: email,
       code: code,
     );
+
+    return result.fold(
+      (failure) {
+        state = FormError(failure);
+        return false;
+      },
+      (accessToken) {
+        _resetAccessToken = accessToken;
+        state = const FormSuccess();
+        return true;
+      },
+    );
+  }
+
+  Future<bool> resendForgotPasswordOtp() async {
+    state = const FormLoading();
+
+    final result = await _repository.resendForgotPasswordOtp();
 
     return result.fold(
       (failure) {

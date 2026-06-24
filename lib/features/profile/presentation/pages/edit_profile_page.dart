@@ -204,16 +204,18 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         _selectedImagePath != null && _selectedImagePath!.trim().isNotEmpty;
 
     if (!nameChanged && !phoneChanged && !photoChanged) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لم يتم إجراء أي تغييرات')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('لم يتم إجراء أي تغييرات')));
       return;
     }
 
     setState(() => _isSaving = true);
 
     try {
-      await ref.read(profileAsyncProvider.notifier).updateProfileData(
+      await ref
+          .read(profileAsyncProvider.notifier)
+          .updateProfileData(
             displayName: nameChanged ? name : null,
             phoneNumber: phoneChanged ? phone : null,
             profilePhotoPath: photoChanged ? _selectedImagePath : null,
@@ -273,8 +275,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     // 1) Local selected image (instant preview) takes priority
     // 2) Then server photo URL
     // 3) Then default avatar
-    final String? displayPhotoPath =
-        _selectedImagePath ?? resolvedPhotoUrl;
+    final String? displayPhotoPath = _selectedImagePath ?? resolvedPhotoUrl;
 
     return Scaffold(
       backgroundColor: pageBackground,
@@ -369,8 +370,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: TextButton(
-                          onPressed:
-                              (_isSaving || profile == null) ? null : _save,
+                          onPressed: (_isSaving || profile == null)
+                              ? null
+                              : _save,
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFFF3F6F9),
                             shape: RoundedRectangleBorder(
@@ -593,11 +595,7 @@ class _SectionTitle extends StatelessWidget {
       title,
       textDirection: TextDirection.rtl,
       textAlign: TextAlign.right,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: color,
-      ),
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
     );
   }
 }
@@ -617,8 +615,9 @@ class _ReadOnlyField extends StatelessWidget {
     final fieldBorderColor = isDark
         ? const Color(0xFFF3F6F9)
         : const Color(0xF2060C3A);
-    final fieldBackground =
-        isDark ? const Color(0xFF121A5C) : const Color(0xFFF1F5F9);
+    final fieldBackground = isDark
+        ? const Color(0xFF121A5C)
+        : const Color(0xFFF1F5F9);
     final valueColor = isDark
         ? const Color(0xFF94A3B8)
         : const Color(0xFF64748B);
@@ -713,7 +712,9 @@ class _LabeledField extends StatelessWidget {
         Container(
           height: 50,
           decoration: BoxDecoration(
-            color: enabled ? fieldBackground : fieldBackground.withValues(alpha: 0.6),
+            color: enabled
+                ? fieldBackground
+                : fieldBackground.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: fieldBorderColor, width: 1),
             boxShadow: const [

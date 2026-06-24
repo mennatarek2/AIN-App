@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/theme_extensions.dart';
+
 class MapScreen extends StatelessWidget {
   const MapScreen({
     super.key,
@@ -39,7 +42,9 @@ class MapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GoogleMap(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: GoogleMap(
       mapType: mapType,
       initialCameraPosition: CameraPosition(
         target: initialTarget,
@@ -58,6 +63,7 @@ class MapScreen extends StatelessWidget {
       mapToolbarEnabled: mapToolbarEnabled,
       onTap: onTap,
       onMapCreated: onMapCreated,
+      ),
     );
   }
 }

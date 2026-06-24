@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/auth_token_utils.dart';
 import '../../../core/widgets/cached_app_image.dart';
 import '../../../core/network/api_exception.dart';
 import 'profile_exceptions.dart';
@@ -260,8 +261,8 @@ class ProfileRemoteDataSource {
 
       if (newToken != null && newToken.isNotEmpty) {
         final prefs = await SharedPreferences.getInstance();
-        // Use the exact key the auth layer reads from
-        await prefs.setString('auth_cached_token_v1', newToken);
+        final normalized = AuthTokenUtils.normalize(newToken) ?? newToken;
+        await prefs.setString('auth_cached_token_v1', normalized);
         print('[Profile] Saved new JWT (auth_cached_token_v1)');
       }
     } catch (e) {

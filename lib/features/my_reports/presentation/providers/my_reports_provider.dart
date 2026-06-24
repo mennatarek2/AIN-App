@@ -4,6 +4,7 @@ import '../../../reports/domain/report_model.dart';
 import '../../../reports/domain/repositories/report_repository.dart';
 import '../../../reports/presentation/providers/report_data_providers.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
+import '../../../social/presentation/providers/social_providers.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Status filter options
@@ -167,6 +168,7 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
       await _repo.deleteReport(id);
 
       // Refresh trust profile immediately after successful deletion
+      _ref.invalidate(myTrustProvider);
       _ref.invalidate(profileProvider);
 
       return true;
@@ -174,6 +176,7 @@ class MyReportsNotifier extends StateNotifier<MyReportsState> {
       // On 404, item is gone upstream — keep it removed locally
       final errStr = e.toString().toLowerCase();
       if (errStr.contains('404') || errStr.contains('not found')) {
+        _ref.invalidate(myTrustProvider);
         _ref.invalidate(profileProvider);
         return true;
       }

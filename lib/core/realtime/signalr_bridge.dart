@@ -29,7 +29,7 @@ class SignalRBridge {
       statusNotifier.setStatus(status);
     };
 
-    // ── Wire SOS events → NotificationsNotifier ────────────────────────────
+    // ── Wire SOS events → NotificationsNotifier + CommunitiesNotifier ───────
     manager.onSOSTriggered = (alert) {
       final sosId = alert['id']?.toString() ?? '';
       final severity = alert['severity']?.toString() ?? 'Standard';
@@ -42,6 +42,7 @@ class SignalRBridge {
         message: message,
         communityName: communityName,
       );
+      _ref.read(communitiesProvider.notifier).handleSosTriggered(alert);
     };
 
     manager.onSOSResolved = (sosId, resolvedBy) {
@@ -49,6 +50,11 @@ class SignalRBridge {
         sosId: sosId,
         resolvedBy: resolvedBy,
       );
+      _ref.read(communitiesProvider.notifier).handleSosEnded(sosId);
+    };
+
+    manager.onSOSCancelled = (sosId, cancelledBy) {
+      _ref.read(communitiesProvider.notifier).handleSosEnded(sosId);
     };
 
     // ── Initialize connection ──────────────────────────────────────────────

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../../../location/data/location_service.dart';
 import '../../../location/presentation/providers/location_providers.dart';
 
@@ -21,7 +23,7 @@ class _SelectReportLocationPageState
     target: _cairoFallback,
     zoom: 15,
   );
-  static const double _sheetTopRadius = 20;
+  static const double _sheetTopRadius = AppRadius.xxl;
 
   GoogleMapController? _controller;
   CameraPosition? _pendingCamera;
@@ -216,6 +218,7 @@ class _SelectReportLocationPageState
 
   @override
   Widget build(BuildContext context) {
+    final semantic = context.semantic;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     final bottomSheetHeight = 164 + safeBottom;
 
@@ -259,7 +262,11 @@ class _SelectReportLocationPageState
             child: Center(
               child: Transform.translate(
                 offset: Offset(0, -24),
-                child: Icon(Icons.location_pin, color: Colors.red, size: 50),
+                child: Icon(
+                  Icons.location_pin,
+                  color: context.semantic.error,
+                  size: 50,
+                ),
               ),
             ),
           ),
@@ -278,15 +285,9 @@ class _SelectReportLocationPageState
                       height: 46,
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x26000000),
-                            blurRadius: 10,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+                        color: semantic.surfaceContainer,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        boxShadow: context.cardShadows,
                       ),
                       alignment: Alignment.centerRight,
                       child: Text(
@@ -296,10 +297,10 @@ class _SelectReportLocationPageState
                         textDirection: TextDirection.rtl,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF1E2B3B),
+                          color: context.colors.onSurface,
                         ),
                       ),
                     ),
@@ -313,8 +314,8 @@ class _SelectReportLocationPageState
             bottom: bottomSheetHeight + 16,
             child: FloatingActionButton.small(
               heroTag: 'select-report-location-my-location',
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.primary,
+              backgroundColor: semantic.surfaceContainer,
+              foregroundColor: context.colors.primary,
               onPressed: () {
                 _moveToCurrentLocation(showErrorSnackBar: true);
               },
@@ -326,28 +327,27 @@ class _SelectReportLocationPageState
             right: 0,
             bottom: 0,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(
+              decoration: BoxDecoration(
+                color: semantic.surfaceContainer,
+                borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(_sheetTopRadius),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x22000000),
-                    blurRadius: 14,
-                    offset: Offset(0, -3),
-                  ),
-                ],
+                boxShadow: context.cardShadows,
               ),
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 32 + safeBottom),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.xxl + safeBottom,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: AppColors.primary),
-                      const SizedBox(width: 8),
+                      Icon(Icons.location_on, color: context.colors.primary),
+                      const SizedBox(width: AppSpacing.xs),
                       Expanded(
                         child: Text(
                           _isResolvingAddress
@@ -356,10 +356,10 @@ class _SelectReportLocationPageState
                           textDirection: TextDirection.rtl,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF18243A),
+                            color: context.colors.onSurface,
                           ),
                         ),
                       ),
@@ -375,10 +375,10 @@ class _SelectReportLocationPageState
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: context.colors.primary,
+                        foregroundColor: context.semantic.textOnPrimary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                         ),
                         elevation: 0,
                       ),
@@ -398,9 +398,9 @@ class _SelectReportLocationPageState
                       _accessHint(),
                       textDirection: TextDirection.rtl,
                       textAlign: TextAlign.right,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF6B7280),
+                        color: semantic.textMuted,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -412,10 +412,10 @@ class _SelectReportLocationPageState
                         icon: const Icon(Icons.settings_outlined),
                         label: const Text('محاولة تفعيل الموقع'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
+                          foregroundColor: context.colors.primary,
+                          side: BorderSide(color: context.colors.primary),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                         ),
                       ),
@@ -426,10 +426,14 @@ class _SelectReportLocationPageState
             ),
           ),
           if (_isLoading)
-            const Positioned.fill(
+            Positioned.fill(
               child: ColoredBox(
-                color: Color(0x33000000),
-                child: Center(child: CircularProgressIndicator()),
+                color: context.semantic.overlay,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: context.colors.primary,
+                  ),
+                ),
               ),
             ),
         ],
@@ -447,15 +451,15 @@ class _CircleShadowButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.semantic.surfaceContainer,
       shape: const CircleBorder(),
       elevation: 2,
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, color: const Color(0xFF243346)),
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          child: Icon(icon, color: context.colors.onSurface),
         ),
       ),
     );

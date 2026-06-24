@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../config/routes/app_routes.dart';
 import '../../../../core/state/app_flow_provider.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/theme_extensions.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/state/auth_state_simple.dart';
 
@@ -16,10 +19,10 @@ class SplashPage extends ConsumerStatefulWidget {
 class _SplashPageState extends ConsumerState<SplashPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _heightAnim;
-  late final Animation<double> _widthAnim;
+  late final Animation<double> _logoScaleAnim;
   late final Animation<double> _logoOpacityAnim;
-  late final Animation<double> _scaleAnim;
+  late final Animation<double> _taglineOpacityAnim;
+  late final Animation<double> _glowAnim;
   bool _animationCompleted = false;
   bool _didNavigate = false;
 
@@ -28,46 +31,36 @@ class _SplashPageState extends ConsumerState<SplashPage>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2200),
     );
 
-    _heightAnim = Tween<double>(begin: 10, end: 325).animate(
+    _logoScaleAnim = Tween<double>(begin: 0.6, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.2, curve: Curves.easeOut),
-      ),
-    );
-
-    _widthAnim = Tween<double>(begin: 10, end: 200).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.2, 0.55, curve: Curves.easeInOut),
+        curve: const Interval(0.0, 0.55, curve: Curves.easeOutBack),
       ),
     );
 
     _logoOpacityAnim = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.55, 0.85, curve: Curves.easeIn),
+        curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
       ),
     );
 
-    _scaleAnim =
-        TweenSequence<double>([
-          TweenSequenceItem(
-            tween: Tween<double>(begin: 1.0, end: 1.06),
-            weight: 50,
-          ),
-          TweenSequenceItem(
-            tween: Tween<double>(begin: 1.06, end: 1.0),
-            weight: 50,
-          ),
-        ]).animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: const Interval(0.85, 1.0, curve: Curves.easeOut),
-          ),
-        );
+    _taglineOpacityAnim = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.45, 0.75, curve: Curves.easeIn),
+      ),
+    );
+
+    _glowAnim = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.55, 1.0, curve: Curves.easeInOut),
+      ),
+    );
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -109,64 +102,164 @@ class _SplashPageState extends ConsumerState<SplashPage>
       }
     });
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scaffoldBg = isDark ? const Color(0xFF0A1045) : Colors.white;
-    final boxColor = isDark ? const Color(0xFFF0F4F8) : const Color(0xFF0A1045);
-    final textColor = isDark ? const Color(0xFF0A1045) : Colors.white;
-
     return Scaffold(
-      backgroundColor: scaffoldBg,
-      body: SafeArea(
-        child: Center(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final showText = _logoOpacityAnim.value > 0;
-
-              return Transform.scale(
-                scale: _scaleAnim.value,
-                child: Container(
-                  width: _widthAnim.value,
-                  height: _heightAnim.value,
-                  decoration: BoxDecoration(
-                    color: boxColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  alignment: Alignment.center,
-                  child: showText
-                      ? Opacity(
-                          opacity: _logoOpacityAnim.value,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'عَيْن',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.3,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Ai-N',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w400,
-                                  letterSpacing: 2.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: context.heroGradient,
+        ),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              // Decorative circles
+              Positioned(
+                top: -80,
+                right: -60,
+                child: AnimatedBuilder(
+                  animation: _glowAnim,
+                  builder: (context, child) {
+                    return Container(
+                      width: 220,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.semantic.textOnPrimary.withValues(
+                          alpha: 0.06 * _glowAnim.value,
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+              Positioned(
+                bottom: -100,
+                left: -80,
+                child: AnimatedBuilder(
+                  animation: _glowAnim,
+                  builder: (context, child) {
+                    return Container(
+                      width: 280,
+                      height: 280,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.semantic.textOnPrimary.withValues(
+                          alpha: 0.04 * _glowAnim.value,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // Brand hero
+              Center(
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _logoOpacityAnim.value,
+                      child: Transform.scale(
+                        scale: _logoScaleAnim.value,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                color: context.semantic.textOnPrimary
+                                    .withValues(alpha: 0.15),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.xxl),
+                                border: Border.all(
+                                  color: context.semantic.textOnPrimary
+                                      .withValues(alpha: 0.3),
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: context.semantic.shadow.withValues(
+                                      alpha: 0.3 * _glowAnim.value,
+                                    ),
+                                    blurRadius: 32,
+                                    spreadRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'عَيْن',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: context.semantic.textOnPrimary,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Ai-N',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: context.semantic.textOnPrimary
+                                          .withValues(alpha: 0.85),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: AppSpacing.xl * _taglineOpacityAnim.value),
+                            Opacity(
+                              opacity: _taglineOpacityAnim.value,
+                              child: Text(
+                                'من عَيْنك يبدأ الحل',
+                                textDirection: TextDirection.rtl,
+                                style: context.text.titleMedium?.copyWith(
+                                  color: context.semantic.textOnPrimary
+                                      .withValues(alpha: 0.9),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // Loading indicator at bottom
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: AppSpacing.xxl,
+                child: AnimatedBuilder(
+                  animation: _taglineOpacityAnim,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _taglineOpacityAnim.value,
+                      child: Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: context.semantic.textOnPrimary.withValues(
+                              alpha: 0.7,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
