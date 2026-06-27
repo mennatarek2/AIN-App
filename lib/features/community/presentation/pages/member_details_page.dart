@@ -42,8 +42,7 @@ class _MemberDetailsPageState extends ConsumerState<MemberDetailsPage> {
 
   bool get _isOwnerTarget => _member.role == CommunityRole.owner;
 
-  bool get _canManage =>
-      CommunityPermissions.canManageMembers(widget.myRole);
+  bool get _canManage => CommunityPermissions.canManageMembers(widget.myRole);
 
   bool get _canChangeRoles =>
       CommunityPermissions.canChangeRoles(widget.myRole);
@@ -55,24 +54,20 @@ class _MemberDetailsPageState extends ConsumerState<MemberDetailsPage> {
       ((_canChangeRoles && !_isOwnerTarget) ||
           (_isAdmin && _member.role.index < CommunityRole.admin.index));
 
-  bool get _canChangeRole =>
-      _canChangeRoles && !_isSelf && !_isOwnerTarget;
+  bool get _canChangeRole => _canChangeRoles && !_isSelf && !_isOwnerTarget;
 
   bool get _canTransfer =>
       _canChangeRoles && !_isSelf && _member.isApproved && !_isOwnerTarget;
 
   bool get _hasActions => _canKick || _canChangeRole || _canTransfer;
 
-  bool get _showRemindButton =>
-      _canManage && !_member.hasLocation && !_isSelf;
+  bool get _showRemindButton => _canManage && !_member.hasLocation && !_isSelf;
 
   Color get _roleColor => roleBadgeColor(_member.role);
 
-  Color get _statusColor =>
-      memberStatusColor(_member.memberStatus);
+  Color get _statusColor => memberStatusColor(_member.memberStatus);
 
-  String get _statusLabel =>
-      memberStatusLabelAr(_member.memberStatus);
+  String get _statusLabel => memberStatusLabelAr(_member.memberStatus);
 
   String get _lastLocationText {
     if (!_member.hasLocation) return 'غير محدد';

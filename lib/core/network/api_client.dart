@@ -104,9 +104,27 @@ class ApiClient {
     return _handleResponse(response);
   }
 
-  Future<dynamic> deleteJson(String path, {String? token}) async {
+  Future<dynamic> deleteJson(
+    String path, {
+    String? token,
+    Map<String, dynamic>? body,
+  }) async {
     final uri = _buildUri(path);
-    final response = await _client.delete(uri, headers: _headers(token: token));
+    final response = await _client.delete(
+      uri,
+      headers: _headers(token: token),
+      body: body != null ? jsonEncode(body) : null,
+    );
+    return _handleResponse(response);
+  }
+
+  /// PATCH with no body (e.g. mark notification read → 204).
+  Future<dynamic> patchEmpty(String path, {String? token}) async {
+    final uri = _buildUri(path);
+    final response = await _client.patch(
+      uri,
+      headers: _headers(token: token, json: false),
+    );
     return _handleResponse(response);
   }
 

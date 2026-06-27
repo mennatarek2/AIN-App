@@ -139,156 +139,176 @@ class _SosPageState extends ConsumerState<SosPage>
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const Spacer(),
 
-            // ── Pulsing SOS button ─────────────────────────────────────────
-            Center(
-              child: GestureDetector(
-                onLongPressStart: (_) => _onHoldStart(),
-                onLongPressEnd: (_) => _onHoldEnd(),
-                onLongPressCancel: _onHoldEnd,
-                child: _PulsingSosButton(
-                  pulseController: _pulseController,
-                  holdController: _holdController,
-                  isHolding: _isHolding,
-                  isTriggering: state.isTriggering,
-                  sosColor: context.semantic.sos,
+                      // ── Pulsing SOS button ─────────────────────────────────────────
+                      Center(
+                        child: GestureDetector(
+                          onLongPressStart: (_) => _onHoldStart(),
+                          onLongPressEnd: (_) => _onHoldEnd(),
+                          onLongPressCancel: _onHoldEnd,
+                          child: _PulsingSosButton(
+                            pulseController: _pulseController,
+                            holdController: _holdController,
+                            isHolding: _isHolding,
+                            isTriggering: state.isTriggering,
+                            sosColor: context.semantic.sos,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      // ── Error message ──────────────────────────────────────────────
+                      if (state.error != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.semantic.sosContainer,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(
+                                color: context.semantic.sos.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              state.error!,
+                              textDirection: TextDirection.rtl,
+                              textAlign: TextAlign.center,
+                              style: context.text.bodySmall?.copyWith(
+                                color: context.semantic.sos,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      if (state.error != null) const SizedBox(height: 16),
+
+                      // ── Severity selector ──────────────────────────────────────────
+                      Text(
+                        'مستوى الطوارئ',
+                        textDirection: TextDirection.rtl,
+                        style: context.text.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: context.semantic.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: SosSeverity.values.map((s) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: _SeverityChip(
+                              label: s.label,
+                              severity: s,
+                              isSelected: state.severity == s,
+                              onTap: () => ref
+                                  .read(sosNotifierProvider.notifier)
+                                  .setSeverity(s),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ── Community dropdown ─────────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'إرسال إلى المجتمع',
+                              textDirection: TextDirection.rtl,
+                              style: context.text.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: context.semantic.textMuted,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            _CommunityDropdown(
+                              selectedId: state.selectedCommunityId,
+                              onChanged: (id) => ref
+                                  .read(sosNotifierProvider.notifier)
+                                  .setCommunityId(id),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ── Optional message ───────────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: TextField(
+                          textDirection: TextDirection.rtl,
+                          maxLines: 2,
+                          maxLength: 200,
+                          onChanged: (v) => ref
+                              .read(sosNotifierProvider.notifier)
+                              .setMessage(v),
+                          decoration: InputDecoration(
+                            hintText: 'رسالة إضافية (اختياري)',
+                            hintTextDirection: TextDirection.rtl,
+                            counterText: '',
+                            filled: true,
+                            fillColor: context.semantic.surfaceInput,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              borderSide: BorderSide(
+                                color: context.semantic.borderSubtle,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              borderSide: BorderSide(
+                                color: context.semantic.borderSubtle,
+                              ),
+                            ),
+                          ),
+                          style: context.text.bodyMedium?.copyWith(
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // ── Hint ──────────────────────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: Text(
+                          'اضغط مطولاً على الزر لمدة 2 ثانية لإرسال النداء',
+                          textDirection: TextDirection.rtl,
+                          textAlign: TextAlign.center,
+                          style: context.text.labelSmall?.copyWith(
+                            color: context.semantic.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // ── Error message ──────────────────────────────────────────────
-            if (state.error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.semantic.sosContainer,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    border: Border.all(
-                      color: context.semantic.sos.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Text(
-                    state.error!,
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.center,
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.semantic.sos,
-                    ),
-                  ),
-                ),
-              ),
-
-            if (state.error != null) const SizedBox(height: 16),
-
-            // ── Severity selector ──────────────────────────────────────────
-            Text(
-              'مستوى الطوارئ',
-              textDirection: TextDirection.rtl,
-              style: context.text.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.semantic.textMuted,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: SosSeverity.values.map((s) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: _SeverityChip(
-                    label: s.label,
-                    severity: s,
-                    isSelected: state.severity == s,
-                    onTap: () =>
-                        ref.read(sosNotifierProvider.notifier).setSeverity(s),
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Community dropdown ─────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'إرسال إلى المجتمع',
-                    textDirection: TextDirection.rtl,
-                    style: context.text.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.semantic.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _CommunityDropdown(
-                    selectedId: state.selectedCommunityId,
-                    onChanged: (id) =>
-                        ref.read(sosNotifierProvider.notifier).setCommunityId(id),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ── Optional message ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                textDirection: TextDirection.rtl,
-                maxLines: 2,
-                maxLength: 200,
-                onChanged: (v) =>
-                    ref.read(sosNotifierProvider.notifier).setMessage(v),
-                decoration: InputDecoration(
-                  hintText: 'رسالة إضافية (اختياري)',
-                  hintTextDirection: TextDirection.rtl,
-                  counterText: '',
-                  filled: true,
-                  fillColor: context.semantic.surfaceInput,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    borderSide: BorderSide(color: context.semantic.borderSubtle),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    borderSide: BorderSide(color: context.semantic.borderSubtle),
-                  ),
-                ),
-                style: context.text.bodyMedium?.copyWith(
-                  color: context.colors.onSurface,
-                ),
-              ),
-            ),
-
-            const Spacer(),
-
-            // ── Hint ──────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: Text(
-                'اضغط مطولاً على الزر لمدة 2 ثانية لإرسال النداء',
-                textDirection: TextDirection.rtl,
-                textAlign: TextAlign.center,
-                style: context.text.labelSmall?.copyWith(
-                  color: context.semantic.textMuted,
-                ),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -308,10 +328,7 @@ class _SosPageState extends ConsumerState<SosPage>
         title: const Text(
           'نداء نشط',
           textDirection: TextDirection.rtl,
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
         actions: [
@@ -322,133 +339,155 @@ class _SosPageState extends ConsumerState<SosPage>
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // ── Status banner ──────────────────────────────────────────────
-            Container(
-              color: sosColor,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              child: Row(
-                textDirection: TextDirection.rtl,
-                children: [
-                  const Icon(
-                    Icons.crisis_alert_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'نداء طوارئ نشط',
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      // ── Status banner ──────────────────────────────────────────────
+                      Container(
+                        color: sosColor,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          children: [
+                            const Icon(
+                              Icons.crisis_alert_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'نداء طوارئ نشط',
+                                textDirection: TextDirection.rtl,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                            _SeverityBadge(
+                              severity:
+                                  state.activeAlert?.severity ?? 'Standard',
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+
+                      if (state.activeAlert != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: _AffectedCommunitiesLabel(
+                            alert: state.activeAlert!,
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+
+                      // ── Elapsed time ───────────────────────────────────────────────
+                      Text(
+                        'مضى على النداء',
+                        textDirection: TextDirection.rtl,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatElapsed(state.elapsedSeconds),
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ── Mini map ───────────────────────────────────────────────────
+                      if (state.currentLat != null && state.currentLng != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: SizedBox(
+                              height: 180,
+                              child: _SosMap(
+                                lat: state.currentLat!,
+                                lng: state.currentLng!,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          height: 180,
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A1010),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Center(
+                            child: CircularProgressIndicator(color: sosColor),
+                          ),
+                        ),
+
+                      const SizedBox(height: 12),
+
+                      // ── Location last update ───────────────────────────────────────
+                      _LocationUpdateRow(
+                        lastUpdated: state.locationLastUpdated,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ── SignalR status card ────────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _SosStatusCard(alert: state.activeAlert),
+                      ),
+
+                      const Spacer(),
+
+                      // ── Cancel button ──────────────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              _showCancelDialog(state.activeAlert?.id ?? ''),
+                          icon: Icon(Icons.cancel_outlined, color: sosColor),
+                          label: Text(
+                            'إلغاء النداء',
+                            style: TextStyle(
+                              color: sosColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: sosColor, width: 1.5),
+                            minimumSize: const Size(double.infinity, 52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  _SeverityBadge(severity: state.activeAlert?.severity ?? 'Standard'),
-                ],
-              ),
-            ),
-
-            if (state.activeAlert != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _AffectedCommunitiesLabel(alert: state.activeAlert!),
-              ),
-
-            const SizedBox(height: 20),
-
-            // ── Elapsed time ───────────────────────────────────────────────
-            Text(
-              'مضى على النداء',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _formatElapsed(state.elapsedSeconds),
-              style: const TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Mini map ───────────────────────────────────────────────────
-            if (state.currentLat != null && state.currentLng != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: SizedBox(
-                    height: 180,
-                    child: _SosMap(
-                      lat: state.currentLat!,
-                      lng: state.currentLng!,
-                    ),
-                  ),
-                ),
-              )
-            else
-              Container(
-                height: 180,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A1010),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: CircularProgressIndicator(color: sosColor),
                 ),
               ),
-
-            const SizedBox(height: 12),
-
-            // ── Location last update ───────────────────────────────────────
-            _LocationUpdateRow(lastUpdated: state.locationLastUpdated),
-
-            const SizedBox(height: 16),
-
-            // ── SignalR status card ────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _SosStatusCard(alert: state.activeAlert),
-            ),
-
-            const Spacer(),
-
-            // ── Cancel button ──────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: OutlinedButton.icon(
-                onPressed: () => _showCancelDialog(state.activeAlert?.id ?? ''),
-                icon: Icon(Icons.cancel_outlined, color: sosColor),
-                label: Text(
-                  'إلغاء النداء',
-                  style: TextStyle(
-                    color: sosColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: sosColor, width: 1.5),
-                  minimumSize: const Size(double.infinity, 52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -471,9 +510,7 @@ class _SosPageState extends ConsumerState<SosPage>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                resolved
-                    ? Icons.check_circle_rounded
-                    : Icons.cancel_rounded,
+                resolved ? Icons.check_circle_rounded : Icons.cancel_rounded,
                 size: 80,
                 color: resolved ? _accentEmerald : Colors.white60,
               ),
@@ -543,7 +580,9 @@ class _SosPageState extends ConsumerState<SosPage>
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: context.semantic.sos),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.semantic.sos,
+            ),
             child: const Text(
               'نعم، إلغاء',
               style: TextStyle(color: Colors.white),
@@ -658,11 +697,7 @@ class _PulsingSosButton extends StatelessWidget {
                 : const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.shield_rounded,
-                        size: 48,
-                        color: Colors.white,
-                      ),
+                      Icon(Icons.shield_rounded, size: 48, color: Colors.white),
                       SizedBox(height: 4),
                       Text(
                         'اضغط مطولاً',
@@ -773,9 +808,7 @@ class _SeverityChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected
-                ? context.semantic.textOnPrimary
-                : chipColor,
+            color: isSelected ? context.semantic.textOnPrimary : chipColor,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             fontSize: 14,
           ),
@@ -788,10 +821,7 @@ class _SeverityChip extends StatelessWidget {
 // ─── Community dropdown ───────────────────────────────────────────────────────
 
 class _CommunityDropdown extends ConsumerWidget {
-  const _CommunityDropdown({
-    required this.selectedId,
-    required this.onChanged,
-  });
+  const _CommunityDropdown({required this.selectedId, required this.onChanged});
 
   final String? selectedId;
   final ValueChanged<String?> onChanged;
@@ -810,9 +840,7 @@ class _CommunityDropdown extends ConsumerWidget {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
-          value: communities.any((c) => c.id == selectedId)
-              ? selectedId
-              : null,
+          value: communities.any((c) => c.id == selectedId) ? selectedId : null,
           hint: Text(
             'اختر مجتمعاً',
             textDirection: TextDirection.rtl,
@@ -1072,7 +1100,7 @@ class _SosStatusCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'الحالة في الوقت الفعلي',

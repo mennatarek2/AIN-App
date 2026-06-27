@@ -105,7 +105,7 @@ class _ReportInfoPageState extends State<ReportInfoPage> {
                         child: Padding(
                           padding: const EdgeInsets.all(4),
                           child: Icon(
-                            Icons.arrow_forward_ios,
+                            Icons.chevron_left_outlined,
                             color: context.colors.onSurface,
                             size: 24,
                           ),
@@ -167,7 +167,7 @@ class _ReportInfoPageState extends State<ReportInfoPage> {
               Container(
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 100),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _InfoRow(
                       label: 'الوصف',

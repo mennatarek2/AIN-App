@@ -1,6 +1,6 @@
 abstract final class ApiEndpoints {
   static const String signUpStepOne = '/api/Account/signup-stepOne';
-  static const String verifyOtp = '/api/Account/verify-otp';
+  static const String verifyOtp = '/api/Account/verify-otp-singup';
   static const String resendOtp = '/api/Account/resend-otp';
   static const String login = '/api/Account/login';
   static const String completeSignUp = '/api/Account/complete-signup';
@@ -97,7 +97,7 @@ abstract final class ApiEndpoints {
   static String communityRemindLocation(String communityId, String memberId) =>
       '/api/Community/$communityId/members/$memberId/remind-location';
 
-  // Legacy member endpoints (still used by add_member_page)
+  // Community member endpoints
   static String communityMembers(String communityId) =>
       '/api/CommunityMember/$communityId';
   static String communityLeave(String communityId) =>
@@ -126,4 +126,17 @@ abstract final class ApiEndpoints {
   // Trust profile
   static const String myTrust = '/api/social/me/trust';
   static String userTrust(String userId) => '/api/social/users/$userId/trust';
+
+  // ── Notifications ───────────────────────────────────────────────────────────
+  static const String notifications = '/api/Notifications';
+  static const String notificationsUnreadCount =
+      '/api/Notifications/unread-count';
+  static const String notificationsReadAll = '/api/Notifications/read-all';
+  static const String notificationsDeviceToken =
+      '/api/Notifications/device-token';
+  static String notificationMarkRead(String id) =>
+      '/api/Notifications/$id/read';
+
+  // ── AI Chatbot ──────────────────────────────────────────────────────────────
+  static const String aiChat = '/api/AI/chat';
 }

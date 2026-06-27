@@ -18,39 +18,25 @@ enum CommunityType {
   bool get hasRadius => defaultRadiusMeters != null;
 
   static CommunityType fromInt(int v) => CommunityType.values.firstWhere(
-        (t) => t.value == v,
-        orElse: () => CommunityType.neighborhood,
-      );
+    (t) => t.value == v,
+    orElse: () => CommunityType.neighborhood,
+  );
 
   static CommunityType fromValue(int value) => fromInt(value);
 }
 
-enum CommunityRole {
-  member,
-  moderator,
-  admin,
-  owner,
-}
+enum CommunityRole { member, moderator, admin, owner }
 
-enum MemberStatus {
-  active,
-  locationPending,
-  inactive,
-}
+enum MemberStatus { active, locationPending, inactive }
 
-enum JoinStatus {
-  pending,
-  approved,
-  rejected,
-  banned,
-}
+enum JoinStatus { pending, approved, rejected, banned }
 
 extension CommunityTypeX on CommunityType {
   String get displayName => switch (this) {
-        CommunityType.neighborhood => 'Neighborhood',
-        CommunityType.building => 'Building',
-        CommunityType.privateGroup => 'Private Group',
-      };
+    CommunityType.neighborhood => 'Neighborhood',
+    CommunityType.building => 'Building',
+    CommunityType.privateGroup => 'Private Group',
+  };
 }
 
 extension CommunityRoleX on CommunityRole {
@@ -81,11 +67,11 @@ extension MemberStatusX on MemberStatus {
   }
 
   static MemberStatus parse(String? raw) => switch ((raw ?? '').toLowerCase()) {
-        'active' => MemberStatus.active,
-        'locationpending' => MemberStatus.locationPending,
-        'inactive' => MemberStatus.inactive,
-        _ => MemberStatus.locationPending,
-      };
+    'active' => MemberStatus.active,
+    'locationpending' => MemberStatus.locationPending,
+    'inactive' => MemberStatus.inactive,
+    _ => MemberStatus.locationPending,
+  };
 }
 
 extension JoinStatusX on JoinStatus {
@@ -98,12 +84,12 @@ extension JoinStatusX on JoinStatus {
 }
 
 JoinStatus joinStatusFromString(String v) => switch (v) {
-      'Pending' => JoinStatus.pending,
-      'Approved' => JoinStatus.approved,
-      'Rejected' => JoinStatus.rejected,
-      'Banned' => JoinStatus.banned,
-      _ => JoinStatus.pending,
-    };
+  'Pending' => JoinStatus.pending,
+  'Approved' => JoinStatus.approved,
+  'Rejected' => JoinStatus.rejected,
+  'Banned' => JoinStatus.banned,
+  _ => JoinStatus.pending,
+};
 
 JoinStatus joinStatusFromJson(dynamic v) {
   if (v is int) return JoinStatusX.fromInt(v);
@@ -111,11 +97,11 @@ JoinStatus joinStatusFromJson(dynamic v) {
 }
 
 CommunityRole communityRoleFromString(String v) => switch (v) {
-      'Owner' => CommunityRole.owner,
-      'Admin' => CommunityRole.admin,
-      'Moderator' => CommunityRole.moderator,
-      _ => CommunityRole.member,
-    };
+  'Owner' => CommunityRole.owner,
+  'Admin' => CommunityRole.admin,
+  'Moderator' => CommunityRole.moderator,
+  _ => CommunityRole.member,
+};
 
 CommunityRole communityRoleFromJson(dynamic v) {
   if (v is int) return CommunityRoleX.fromInt(v);

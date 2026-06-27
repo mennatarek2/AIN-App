@@ -657,20 +657,6 @@ class CommunityRemoteDataSource {
     );
   }
 
-  // ── Legacy: add member by email ────────────────────────────────────────────
-
-  Future<void> addMemberByEmail({
-    required String communityId,
-    required String email,
-  }) async {
-    final token = await _requiredToken();
-    await _client.postJson(
-      ApiEndpoints.communityMembers(communityId),
-      token: token,
-      body: {'email': email},
-    );
-  }
-
   Future<List<CommunityMemberApiModel>> fetchCommunityMembers(
     String communityId,
   ) async {

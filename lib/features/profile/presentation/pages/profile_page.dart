@@ -15,7 +15,6 @@ import '../providers/profile_provider.dart';
 import 'edit_profile_page.dart';
 import 'points_page.dart';
 import 'settings_page.dart';
-import 'chatbot_page.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key, this.embeddedInShell = false});
@@ -66,8 +65,9 @@ class ProfilePage extends ConsumerWidget {
                             height: 120,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: context.semantic.textOnPrimary
-                                  .withValues(alpha: 0.08),
+                              color: context.semantic.textOnPrimary.withValues(
+                                alpha: 0.08,
+                              ),
                             ),
                           ),
                         ),
@@ -79,8 +79,9 @@ class ProfilePage extends ConsumerWidget {
                             height: 80,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: context.semantic.textOnPrimary
-                                  .withValues(alpha: 0.06),
+                              color: context.semantic.textOnPrimary.withValues(
+                                alpha: 0.06,
+                              ),
                             ),
                           ),
                         ),
@@ -92,8 +93,9 @@ class ProfilePage extends ConsumerWidget {
                             height: 140,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: context.semantic.textOnPrimary
-                                  .withValues(alpha: 0.05),
+                              color: context.semantic.textOnPrimary.withValues(
+                                alpha: 0.05,
+                              ),
                             ),
                           ),
                         ),
@@ -115,15 +117,16 @@ class ProfilePage extends ConsumerWidget {
                                     ),
                                   ),
                                 ),
-                            if (!embeddedInShell)
-                              IconButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                icon: Icon(
-                                  Icons.arrow_forward_ios_rounded,
-                                  color: context.semantic.textOnPrimary,
-                                  size: 20,
-                                ),
-                              ),
+                                if (!embeddedInShell)
+                                  IconButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                    icon: Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      color: context.semantic.textOnPrimary,
+                                      size: 20,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -157,9 +160,7 @@ class ProfilePage extends ConsumerWidget {
                   children: [
                     GestureDetector(
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const PointsPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const PointsPage()),
                       ),
                       child: const TrustProfileCard(userId: 'me'),
                     ),
@@ -202,10 +203,8 @@ class ProfilePage extends ConsumerWidget {
                         _SettingsTileData(
                           icon: Icons.smart_toy_outlined,
                           label: 'المساعد الذكي',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ChatbotPage(),
-                            ),
+                          onTap: () => Navigator.of(context).pushNamed(
+                            AppRoutes.chatbot,
                           ),
                         ),
                       ],
@@ -365,7 +364,9 @@ class _ProfileIdentityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+      ),
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: context.semantic.surfaceContainer,
@@ -521,7 +522,7 @@ class _SettingsTile extends StatelessWidget {
         style: TextStyle(color: color, fontWeight: FontWeight.w500),
       ),
       trailing: Icon(
-        Icons.chevron_left_rounded,
+        Icons.chevron_right_outlined,
         color: context.semantic.textMuted,
       ),
     );

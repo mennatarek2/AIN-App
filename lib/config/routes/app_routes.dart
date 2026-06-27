@@ -22,4 +22,5 @@ abstract final class AppRoutes {
   static const String community = '/community';
   static const String notifications = '/notifications';
   static const String reportDetail = '/report';
+  static const String chatbot = '/chatbot';
 }

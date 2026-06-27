@@ -85,7 +85,7 @@ class _YourLocationPageState extends ConsumerState<YourLocationPage> {
             backgroundColor: context.semantic.surfaceHeader,
             foregroundColor: context.semantic.textOnPrimary,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+              icon: const Icon(Icons.arrow_back_ios_rounded, size: 18),
               onPressed: () => Navigator.of(context).pop(),
             ),
             flexibleSpace: FlexibleSpaceBar(
@@ -138,12 +138,15 @@ class _YourLocationPageState extends ConsumerState<YourLocationPage> {
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Material(
-                          color: context.semantic.textOnPrimary
-                              .withValues(alpha: 0.14),
+                          color: context.semantic.textOnPrimary.withValues(
+                            alpha: 0.14,
+                          ),
                           borderRadius: BorderRadius.circular(AppRadius.pill),
                           child: InkWell(
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const MapPage()),
+                              MaterialPageRoute(
+                                builder: (_) => const MapPage(),
+                              ),
                             ),
                             borderRadius: BorderRadius.circular(AppRadius.pill),
                             child: Padding(
@@ -286,24 +289,20 @@ class _YourLocationPageState extends ConsumerState<YourLocationPage> {
                 AppSpacing.xxxl,
               ),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final pin = nearbyPins[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _NearbyReportCard(
-                        pin: pin,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ReportDetailPage(reportId: pin.id),
-                          ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final pin = nearbyPins[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _NearbyReportCard(
+                      pin: pin,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ReportDetailPage(reportId: pin.id),
                         ),
                       ),
-                    );
-                  },
-                  childCount: nearbyPins.take(15).length,
-                ),
+                    ),
+                  );
+                }, childCount: nearbyPins.take(15).length),
               ),
             ),
         ],
@@ -325,7 +324,9 @@ class _YourLocationPageState extends ConsumerState<YourLocationPage> {
         Marker(
           markerId: const MarkerId('your-location-live-marker'),
           position: currentLatLng,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
         ),
         ...nearbyPins.map(
           (pin) => Marker(
@@ -520,7 +521,9 @@ class _NearbyReportCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(AppRadius.pill),
-                        border: Border.all(color: color.withValues(alpha: 0.35)),
+                        border: Border.all(
+                          color: color.withValues(alpha: 0.35),
+                        ),
                       ),
                       child: Text(
                         _statusLabel,

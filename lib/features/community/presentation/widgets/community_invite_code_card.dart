@@ -26,7 +26,8 @@ class CommunityInviteCodeCard extends ConsumerStatefulWidget {
       _CommunityInviteCodeCardState();
 }
 
-class _CommunityInviteCodeCardState extends ConsumerState<CommunityInviteCodeCard> {
+class _CommunityInviteCodeCardState
+    extends ConsumerState<CommunityInviteCodeCard> {
   String? _displayCode;
   bool _isBusy = false;
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "705448515301",
+    "project_id": "ain-d919e",
+    "storage_bucket": "ain-d919e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:705448515301:android:f057aba99085951c17260c",
+        "android_client_info": {
+          "package_name": "com.example.ain_graduation_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-fRs4H1evKJnoCoj9nUtY2-nETzadsRg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

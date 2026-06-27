@@ -23,7 +23,9 @@ class CommunityNotificationPage extends ConsumerWidget {
     final items = ref
         .watch(notificationsProvider)
         .items
-        .where((item) => item.type == NotificationType.sos)
+        .where(
+          (item) => NotificationsState.typeFor(item) == NotificationType.sos,
+        )
         .toList();
 
     return Scaffold(
@@ -59,7 +61,7 @@ class CommunityNotificationPage extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
-                            'ستظهر هنا تنبيهات الطوارئ الواردة عبر SignalR',
+                            'ستظهر هنا تنبيهات الطوارئ الواردة',
                             textDirection: TextDirection.rtl,
                             textAlign: TextAlign.center,
                             style: context.text.bodySmall?.copyWith(
@@ -99,8 +101,8 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        item.highlighted ? context.semantic.sos : context.colors.onSurface;
+    final isUnread = !item.isRead;
+    final color = isUnread ? context.semantic.sos : context.colors.onSurface;
 
     return AppSurfaceCard(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -123,13 +125,23 @@ class _NotificationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.text,
+                  item.title.isNotEmpty ? item.title : item.body,
                   textDirection: TextDirection.rtl,
                   style: context.text.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: color,
                   ),
                 ),
+                if (item.title.isNotEmpty && item.body.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    item.body,
+                    textDirection: TextDirection.rtl,
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.semantic.textMuted,
+                    ),
+                  ),
+                ],
                 if (!item.isRead) ...[
                   const SizedBox(height: AppSpacing.xxs),
                   Text(

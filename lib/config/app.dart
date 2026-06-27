@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/local_notification_service.dart';
+import '../core/notifications/notification_bootstrap.dart';
 import '../core/realtime/signalr_bridge.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_provider.dart';
@@ -21,6 +22,7 @@ import '../features/auth/presentation/pages/verification_progress_page.dart';
 import '../features/auth/presentation/pages/verification_success_page.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/auth/presentation/state/auth_state_simple.dart';
+import '../features/chatbot/presentation/pages/chatbot_page.dart';
 import '../features/community/presentation/pages/community_page.dart';
 import '../features/home/presentation/pages/main_shell_page.dart';
 import '../features/home/presentation/pages/map_page.dart';
@@ -59,12 +61,14 @@ class _AppState extends ConsumerState<App> {
       if (token != null && token.isNotEmpty) {
         await ref.read(signalRBridgeProvider).start(token: token);
       }
+      await ref.read(notificationBootstrapProvider).onAuthenticated();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     ref.watch(reportSyncBootstrapProvider);
+    ref.watch(notificationAuthListenerProvider);
     final themeMode = ref.watch(appSettingsProvider).themeMode;
 
     // Listen for auth state changes → start/stop SignalR automatically.
@@ -121,6 +125,7 @@ class _AppState extends ConsumerState<App> {
         AppRoutes.profile: (_) => const ProfilePage(),
         AppRoutes.changePassword: (_) => const EditPasswordPage(),
         AppRoutes.sos: (_) => const SosPage(),
+        AppRoutes.chatbot: (_) => const ChatbotPage(),
       },
       // Routes that require arguments cannot use the static routes table.
       onGenerateRoute: (settings) {

@@ -1,6 +1,10 @@
 import 'package:dartz/dartz.dart';
 
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_config.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/notifications/device_token_storage.dart';
+import '../../../notifications/data/data_sources/notification_remote_data_source.dart';
 import '../../domain/entities/auth_failure.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -442,9 +446,11 @@ class AuthRepositoryImpl implements AuthRepository {
           refreshToken: refreshToken,
         );
       }
+      await _deleteRegisteredDeviceToken();
       await userLocalDataSource.clearSession();
       return const Right(null);
     } catch (e) {
+      await _deleteRegisteredDeviceToken();
       await userLocalDataSource.clearSession();
       return Left(_handleException(e));
     }
@@ -466,6 +472,29 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (e) {
       return null;
     }
+  }
+
+  Future<void> _deleteRegisteredDeviceToken() async {
+    final fcmToken = await DeviceTokenStorage.readCachedToken();
+    if (fcmToken == null || fcmToken.isEmpty) return;
+
+    final authToken = await userLocalDataSource.getCachedToken();
+    if (authToken == null || authToken.trim().isEmpty) {
+      await DeviceTokenStorage.clearCachedToken();
+      return;
+    }
+
+    try {
+      final dataSource = NotificationRemoteDataSource(
+        ApiClient(baseUrl: ApiConfig.baseUrl),
+        readToken: () async => authToken,
+      );
+      await dataSource.deleteDeviceToken(token: fcmToken);
+    } catch (_) {
+      // Logout should proceed even if token deletion fails.
+    }
+
+    await DeviceTokenStorage.clearCachedToken();
   }
 
   AuthFailure _handleException(Object e) {

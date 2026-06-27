@@ -1,136 +1,251 @@
-import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/notifications/device_token_storage.dart';
 import '../../../../core/notifications/fcm_notification_service.dart';
 import '../../../../core/notifications/local_notification_service.dart';
 import '../../../../core/notifications/push_notification_service.dart';
+import '../../data/models/notification_model.dart';
+import '../../domain/repositories/notification_repository.dart';
+import 'notification_data_providers.dart';
 
-// ─── Notification type ────────────────────────────────────────────────────────
+// ─── Notification type (UI helpers) ───────────────────────────────────────────
 
 enum NotificationType { sos, reportUpdate, system }
 
 enum NotificationSection { today, thisWeek }
 
-// ─── Notification model ───────────────────────────────────────────────────────
-
-class NotificationItem {
-  const NotificationItem({
-    required this.id,
-    required this.text,
-    required this.section,
-    this.highlighted = false,
-    this.isRead = false,
-    this.type = NotificationType.system,
-    this.relatedId,
-    this.createdAt,
-  });
-
-  final String id;
-  final String text;
-  final NotificationSection section;
-  final bool highlighted;
-  final bool isRead;
-  final NotificationType type;
-  final String? relatedId; // sosAlertId or reportId
-  final DateTime? createdAt;
-
-  NotificationItem copyWith({bool? isRead}) {
-    return NotificationItem(
-      id: id,
-      text: text,
-      section: section,
-      highlighted: highlighted,
-      isRead: isRead ?? this.isRead,
-      type: type,
-      relatedId: relatedId,
-      createdAt: createdAt,
-    );
-  }
-}
-
 // ─── State ────────────────────────────────────────────────────────────────────
 
 class NotificationsState {
-  const NotificationsState({required this.items});
+  const NotificationsState({
+    this.items = const [],
+    this.isLoading = false,
+    this.isLoadingMore = false,
+    this.isRefreshing = false,
+    this.pageIndex = 1,
+    this.hasMore = true,
+    this.error,
+    this.unreadCount = 0,
+  });
 
-  final List<NotificationItem> items;
+  final List<NotificationModel> items;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final bool isRefreshing;
+  final int pageIndex;
+  final bool hasMore;
+  final String? error;
+  final int unreadCount;
 
-  List<NotificationItem> itemsForSection(NotificationSection section) {
-    return items.where((item) => item.section == section).toList();
+  NotificationsState copyWith({
+    List<NotificationModel>? items,
+    bool? isLoading,
+    bool? isLoadingMore,
+    bool? isRefreshing,
+    int? pageIndex,
+    bool? hasMore,
+    String? error,
+    int? unreadCount,
+    bool clearError = false,
+  }) {
+    return NotificationsState(
+      items: items ?? this.items,
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      pageIndex: pageIndex ?? this.pageIndex,
+      hasMore: hasMore ?? this.hasMore,
+      error: clearError ? null : (error ?? this.error),
+      unreadCount: unreadCount ?? this.unreadCount,
+    );
   }
 
-  int get unreadCount => items.where((n) => !n.isRead).length;
+  List<NotificationModel> itemsForSection(NotificationSection section) {
+    return items.where((item) => sectionFor(item.createdAt) == section).toList();
+  }
+
+  static NotificationSection sectionFor(DateTime createdAt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final createdDay = DateTime(
+      createdAt.year,
+      createdAt.month,
+      createdAt.day,
+    );
+    if (!createdDay.isBefore(today)) return NotificationSection.today;
+
+    final weekAgo = today.subtract(const Duration(days: 7));
+    if (!createdDay.isBefore(weekAgo)) return NotificationSection.thisWeek;
+
+    return NotificationSection.thisWeek;
+  }
+
+  static NotificationType typeFor(NotificationModel item) {
+    final text = '${item.title} ${item.body}'.toLowerCase();
+    if (text.contains('sos') ||
+        text.contains('طوارئ') ||
+        text.contains('نداء')) {
+      return NotificationType.sos;
+    }
+    if (text.contains('بلاغ') ||
+        text.contains('report') ||
+        text.contains('حالة')) {
+      return NotificationType.reportUpdate;
+    }
+    return NotificationType.system;
+  }
 }
 
 // ─── Notifier ─────────────────────────────────────────────────────────────────
 
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
-  NotificationsNotifier(this._pushNotificationService)
-    : super(const NotificationsState(items: _mockItems)) {
+  NotificationsNotifier(
+    this._repository,
+    this._pushNotificationService,
+  ) : super(const NotificationsState()) {
     _bootstrap();
   }
 
+  final NotificationRepository _repository;
   final PushNotificationService _pushNotificationService;
 
-  static const _cacheKey = 'notifications_cache_v2';
-
-  // ── Mock seed data ─────────────────────────────────────────────────────────
-
-  static const List<NotificationItem> _mockItems = [
-    NotificationItem(
-      id: 'n1',
-      text: 'شكراً لك! تم استلام بلاغك "حادث سير" نراجع التفاصيل الآن',
-      section: NotificationSection.today,
-      highlighted: true,
-      type: NotificationType.reportUpdate,
-    ),
-    NotificationItem(
-      id: 'n2',
-      text: 'بلاغك عن "مشاكل كهربية" تغير إلى حالة قيد المعالجة',
-      section: NotificationSection.today,
-      highlighted: true,
-      type: NotificationType.reportUpdate,
-    ),
-    NotificationItem(
-      id: 'n3',
-      text: 'قام 5 أشخاص بالتفاعل علي البلاغ الخاص بك',
-      section: NotificationSection.today,
-      highlighted: true,
-      type: NotificationType.reportUpdate,
-    ),
-    NotificationItem(
-      id: 'n4',
-      text: 'هل من بلاغ عن طرق متضررة بسبب المطر؟',
-      section: NotificationSection.thisWeek,
-      type: NotificationType.system,
-    ),
-    NotificationItem(
-      id: 'n5',
-      text: 'أحسنت! ربحت 10 نقاط لإرسال بلاغك الجديد بنجاح.',
-      section: NotificationSection.thisWeek,
-      type: NotificationType.system,
-    ),
-    NotificationItem(
-      id: 'n6',
-      text: 'تم رفض البلاغ. يرجى إعادة إرساله مع صورة أكثر دقة',
-      section: NotificationSection.thisWeek,
-      type: NotificationType.reportUpdate,
-    ),
-    NotificationItem(
-      id: 'n7',
-      text: 'تم إنجاز المهمة! تم حل بلاغك عن الحفرة في "اسم الشارع"',
-      section: NotificationSection.thisWeek,
-      type: NotificationType.reportUpdate,
-    ),
-  ];
-
-  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  static const int _pageSize = 20;
 
   Future<void> _bootstrap() async {
     await _pushNotificationService.initialize();
-    await _loadPersistedItems();
+    if (_pushNotificationService is FcmNotificationService) {
+      _pushNotificationService.onMessageReceived = _handlePushReceived;
+    }
+  }
+
+  Future<void> loadInitial() async {
+    if (!mounted) return;
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    try {
+      final results = await Future.wait([
+        _repository.fetchNotifications(pageIndex: 1, pageSize: _pageSize),
+        _repository.fetchUnreadCount(),
+      ]);
+      if (!mounted) return;
+
+      final items = results[0] as List<NotificationModel>;
+      final unread = results[1] as int;
+
+      state = state.copyWith(
+        items: items,
+        isLoading: false,
+        pageIndex: 1,
+        hasMore: items.length >= _pageSize,
+        unreadCount: unread,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(isLoading: false, error: _errorMessage(e));
+    }
+  }
+
+  Future<void> refresh() async {
+    if (!mounted) return;
+    state = state.copyWith(isRefreshing: true, clearError: true);
+
+    try {
+      final results = await Future.wait([
+        _repository.fetchNotifications(pageIndex: 1, pageSize: _pageSize),
+        _repository.fetchUnreadCount(),
+      ]);
+      if (!mounted) return;
+
+      final items = results[0] as List<NotificationModel>;
+      final unread = results[1] as int;
+
+      state = state.copyWith(
+        items: items,
+        isRefreshing: false,
+        pageIndex: 1,
+        hasMore: items.length >= _pageSize,
+        unreadCount: unread,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(isRefreshing: false, error: _errorMessage(e));
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (!mounted || state.isLoadingMore || !state.hasMore) return;
+
+    final nextPage = state.pageIndex + 1;
+    state = state.copyWith(isLoadingMore: true);
+
+    try {
+      final items = await _repository.fetchNotifications(
+        pageIndex: nextPage,
+        pageSize: _pageSize,
+      );
+      if (!mounted) return;
+
+      state = state.copyWith(
+        items: [...state.items, ...items],
+        isLoadingMore: false,
+        pageIndex: nextPage,
+        hasMore: items.length >= _pageSize,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(isLoadingMore: false);
+    }
+  }
+
+  Future<void> refreshUnreadCount() async {
+    try {
+      final unread = await _repository.fetchUnreadCount();
+      if (!mounted) return;
+      state = state.copyWith(unreadCount: unread);
+    } catch (_) {
+      // Non-fatal — keep cached count.
+    }
+  }
+
+  Future<void> markRead(String id) async {
+    final original = state.items;
+    final updated = state.items
+        .map((n) => n.id == id ? n.copyWith(isRead: true) : n)
+        .toList();
+    final wasUnread = original.any((n) => n.id == id && !n.isRead);
+
+    state = state.copyWith(
+      items: updated,
+      unreadCount: wasUnread && state.unreadCount > 0
+          ? state.unreadCount - 1
+          : state.unreadCount,
+    );
+
+    try {
+      await _repository.markAsRead(id);
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(items: original);
+      await refreshUnreadCount();
+    }
+  }
+
+  Future<void> markAllRead() async {
+    final original = state.items;
+    final updated = state.items.map((n) => n.copyWith(isRead: true)).toList();
+
+    state = state.copyWith(items: updated, unreadCount: 0);
+
+    try {
+      await _repository.markAllAsRead();
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(items: original);
+      await refreshUnreadCount();
+    }
   }
 
   // ── SOS notification (called by SignalR bridge) ────────────────────────────
@@ -146,20 +261,6 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         ? 'نداء ($label) من مجتمع $communityName'
         : 'نداء طوارئ جديد — $label';
 
-    final item = NotificationItem(
-      id: 'sos-$sosId-${DateTime.now().microsecondsSinceEpoch}',
-      text: body,
-      section: NotificationSection.today,
-      highlighted: true,
-      isRead: false,
-      type: NotificationType.sos,
-      relatedId: sosId,
-      createdAt: DateTime.now(),
-    );
-
-    await _addNotification(item);
-
-    // Show local system notification
     final localService = _pushNotificationService;
     if (localService is LocalNotificationService) {
       await localService.showSOSAlert(
@@ -168,60 +269,49 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         message: message,
         communityName: communityName,
       );
+    } else if (localService is FcmNotificationService) {
+      await localService.showLocalNotification(
+        title: 'نداء طوارئ',
+        body: body,
+        payload: 'sos:$sosId',
+      );
     }
+
+    await refresh();
   }
 
   Future<void> addSOSResolvedNotification({
     required String sosId,
     required String resolvedBy,
   }) async {
-    final item = NotificationItem(
-      id: 'sos-resolved-$sosId',
-      text: 'تم حل نداء الطوارئ بواسطة: $resolvedBy',
-      section: NotificationSection.today,
-      highlighted: false,
-      isRead: false,
-      type: NotificationType.sos,
-      relatedId: sosId,
-      createdAt: DateTime.now(),
-    );
-
-    await _addNotification(item);
-
     final localService = _pushNotificationService;
     if (localService is LocalNotificationService) {
       await localService.showSOSResolved(
         sosId: sosId,
         resolvedBy: resolvedBy,
       );
+    } else if (localService is FcmNotificationService) {
+      await localService.showLocalNotification(
+        title: 'تم حل نداء الطوارئ',
+        body: 'تم الحل بواسطة: $resolvedBy',
+        payload: 'sos:$sosId',
+      );
     }
-  }
 
-  // ── Report notifications ───────────────────────────────────────────────────
+    await refresh();
+  }
 
   Future<void> notifyReportSubmitted({
     required String reportTitle,
     required String reportType,
     String? reportId,
   }) async {
-    final item = NotificationItem(
-      id: 'n-${DateTime.now().microsecondsSinceEpoch}',
-      text: 'تم استلام بلاغ "$reportType" بعنوان "$reportTitle"',
-      section: NotificationSection.today,
-      highlighted: true,
-      isRead: false,
-      type: NotificationType.reportUpdate,
-      relatedId: reportId,
-      createdAt: DateTime.now(),
-    );
-
-    await _addNotification(item);
-
     await _pushNotificationService.showReportNotification(
       title: 'تم إرسال البلاغ بنجاح',
       body: 'تم استلام "$reportTitle" وسيتم مراجعته قريباً.',
       reportId: reportId,
     );
+    await refresh();
   }
 
   Future<void> notifyReportStatusChanged({
@@ -229,124 +319,16 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     required String statusLabel,
     String? reportId,
   }) async {
-    final item = NotificationItem(
-      id: 'n-${DateTime.now().microsecondsSinceEpoch}',
-      text: 'تم تحديث حالة "$reportTitle" إلى "$statusLabel"',
-      section: NotificationSection.today,
-      highlighted: true,
-      isRead: false,
-      type: NotificationType.reportUpdate,
-      relatedId: reportId,
-      createdAt: DateTime.now(),
-    );
-
-    await _addNotification(item);
-
     await _pushNotificationService.showReportNotification(
       title: 'تحديث حالة البلاغ',
       body: 'حالة "$reportTitle": $statusLabel',
       reportId: reportId,
     );
+    await refresh();
   }
 
-  // ── Read management ────────────────────────────────────────────────────────
-
-  void markRead(String id) {
-    state = NotificationsState(
-      items: state.items.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList(),
-    );
-  }
-
-  void markAllRead() {
-    state = NotificationsState(
-      items: state.items.map((n) => n.copyWith(isRead: true)).toList(),
-    );
-  }
-
-  void clearAll() {
-    state = const NotificationsState(items: []);
-    _persistItems([]);
-  }
-
-  // ── Internal helpers ───────────────────────────────────────────────────────
-
-  Future<void> _addNotification(NotificationItem item) async {
-    if (!mounted) return;
-    state = NotificationsState(items: [item, ...state.items]);
-    await _persistItems(state.items);
-  }
-
-  Future<void> _loadPersistedItems() async {
-    final prefs = await _safeGetPrefs();
-    if (prefs == null) return;
-
-    final rawJson = prefs.getString(_cacheKey);
-    if (rawJson == null || rawJson.isEmpty) {
-      await _persistItems(state.items);
-      return;
-    }
-
-    try {
-      final decoded = jsonDecode(rawJson);
-      if (decoded is! List) return;
-
-      final items = decoded
-          .whereType<Map>()
-          .map(
-            (item) => NotificationItem(
-              id: item['id']?.toString() ?? '',
-              text: item['text']?.toString() ?? '',
-              section: _sectionFromString(item['section']?.toString()),
-              highlighted: item['highlighted'] == true,
-              isRead: item['isRead'] == true,
-              type: _typeFromString(item['type']?.toString()),
-              relatedId: item['relatedId']?.toString(),
-            ),
-          )
-          .where((item) => item.id.isNotEmpty && item.text.isNotEmpty)
-          .toList();
-
-      if (items.isEmpty) return;
-      if (!mounted) return;
-      state = NotificationsState(items: items);
-    } catch (_) {
-      // Corrupted cache — keep seeded fallback.
-    }
-  }
-
-  Future<void> _persistItems(List<NotificationItem> items) async {
-    final prefs = await _safeGetPrefs();
-    if (prefs == null) return;
-
-    final payload = items
-        .map(
-          (item) => {
-            'id': item.id,
-            'text': item.text,
-            'section': item.section.name,
-            'highlighted': item.highlighted,
-            'isRead': item.isRead,
-            'type': item.type.name,
-            if (item.relatedId != null) 'relatedId': item.relatedId,
-          },
-        )
-        .toList();
-
-    await prefs.setString(_cacheKey, jsonEncode(payload));
-  }
-
-  NotificationSection _sectionFromString(String? value) {
-    return NotificationSection.values.firstWhere(
-      (section) => section.name == value,
-      orElse: () => NotificationSection.thisWeek,
-    );
-  }
-
-  NotificationType _typeFromString(String? value) {
-    return NotificationType.values.firstWhere(
-      (t) => t.name == value,
-      orElse: () => NotificationType.system,
-    );
+  void _handlePushReceived() {
+    refresh();
   }
 
   String _severityLabel(String severity) {
@@ -357,12 +339,55 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     };
   }
 
-  Future<SharedPreferences?> _safeGetPrefs() async {
+  String _errorMessage(Object error) {
+    return error.toString().replaceFirst('Exception: ', '');
+  }
+}
+
+// ─── Device token manager ─────────────────────────────────────────────────────
+
+class DeviceTokenManager {
+  DeviceTokenManager(this._repository);
+
+  final NotificationRepository _repository;
+
+  Future<void> registerCurrentToken(FcmNotificationService fcmService) async {
+    final token = await fcmService.getDeviceToken();
+    if (token == null || token.isEmpty) return;
+    await registerToken(token);
+  }
+
+  Future<void> registerToken(String token) async {
+    if (token.isEmpty) return;
+
+    final cached = await DeviceTokenStorage.readCachedToken();
+    if (cached == token) return;
+
+    await _repository.registerDeviceToken(
+      token: token,
+      platform: _platformName(),
+    );
+    await DeviceTokenStorage.cacheToken(token);
+  }
+
+  Future<void> unregisterCachedToken() async {
+    final cached = await DeviceTokenStorage.readCachedToken();
+    if (cached == null || cached.isEmpty) return;
+
     try {
-      return await SharedPreferences.getInstance();
+      await _repository.deleteDeviceToken(token: cached);
     } catch (_) {
-      return null;
+      // Logout should proceed even if backend deletion fails.
     }
+
+    await DeviceTokenStorage.clearCachedToken();
+  }
+
+  String _platformName() {
+    if (kIsWeb) return 'Web';
+    if (Platform.isAndroid) return 'Android';
+    if (Platform.isIOS) return 'iOS';
+    return 'Unknown';
   }
 }
 
@@ -370,7 +395,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
 enum PushNotificationMode { local, fcm }
 
-const _pushNotificationMode = PushNotificationMode.local;
+const _pushNotificationMode = PushNotificationMode.fcm;
 
 final pushNotificationServiceProvider = Provider<PushNotificationService>((
   ref,
@@ -383,12 +408,22 @@ final pushNotificationServiceProvider = Provider<PushNotificationService>((
   }
 });
 
+final deviceTokenManagerProvider = Provider<DeviceTokenManager>((ref) {
+  return DeviceTokenManager(ref.watch(notificationRepositoryProvider));
+});
+
 final notificationsProvider =
     StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
-      return NotificationsNotifier(ref.watch(pushNotificationServiceProvider));
+      return NotificationsNotifier(
+        ref.watch(notificationRepositoryProvider),
+        ref.watch(pushNotificationServiceProvider),
+      );
     });
 
 /// Convenience provider for unread count — used by the notification bell badge.
 final unreadNotificationCountProvider = Provider<int>((ref) {
   return ref.watch(notificationsProvider).unreadCount;
 });
+
+/// Backward-compatible alias for community SOS filter page.
+typedef NotificationItem = NotificationModel;

@@ -9,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/widgets/app_layout_primitives.dart';
 import '../../../../core/widgets/app_page_header.dart';
+import '../../../../core/widgets/image_source_picker_sheet.dart';
 import '../../data/attachment_store.dart';
 
 class IdVerificationPage extends StatefulWidget {
@@ -23,11 +24,12 @@ class _IdVerificationPageState extends State<IdVerificationPage> {
   String? _frontPath;
   String? _backPath;
 
-  Future<void> _captureFront() async {
-    final XFile? file = await _picker.pickImage(
-      source: ImageSource.camera,
+  Future<void> _pickFront() async {
+    final XFile? file = await pickImageWithSourceChoice(
+      context,
+      _picker,
+      title: 'الوجه الأمامي للبطاقة',
       preferredCameraDevice: CameraDevice.rear,
-      imageQuality: 85,
     );
     if (file != null) {
       setState(() {
@@ -37,11 +39,12 @@ class _IdVerificationPageState extends State<IdVerificationPage> {
     }
   }
 
-  Future<void> _captureBack() async {
-    final XFile? file = await _picker.pickImage(
-      source: ImageSource.camera,
+  Future<void> _pickBack() async {
+    final XFile? file = await pickImageWithSourceChoice(
+      context,
+      _picker,
+      title: 'الوجه الخلفي للبطاقة',
       preferredCameraDevice: CameraDevice.rear,
-      imageQuality: 85,
     );
     if (file != null) {
       setState(() {
@@ -62,7 +65,7 @@ class _IdVerificationPageState extends State<IdVerificationPage> {
         body: Column(
           children: [
             AppPageHeader(
-              title: 'تصوير الهوية',
+              title: 'صور الهوية',
               subtitle: 'الخطوة 1 من 2',
               onBack: () => Navigator.of(context).pop(),
             ),
@@ -72,7 +75,8 @@ class _IdVerificationPageState extends State<IdVerificationPage> {
                   offset: const Offset(0, -AppSpacing.md),
                   child: AppFormCard(
                     title: 'بطاقة الرقم القومي',
-                    subtitle: 'قم بتصوير الوجهين الأمامي والخلفي للبطاقة',
+                    subtitle:
+                        'التقط صورة أو اختر من المعرض للوجهين الأمامي والخلفي',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -83,7 +87,7 @@ class _IdVerificationPageState extends State<IdVerificationPage> {
                                 label: 'الوجه الأمامي',
                                 icon: Icons.credit_card_outlined,
                                 imagePath: _frontPath,
-                                onTap: _captureFront,
+                                onTap: _pickFront,
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
@@ -92,7 +96,7 @@ class _IdVerificationPageState extends State<IdVerificationPage> {
                                 label: 'الوجه الخلفي',
                                 icon: Icons.flip_to_back_outlined,
                                 imagePath: _backPath,
-                                onTap: _captureBack,
+                                onTap: _pickBack,
                               ),
                             ),
                           ],
@@ -271,7 +275,7 @@ class _IdCaptureCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'تم التقاط الصورة',
+                      'تمت إضافة الصورة',
                       style: context.text.labelSmall?.copyWith(
                         color: context.semantic.success,
                         fontWeight: FontWeight.w600,

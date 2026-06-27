@@ -112,9 +112,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           const SizedBox(height: AppSpacing.lg),
                           _buildLoginButton(isLoading),
                           const SizedBox(height: AppSpacing.lg),
-                          _buildDividerWithOr(context),
-                          const SizedBox(height: AppSpacing.lg),
-                          _buildGoogleButton(context),
                         ],
                       ),
                     ),
@@ -230,9 +227,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         TextButton(
-          onPressed: () => Navigator.of(context).pushReplacementNamed(
-            AppRoutes.forgotPassword,
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).pushReplacementNamed(AppRoutes.forgotPassword),
           style: TextButton.styleFrom(
             foregroundColor: context.colors.primary,
             padding: EdgeInsets.zero,
@@ -300,44 +297,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  Widget _buildDividerWithOr(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Divider(color: context.semantic.divider)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-          child: Text('أو', style: context.text.bodySmall),
-        ),
-        Expanded(child: Divider(color: context.semantic.divider)),
-      ],
-    );
-  }
-
-  Widget _buildGoogleButton(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: () {},
-      icon: Image.asset(
-        'assets/images/googleIcon.png',
-        width: 22,
-        height: 22,
-        errorBuilder: (_, __, ___) => Icon(
-          Icons.g_mobiledata_rounded,
-          size: 26,
-          color: context.colors.onSurface,
-        ),
-      ),
-      label: const Text('الاستمرار باستخدام جوجل'),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 52),
-        side: BorderSide(color: context.semantic.borderSubtle),
-      ),
-    );
-  }
-
   Widget _buildSignUpLink(BuildContext context) {
     return GestureDetector(
-      onTap: () =>
-          Navigator.of(context).pushReplacementNamed(AppRoutes.signUp),
+      onTap: () => Navigator.of(context).pushReplacementNamed(AppRoutes.signUp),
       child: RichText(
         text: TextSpan(
           style: context.text.bodyMedium,

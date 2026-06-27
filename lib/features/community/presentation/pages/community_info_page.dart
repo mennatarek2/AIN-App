@@ -24,7 +24,6 @@ import '../providers/communities_provider.dart';
 import '../widgets/community_dialogs.dart';
 import '../widgets/community_invite_code_card.dart';
 import '../widgets/community_join_requests_tab.dart';
-import 'add_member_page.dart';
 import 'community_notification_page.dart';
 import 'edit_community_page.dart';
 import 'member_details_page.dart';
@@ -299,8 +298,10 @@ class _CommunityInfoPageState extends ConsumerState<CommunityInfoPage> {
         ref.read(currentUserProvider)?.id;
     final myRole = currentUserId == null
         ? null
-        : myMembership(membersSnap.valueOrNull ?? const [], currentUserId)
-            ?.role;
+        : myMembership(
+            membersSnap.valueOrNull ?? const [],
+            currentUserId,
+          )?.role;
     final userIsOwner = myRole == CommunityRole.owner;
 
     final confirmed = await CommunityDialogs.confirmLeave(
@@ -762,44 +763,6 @@ class _MembersSection extends ConsumerWidget {
                   ),
                 );
               }),
-            if (canManage) ...[
-              const SizedBox(height: AppSpacing.sm),
-              SizedBox(
-                height: 50,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    gradient: context.primaryGradient,
-                  ),
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                    ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => AddMemberPage(communityId: communityId),
-                      ),
-                    ),
-                    icon: Icon(
-                      Icons.person_add_rounded,
-                      color: context.semantic.textOnPrimary,
-                      size: 18,
-                    ),
-                    label: Text(
-                      'إضافة عضو جديد',
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                        color: context.semantic.textOnPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
         );
       },
@@ -1361,7 +1324,7 @@ class _LocationPendingDetailBanner extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              '⚠️ موقعك غير محدد. حدّثه من الملف الشخصي لتفعيل SOS.',
+              'موقعك غير محدد. حدّثه من الملف الشخصي لتفعيل SOS.',
               textDirection: TextDirection.rtl,
               style: context.text.bodySmall,
             ),
@@ -1933,7 +1896,7 @@ class _MemberCard extends StatelessWidget {
               ),
             ),
           Icon(
-            Icons.chevron_left_rounded,
+            Icons.chevron_right_rounded,
             size: 20,
             color: context.semantic.textMuted,
           ),

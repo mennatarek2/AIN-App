@@ -813,10 +813,10 @@ class _DescriptionSection extends StatelessWidget {
     if (text.isEmpty) return const SizedBox.shrink();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionLabel(label: 'الوصف'),
-        const SizedBox(height: AppSpacing.xxs),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           text,
           textDirection: TextDirection.rtl,

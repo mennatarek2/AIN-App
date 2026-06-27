@@ -10,6 +10,7 @@ import '../../../../core/widgets/app_layout_primitives.dart';
 import '../../../../core/widgets/app_state_views.dart';
 import '../../../home/presentation/providers/home_navigation_provider.dart';
 import '../../../home/presentation/widgets/bottom_nav_bar.dart';
+import '../../data/models/notification_model.dart';
 import '../providers/notifications_provider.dart';
 
 class NotificationsPage extends ConsumerStatefulWidget {
@@ -20,24 +21,44 @@ class NotificationsPage extends ConsumerStatefulWidget {
 }
 
 class _NotificationsPageState extends ConsumerState<NotificationsPage> {
+  final _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
-    ref.read(homeNavigationProvider.notifier).setSelectedIndex(3);
+    _scrollController.addListener(_onScroll);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(notificationsProvider);
+      if (state.items.isEmpty && !state.isLoading && state.error == null) {
+        ref.read(notificationsProvider.notifier).loadInitial();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      ref.read(notificationsProvider.notifier).loadMore();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final notificationsState = ref.watch(notificationsProvider);
+    final state = ref.watch(notificationsProvider);
     final signalRStatus = ref.watch(signalRStatusProvider);
 
-    final todayItems = notificationsState.itemsForSection(
-      NotificationSection.today,
-    );
-    final weekItems = notificationsState.itemsForSection(
-      NotificationSection.thisWeek,
-    );
-    final unread = notificationsState.unreadCount;
+    final todayItems = state.itemsForSection(NotificationSection.today);
+    final weekItems = state.itemsForSection(NotificationSection.thisWeek);
+    final unread = state.unreadCount;
 
     return Scaffold(
       backgroundColor: context.colors.surface,
@@ -70,97 +91,24 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                     ),
                   ),
                 ),
-              TextButton(
-                onPressed: () =>
-                    ref.read(notificationsProvider.notifier).clearAll(),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: context.semantic.textOnPrimary,
+                  size: 20,
                 ),
-                child: Text(
-                  'مسح',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.semantic.textOnPrimary.withValues(
-                      alpha: 0.75,
-                    ),
-                  ),
-                ),
+                tooltip: 'رجوع',
               ),
             ],
           ),
 
-          Expanded(
-            child: notificationsState.items.isEmpty
-                ? const AppEmptyView(
-                    icon: Icons.notifications_none_rounded,
-                    title: 'لا توجد إشعارات',
-                  )
-                : ListView(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                    children: [
-                      if (todayItems.isNotEmpty) ...[
-                        AppSectionHeader(
-                          title: 'اليوم',
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.screenHorizontal,
-                            AppSpacing.md,
-                            AppSpacing.screenHorizontal,
-                            AppSpacing.xs,
-                          ),
-                        ),
-                        ...todayItems.map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.screenHorizontal,
-                              0,
-                              AppSpacing.screenHorizontal,
-                              AppSpacing.xs,
-                            ),
-                            child: _NotificationTile(
-                              item: item,
-                              onTap: () => _onTap(item),
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (weekItems.isNotEmpty) ...[
-                        AppSectionHeader(
-                          title: 'هذا الأسبوع',
-                          padding: EdgeInsets.fromLTRB(
-                            AppSpacing.screenHorizontal,
-                            todayItems.isNotEmpty ? AppSpacing.md : AppSpacing.sm,
-                            AppSpacing.screenHorizontal,
-                            AppSpacing.xs,
-                          ),
-                        ),
-                        ...weekItems.map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.screenHorizontal,
-                              0,
-                              AppSpacing.screenHorizontal,
-                              AppSpacing.xs,
-                            ),
-                            child: _NotificationTile(
-                              item: item,
-                              onTap: () => _onTap(item),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-          ),
+          Expanded(child: _buildBody(context, state, todayItems, weekItems)),
         ],
       ),
       bottomNavigationBar: BottomNavBar(
         selectedIndex: ref.watch(homeNavigationProvider),
         onTap: (index) {
-          if (index == 3) return;
           ref.read(homeNavigationProvider.notifier).setSelectedIndex(index);
           navigateFromBottomNav(context, ref, index);
         },
@@ -168,13 +116,113 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     );
   }
 
-  void _onTap(NotificationItem item) {
+  Widget _buildBody(
+    BuildContext context,
+    NotificationsState state,
+    List<NotificationModel> todayItems,
+    List<NotificationModel> weekItems,
+  ) {
+    if (state.isLoading && state.items.isEmpty) {
+      return const AppLoadingView(message: 'جاري تحميل الإشعارات...');
+    }
+
+    if (state.error != null && state.items.isEmpty) {
+      return AppErrorView(
+        message: state.error!,
+        onRetry: () => ref.read(notificationsProvider.notifier).loadInitial(),
+      );
+    }
+
+    if (state.items.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () => ref.read(notificationsProvider.notifier).refresh(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            AppEmptyView(
+              icon: Icons.notifications_none_rounded,
+              title: 'لا توجد إشعارات',
+              subtitle: 'ستظهر هنا الإشعارات الواردة من التطبيق',
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => ref.read(notificationsProvider.notifier).refresh(),
+      child: ListView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+        children: [
+          if (todayItems.isNotEmpty) ...[
+            AppSectionHeader(
+              title: 'اليوم',
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenHorizontal,
+                AppSpacing.md,
+                AppSpacing.screenHorizontal,
+                AppSpacing.xs,
+              ),
+            ),
+            ...todayItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenHorizontal,
+                  0,
+                  AppSpacing.screenHorizontal,
+                  AppSpacing.xs,
+                ),
+                child: _NotificationTile(
+                  item: item,
+                  onTap: () => _onTap(item),
+                ),
+              ),
+            ),
+          ],
+          if (weekItems.isNotEmpty) ...[
+            AppSectionHeader(
+              title: 'هذا الأسبوع',
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.screenHorizontal,
+                todayItems.isNotEmpty ? AppSpacing.md : AppSpacing.sm,
+                AppSpacing.screenHorizontal,
+                AppSpacing.xs,
+              ),
+            ),
+            ...weekItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenHorizontal,
+                  0,
+                  AppSpacing.screenHorizontal,
+                  AppSpacing.xs,
+                ),
+                child: _NotificationTile(
+                  item: item,
+                  onTap: () => _onTap(item),
+                ),
+              ),
+            ),
+          ],
+          if (state.isLoadingMore)
+            const Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _onTap(NotificationModel item) {
     ref.read(notificationsProvider.notifier).markRead(item.id);
-    if (item.type == NotificationType.sos && item.relatedId != null) {
+
+    final type = NotificationsState.typeFor(item);
+    if (type == NotificationType.sos) {
       Navigator.of(context).pushNamed('/sos');
-    } else if (item.type == NotificationType.reportUpdate &&
-        item.relatedId != null) {
-      Navigator.of(context).pushNamed('/report', arguments: item.relatedId);
     }
   }
 }
@@ -197,7 +245,7 @@ class _ConnectionBanner extends StatelessWidget {
 
     final label = status == SignalRStatus.reconnecting
         ? 'جاري إعادة الاتصال...'
-        : 'اتصال منقطع — التحديثات متوقفة';
+        : 'اتصال منقطع — التحديثات المتوقفة';
 
     return Container(
       width: double.infinity,
@@ -237,13 +285,14 @@ class _NotificationTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final NotificationItem item;
+  final NotificationModel item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isUnread = !item.isRead;
-    final (typeIcon, typeColor) = _typeInfo(context, item.type);
+    final type = NotificationsState.typeFor(item);
+    final (typeIcon, typeColor) = _typeInfo(context, type);
 
     return Material(
       color: Colors.transparent,
@@ -330,14 +379,16 @@ class _NotificationTile extends StatelessWidget {
                                     ),
                                   Expanded(
                                     child: Text(
-                                      item.text,
+                                      item.title.isNotEmpty
+                                          ? item.title
+                                          : item.body,
                                       textDirection: TextDirection.rtl,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: context.text.bodyMedium?.copyWith(
                                         fontWeight: isUnread
                                             ? FontWeight.w700
-                                            : FontWeight.w400,
+                                            : FontWeight.w600,
                                         color: context.colors.onSurface,
                                         height: 1.35,
                                       ),
@@ -345,16 +396,28 @@ class _NotificationTile extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              if (item.createdAt != null) ...[
+                              if (item.title.isNotEmpty &&
+                                  item.body.isNotEmpty) ...[
                                 const SizedBox(height: AppSpacing.xxs),
                                 Text(
-                                  _timeAgo(item.createdAt!),
+                                  item.body,
                                   textDirection: TextDirection.rtl,
-                                  style: context.text.labelSmall?.copyWith(
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.text.bodySmall?.copyWith(
                                     color: context.semantic.textMuted,
+                                    height: 1.35,
                                   ),
                                 ),
                               ],
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                _formatDateTime(item.createdAt),
+                                textDirection: TextDirection.rtl,
+                                style: context.text.labelSmall?.copyWith(
+                                  color: context.semantic.textMuted,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -387,12 +450,18 @@ class _NotificationTile extends StatelessWidget {
     };
   }
 
-  String _timeAgo(DateTime dt) {
+  String _formatDateTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'الآن';
     if (diff.inMinutes < 60) return 'منذ ${diff.inMinutes} دقيقة';
     if (diff.inHours < 24) return 'منذ ${diff.inHours} ساعة';
-    return 'منذ ${diff.inDays} يوم';
+    if (diff.inDays < 7) return 'منذ ${diff.inDays} يوم';
+
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '$day/$month ${dt.year} — $hour:$minute';
   }
 }
 

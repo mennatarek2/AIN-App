@@ -47,15 +47,16 @@ class ReportLikeNotifier
   }
 
   Future<void> toggle() async {
-    final current = state.valueOrNull;
-    if (current == null) return;
+    final previous = state.valueOrNull;
+    final optimistic = previous ??
+        const LikeResult(totalLikes: 0, isLikedByCaller: false);
 
     state = AsyncData(
-      current.copyWith(
-        isLikedByCaller: !current.isLikedByCaller,
-        totalLikes: current.isLikedByCaller
-            ? current.totalLikes - 1
-            : current.totalLikes + 1,
+      optimistic.copyWith(
+        isLikedByCaller: !optimistic.isLikedByCaller,
+        totalLikes: optimistic.isLikedByCaller
+            ? optimistic.totalLikes - 1
+            : optimistic.totalLikes + 1,
       ),
     );
 
@@ -65,7 +66,13 @@ class ReportLikeNotifier
           .toggleReportLike(arg);
       state = AsyncData(result);
     } catch (_) {
-      state = AsyncData(current);
+      if (previous != null) {
+        state = AsyncData(previous);
+      } else {
+        state = const AsyncData(
+          LikeResult(totalLikes: 0, isLikedByCaller: false),
+        );
+      }
     }
   }
 }

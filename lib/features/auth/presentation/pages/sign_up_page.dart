@@ -141,12 +141,13 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                           ),
                           const SizedBox(height: AppSpacing.md),
                           _buildInput(
-                            hint: 'رقم الهوية الشخصية',
+                            hint: 'رقم الهوية الشخصية (اختياري)',
                             icon: Icons.badge_outlined,
                             keyboardType: TextInputType.number,
                             textInputAction: TextInputAction.next,
                             controller: _ssnController,
                             enabled: !isLoading,
+                            required: false,
                           ),
                           const SizedBox(height: AppSpacing.md),
                           _buildInput(
@@ -192,9 +193,6 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                           const SizedBox(height: AppSpacing.lg),
                           _buildContinueButton(isLoading),
                           const SizedBox(height: AppSpacing.lg),
-                          _buildDividerWithOr(context),
-                          const SizedBox(height: AppSpacing.lg),
-                          _buildGoogleButton(context),
                         ],
                       ),
                     ),
@@ -276,6 +274,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
     bool obscureText = false,
     TextEditingController? controller,
     bool enabled = true,
+    bool required = true,
     Widget? suffix,
   }) {
     return TextFormField(
@@ -288,8 +287,11 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       obscureText: obscureText,
       style: context.text.bodyLarge,
       validator: (value) {
-        if (value == null || value.trim().isEmpty) {
+        if (required && (value == null || value.trim().isEmpty)) {
           return 'هذا الحقل مطلوب';
+        }
+        if (value == null || value.trim().isEmpty) {
+          return null;
         }
         if (keyboardType == TextInputType.emailAddress) {
           if (UsernameUtils.fromEmail(value) == null) {
@@ -358,40 +360,6 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDividerWithOr(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Divider(color: context.semantic.divider)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-          child: Text('أو', style: context.text.bodySmall),
-        ),
-        Expanded(child: Divider(color: context.semantic.divider)),
-      ],
-    );
-  }
-
-  Widget _buildGoogleButton(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: () {},
-      icon: Image.asset(
-        'assets/images/googleIcon.png',
-        width: 22,
-        height: 22,
-        errorBuilder: (_, __, ___) => Icon(
-          Icons.g_mobiledata_rounded,
-          size: 26,
-          color: context.colors.onSurface,
-        ),
-      ),
-      label: const Text('الاستمرار باستخدام جوجل'),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 52),
-        side: BorderSide(color: context.semantic.borderSubtle),
       ),
     );
   }

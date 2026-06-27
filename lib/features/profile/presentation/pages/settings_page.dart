@@ -100,23 +100,6 @@ class SettingsPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSpacing.sectionGap),
                 AppSettingsSection(
-                  title: 'الحساب',
-                  children: [
-                    AppSettingsTile(
-                      icon: Icons.lock_outline_rounded,
-                      label: 'تغيير كلمة المرور',
-                      onTap: () =>
-                          Navigator.of(context).pushNamed(AppRoutes.changePassword),
-                    ),
-                    AppSettingsTile(
-                      icon: Icons.person_outline_rounded,
-                      label: 'تعديل الملف الشخصي',
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sectionGap),
-                AppSettingsSection(
                   title: 'حول التطبيق',
                   children: [
                     AppSettingsTile(

@@ -403,25 +403,6 @@ class CommunitiesNotifier extends StateNotifier<CommunitiesState> {
     } catch (_) {}
   }
 
-  Future<String?> addMemberByEmail({
-    required String communityId,
-    required String email,
-  }) async {
-    try {
-      await _remoteDataSource.addMemberByEmail(
-        communityId: communityId,
-        email: email,
-      );
-      _invalidateMembers(communityId);
-      await _loadFromApi();
-      return null;
-    } on ApiException catch (e) {
-      return communityApiUserMessage(e);
-    } catch (e) {
-      return e.toString();
-    }
-  }
-
   Future<String?> leaveCommunity(String communityId) async {
     try {
       await _remoteDataSource.leaveCommunity(communityId);

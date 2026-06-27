@@ -30,10 +30,12 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   @override
   void initState() {
     super.initState();
-    if (!widget.embeddedInShell) {
-      ref.read(homeNavigationProvider.notifier).setSelectedIndex(1);
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _joinSignalRGroups());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!widget.embeddedInShell) {
+        ref.read(homeNavigationProvider.notifier).setSelectedIndex(1);
+      }
+      _joinSignalRGroups();
+    });
   }
 
   Future<void> _joinSignalRGroups() async {
@@ -54,17 +56,17 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Future<void> _openDiscover() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CommunityDiscoverPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const CommunityDiscoverPage()));
     if (!mounted) return;
     ref.read(communitiesProvider.notifier).clearSearchResults();
   }
 
   void _openCreateCommunity() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CreateCommunityPage()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const CreateCommunityPage()));
   }
 
   @override
@@ -79,9 +81,9 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         LocationPendingBanner.show(
           context,
           onSetLocation: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const YourLocationPage()),
-            );
+            await Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const YourLocationPage()));
             if (!context.mounted) return;
             ref.read(communitiesProvider.notifier).onLocationShared();
           },
@@ -97,7 +99,8 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         children: [
           AppDashboardHeader(
             title: 'مجتمعي',
-            subtitle: '${communities.length} مجتمع${communities.length == 1 ? '' : 'ات'}',
+            subtitle:
+                '${communities.length} مجتمع${communities.length == 1 ? '' : 'ات'}',
             trailing: [
               Material(
                 color: context.semantic.textOnPrimary.withValues(alpha: 0.18),
@@ -226,7 +229,9 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
               selectedIndex: ref.watch(homeNavigationProvider),
               onTap: (index) {
                 if (index == 1) return;
-                ref.read(homeNavigationProvider.notifier).setSelectedIndex(index);
+                ref
+                    .read(homeNavigationProvider.notifier)
+                    .setSelectedIndex(index);
                 navigateFromBottomNav(context, ref, index);
               },
             ),
@@ -300,10 +305,7 @@ class _FeaturedJoinCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_left_rounded,
-                color: context.colors.primary,
-              ),
+              Icon(Icons.chevron_right_rounded, color: context.colors.primary),
             ],
           ),
         ),
@@ -368,10 +370,7 @@ class _DiscoverCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_left_rounded,
-              color: context.colors.primary,
-            ),
+            Icon(Icons.chevron_right_rounded, color: context.colors.primary),
           ],
         ),
       ),
@@ -461,9 +460,7 @@ class _CommunityCard extends StatelessWidget {
           color: hasActiveSos
               ? sosColor.withValues(alpha: 0.06)
               : Colors.transparent,
-          border: hasActiveSos
-              ? Border.all(color: sosColor, width: 2)
-              : null,
+          border: hasActiveSos ? Border.all(color: sosColor, width: 2) : null,
           boxShadow: hasActiveSos
               ? [
                   BoxShadow(
@@ -514,88 +511,88 @@ class _CommunityCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
-              textDirection: TextDirection.rtl,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        _colorFor(community.title, 0),
-                        _colorFor(community.title, 1),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    community.title.isNotEmpty
-                        ? community.title[0].toUpperCase()
-                        : '?',
-                    style: TextStyle(
-                      color: context.semantic.textOnPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textDirection: TextDirection.rtl,
                     children: [
-                      Row(
-                        textDirection: TextDirection.rtl,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              community.title,
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _colorFor(community.title, 0),
+                              _colorFor(community.title, 1),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          community.title.isNotEmpty
+                              ? community.title[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            color: context.semantic.textOnPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               textDirection: TextDirection.rtl,
-                              style: context.text.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    community.title,
+                                    textDirection: TextDirection.rtl,
+                                    style: context.text.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              '${community.memberCount} عضو',
+                              textDirection: TextDirection.rtl,
+                              style: context.text.bodySmall?.copyWith(
+                                color: semantic.textMuted,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        '${community.memberCount} عضو',
-                        textDirection: TextDirection.rtl,
-                        style: context.text.bodySmall?.copyWith(
-                          color: semantic.textMuted,
+                          ],
                         ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: semantic.textMuted.withValues(alpha: 0.5),
                       ),
                     ],
                   ),
-                ),
-                Icon(
-                  Icons.chevron_left_rounded,
-                  color: semantic.textMuted.withValues(alpha: 0.5),
-                ),
-              ],
-            ),
-            if (community.members.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              _MemberAvatarStack(
-                members: community.members,
-                memberCount: community.memberCount,
-              ),
-            ] else if (community.membersPreview.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                community.membersPreview,
-                textDirection: TextDirection.rtl,
-                style: context.text.labelSmall?.copyWith(
-                  color: semantic.textMuted.withValues(alpha: 0.7),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+                  if (community.members.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _MemberAvatarStack(
+                      members: community.members,
+                      memberCount: community.memberCount,
+                    ),
+                  ] else if (community.membersPreview.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      community.membersPreview,
+                      textDirection: TextDirection.rtl,
+                      style: context.text.labelSmall?.copyWith(
+                        color: semantic.textMuted.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -607,10 +604,7 @@ class _CommunityCard extends StatelessWidget {
 }
 
 class _MemberAvatarStack extends StatelessWidget {
-  const _MemberAvatarStack({
-    required this.members,
-    required this.memberCount,
-  });
+  const _MemberAvatarStack({required this.members, required this.memberCount});
 
   final List<CommunityMember> members;
   final int memberCount;
@@ -765,9 +759,10 @@ class _CommunityCardSkeletonState extends State<CommunityCardSkeleton>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _opacity = Tween<double>(begin: 0.35, end: 0.75).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _opacity = Tween<double>(
+      begin: 0.35,
+      end: 0.75,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -776,7 +771,11 @@ class _CommunityCardSkeletonState extends State<CommunityCardSkeleton>
     super.dispose();
   }
 
-  Widget _box({double width = double.infinity, double height = 14.0, double radius = 8}) {
+  Widget _box({
+    double width = double.infinity,
+    double height = 14.0,
+    double radius = 8,
+  }) {
     return AnimatedBuilder(
       animation: _opacity,
       builder: (context, _) => Opacity(

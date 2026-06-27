@@ -31,17 +31,17 @@ class IdVerificationIntroPage extends StatelessWidget {
                         _StepRow(
                           number: '1',
                           icon: Icons.credit_card_outlined,
-                          title: 'تصوير بطاقة الرقم القومي',
+                          title: 'صور بطاقة الرقم القومي',
                           description:
-                              'قم بتصوير الوجهين الأمامي والخلفي للبطاقة.',
+                              'التقط صورة أو اختر من المعرض للوجهين الأمامي والخلفي.',
                         ),
                         const SizedBox(height: AppSpacing.md),
                         _StepRow(
                           number: '2',
                           icon: Icons.face_retouching_natural_outlined,
-                          title: 'التقاط صورة شخصية',
+                          title: 'إضافة صورة شخصية',
                           description:
-                              'يُرجى التأكد من أن تكون الصورة واضحة ومناسبة',
+                              'التقط صورة أو اختر من المعرض مع إضاءة جيدة',
                         ),
                         const SizedBox(height: AppSpacing.md),
                         _StepRow(

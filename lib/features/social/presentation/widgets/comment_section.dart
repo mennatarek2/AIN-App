@@ -292,3 +292,57 @@ class _CommentShimmerCardState extends State<_CommentShimmerCard>
     );
   }
 }
+
+Future<void> showReportCommentsSheet(
+  BuildContext context, {
+  required String reportId,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+    ),
+    builder: (sheetContext) {
+      final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+
+      return Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.72,
+          minChildSize: 0.45,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: sheetContext.semantic.borderStrong,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.screenHorizontal,
+                      AppSpacing.md,
+                      AppSpacing.screenHorizontal,
+                      AppSpacing.xxl,
+                    ),
+                    child: CommentSection(reportId: reportId),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    },
+  );
+}

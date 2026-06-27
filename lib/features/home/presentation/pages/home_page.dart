@@ -263,6 +263,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         imageUrls.isNotEmpty ? imageUrls.first : report.imagePath;
 
     return ReportCard(
+      reportId: report.id,
       username: username,
       reporterAvatarUrl: report.reporter?.resolvedPhotoUrl,
       timeAgo: report.submittedAgo,
@@ -275,6 +276,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       locationPreview: report.displayLocation,
       locationMapUrl: report.mapsUrl,
       statusColor: report.statusColor,
+      statusLabel: report.statusLabel,
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(

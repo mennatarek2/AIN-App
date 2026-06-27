@@ -10,6 +10,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/widgets/app_layout_primitives.dart';
 import '../../../../core/widgets/app_page_header.dart';
+import '../../../../core/widgets/image_source_picker_sheet.dart';
 import '../../data/attachment_store.dart';
 import '../notifiers/id_verification_notifier.dart';
 import '../state/form_state_simple.dart' as auth_form;
@@ -25,11 +26,12 @@ class _SelfieCapturePageState extends ConsumerState<SelfieCapturePage> {
   final ImagePicker _picker = ImagePicker();
   String? _selfiePath;
 
-  Future<void> _captureSelfie() async {
-    final XFile? file = await _picker.pickImage(
-      source: ImageSource.camera,
+  Future<void> _pickSelfie() async {
+    final XFile? file = await pickImageWithSourceChoice(
+      context,
+      _picker,
+      title: 'الصورة الشخصية',
       preferredCameraDevice: CameraDevice.front,
-      imageQuality: 85,
     );
     if (file != null) {
       setState(() {
@@ -106,13 +108,13 @@ class _SelfieCapturePageState extends ConsumerState<SelfieCapturePage> {
                 child: Transform.translate(
                   offset: const Offset(0, -AppSpacing.md),
                   child: AppFormCard(
-                    title: 'التقط صورتك الشخصية',
-                    subtitle: 'انظر مباشرة إلى الكاميرا مع إضاءة جيدة',
+                    title: 'أضف صورتك الشخصية',
+                    subtitle: 'التقط صورة أو اختر من المعرض مع إضاءة جيدة',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         GestureDetector(
-                          onTap: _captureSelfie,
+                          onTap: _pickSelfie,
                           child: Container(
                             height: 260,
                             decoration: BoxDecoration(
@@ -153,7 +155,7 @@ class _SelfieCapturePageState extends ConsumerState<SelfieCapturePage> {
                                       ),
                                       const SizedBox(height: AppSpacing.md),
                                       Text(
-                                        'اضغط لالتقاط الصورة',
+                                        'اضغط لإضافة الصورة',
                                         style: context.text.bodyMedium
                                             ?.copyWith(
                                           color: context.semantic.textMuted,
@@ -185,12 +187,12 @@ class _SelfieCapturePageState extends ConsumerState<SelfieCapturePage> {
                                         ),
                                         const SizedBox(height: AppSpacing.sm),
                                         TextButton.icon(
-                                          onPressed: _captureSelfie,
+                                          onPressed: _pickSelfie,
                                           icon: const Icon(
                                             Icons.refresh_rounded,
                                             size: 18,
                                           ),
-                                          label: const Text('إعادة التقاط'),
+                                          label: const Text('تغيير الصورة'),
                                         ),
                                       ],
                                     ),

@@ -11,14 +11,16 @@ class LikeResultModel {
 
   factory LikeResultModel.fromJson(Map<String, dynamic> json) {
     final likes = _parseInt(
-      json['totalLikes'] ??
+      json['likeCount'] ??
+          json['totalLikes'] ??
           json['likesCount'] ??
           json['count'] ??
           json['likes'] ??
           0,
     );
     final isLiked = _parseBool(
-      json['isLikedByCaller'] ??
+      json['isLikedByCurrentUser'] ??
+          json['isLikedByCaller'] ??
           json['isLikedByCalller'] ??
           json['isLiked'] ??
           json['likedByMe'] ??
