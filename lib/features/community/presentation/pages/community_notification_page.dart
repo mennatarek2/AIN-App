@@ -23,9 +23,7 @@ class CommunityNotificationPage extends ConsumerWidget {
     final items = ref
         .watch(notificationsProvider)
         .items
-        .where(
-          (item) => NotificationsState.typeFor(item) == NotificationType.sos,
-        )
+        .where((item) => item.type.isSos)
         .toList();
 
     return Scaffold(

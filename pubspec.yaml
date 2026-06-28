@@ -48,7 +48,7 @@ dependencies:
   geocoding: ^4.0.0
   connectivity_plus: ^6.1.5
   cached_network_image: ^3.4.1
-  flutter_local_notifications: ^17.2.4
+  flutter_local_notifications: ^18.0.1
   http: ^1.2.2
   url_launcher: ^6.3.0
   share_plus: ^10.0.0

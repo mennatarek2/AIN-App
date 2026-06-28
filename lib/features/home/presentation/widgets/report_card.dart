@@ -9,6 +9,7 @@ import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/widgets/cached_app_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../social/presentation/providers/social_providers.dart';
+import '../../../social/presentation/utils/social_api_error.dart';
 import '../../../social/presentation/widgets/comment_section.dart';
 
 class ReportCard extends ConsumerStatefulWidget {
@@ -102,9 +103,21 @@ class _ReportCardState extends ConsumerState<ReportCard> {
       return;
     }
 
-    await ref
-        .read(reportLikeNotifierProvider(widget.reportId).notifier)
-        .toggle();
+    try {
+      await ref
+          .read(reportLikeNotifierProvider(widget.reportId).notifier)
+          .toggle();
+    } catch (e) {
+      if (!mounted) return;
+      if (!handleSocialApiError(context, e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(socialApiFallbackMessage(e)),
+            backgroundColor: context.semantic.error,
+          ),
+        );
+      }
+    }
   }
 
   void _handleComment() {

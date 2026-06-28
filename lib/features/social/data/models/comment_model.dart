@@ -75,9 +75,15 @@ class CommentModel {
           ) ??
           DateTime.now(),
       isDeleted: _parseBool(json['isDeleted'] ?? json['deleted'] ?? false),
-      totalLikes: _parseInt(json['totalLikes'] ?? json['likesCount'] ?? 0),
+      totalLikes: _parseInt(
+        json['likeCount'] ??
+            json['totalLikes'] ??
+            json['likesCount'] ??
+            0,
+      ),
       isLikedByCaller: _parseBool(
-        json['isLikedByCaller'] ??
+        json['isLikedByCurrentUser'] ??
+            json['isLikedByCaller'] ??
             json['isLikedByCalller'] ??
             json['isLiked'] ??
             false,

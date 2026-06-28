@@ -27,7 +27,7 @@ class ProfilePage extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final trustAsync = ref.watch(myTrustProvider);
     final trust = trustAsync.valueOrNull;
-    final badge = TrustBadge.fromString(trust?.badge ?? profile?.badge);
+    final badge = TrustBadge.fromString(trust?.tierName ?? profile?.badge);
     final photoUrl = ref.watch(profilePhotoUrlProvider);
 
     return Scaffold(

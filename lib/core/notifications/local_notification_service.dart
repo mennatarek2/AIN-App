@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 
+import 'notification_payload_codec.dart';
 import 'push_notification_service.dart';
 
 // ─── Global navigator key ─────────────────────────────────────────────────────
@@ -83,15 +84,9 @@ class LocalNotificationService implements PushNotificationService {
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return;
 
-    final nav = appNavigatorKey.currentState;
-    if (nav == null) return;
+    if (payload.startsWith('sos:')) return;
 
-    if (payload.startsWith('sos:')) {
-      nav.pushNamed('/sos');
-    } else if (payload.startsWith('report:')) {
-      final reportId = payload.substring(7);
-      nav.pushNamed('/report', arguments: reportId);
-    }
+    NotificationPayloadCodec.route(payload);
   }
 
   // ── Permissions ───────────────────────────────────────────────────────────

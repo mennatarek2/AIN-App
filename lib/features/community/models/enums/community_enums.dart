@@ -61,7 +61,7 @@ extension CommunityRoleX on CommunityRole {
 extension MemberStatusX on MemberStatus {
   static MemberStatus fromInt(int v) {
     if (v < 0 || v >= MemberStatus.values.length) {
-      return MemberStatus.locationPending;
+      return MemberStatus.inactive;
     }
     return MemberStatus.values[v];
   }
@@ -70,7 +70,7 @@ extension MemberStatusX on MemberStatus {
     'active' => MemberStatus.active,
     'locationpending' => MemberStatus.locationPending,
     'inactive' => MemberStatus.inactive,
-    _ => MemberStatus.locationPending,
+    _ => MemberStatus.inactive,
   };
 }
 

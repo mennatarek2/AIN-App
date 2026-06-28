@@ -46,7 +46,7 @@ class ReportLikeNotifier
     return ref.read(socialRepositoryProvider).getReportLikes(reportId);
   }
 
-  Future<void> toggle() async {
+  Future<bool> toggle() async {
     final previous = state.valueOrNull;
     final optimistic = previous ??
         const LikeResult(totalLikes: 0, isLikedByCaller: false);
@@ -65,7 +65,8 @@ class ReportLikeNotifier
           .read(socialRepositoryProvider)
           .toggleReportLike(arg);
       state = AsyncData(result);
-    } catch (_) {
+      return true;
+    } catch (e) {
       if (previous != null) {
         state = AsyncData(previous);
       } else {
@@ -73,6 +74,7 @@ class ReportLikeNotifier
           LikeResult(totalLikes: 0, isLikedByCaller: false),
         );
       }
+      rethrow;
     }
   }
 }
@@ -91,7 +93,7 @@ class CommentLikeNotifier
     return const CommentLikeResult(totalLikes: 0, isLikedByCaller: false);
   }
 
-  Future<void> toggle(int initialLikes, bool initialLiked) async {
+  Future<bool> toggle(int initialLikes, bool initialLiked) async {
     final current = state.valueOrNull ??
         CommentLikeResult(
           totalLikes: initialLikes,
@@ -112,8 +114,10 @@ class CommentLikeNotifier
           .read(socialRepositoryProvider)
           .toggleCommentLike(arg);
       state = AsyncData(result);
-    } catch (_) {
+      return true;
+    } catch (e) {
       state = AsyncData(current);
+      rethrow;
     }
   }
 }
@@ -150,17 +154,25 @@ UserTrust _fallbackTrust(Ref ref) {
   final points = profile?.points ?? 0;
   return UserTrust(
     userId: profile?.id ?? '',
-    displayName: profile?.name ?? '',
-    trustPoints: points,
-    badge: _badgeFromPoints(points),
+    score: points,
+    tierName: _tierNameFromPoints(points),
+    tierNameAr: _tierNameArFromPoints(points),
     totalReports: 0,
     resolvedReports: 0,
+    totalLikesReceived: 0,
   );
 }
 
-String _badgeFromPoints(int points) {
+String _tierNameFromPoints(int points) {
   if (points >= 100) return 'Guardian';
   if (points >= 50) return 'Trusted';
   if (points >= 20) return 'Contributor';
   return 'Newcomer';
+}
+
+String _tierNameArFromPoints(int points) {
+  if (points >= 100) return 'حارس';
+  if (points >= 50) return 'موثوق';
+  if (points >= 20) return 'مساهم';
+  return 'مبتدئ';
 }

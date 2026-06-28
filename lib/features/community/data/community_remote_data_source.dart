@@ -50,9 +50,9 @@ class LocationDto {
   final double longitude;
 
   factory LocationDto.fromJson(Map<String, dynamic> json) => LocationDto(
-        latitude: _toDouble(json['latitude']),
-        longitude: _toDouble(json['longitude']),
-      );
+    latitude: _toDouble(json['latitude']),
+    longitude: _toDouble(json['longitude']),
+  );
 
   static double _toDouble(dynamic v) {
     if (v is double) return v;
@@ -83,18 +83,19 @@ class UserDetailsDto {
   bool get hasLocation => userLocation != null;
 
   factory UserDetailsDto.fromJson(Map<String, dynamic> json) => UserDetailsDto(
-        usrId: json['usrId']?.toString() ?? '',
-        userName: json['userName']?.toString() ?? '',
-        role: json['role']?.toString() ?? 'Member',
-        userLocation: json['userLocation'] != null
-            ? LocationDto.fromJson(
-                Map<String, dynamic>.from(json['userLocation'] as Map))
-            : null,
-        lastLocationUpdatedAt:
-            DateTime.tryParse(json['lastLocationUpdatedAt']?.toString() ?? '') ??
-                DateTime(1),
-        memberStatus: memberStatusFromJson(json['memberStatus']),
-      );
+    usrId: json['usrId']?.toString() ?? '',
+    userName: json['userName']?.toString() ?? '',
+    role: json['role']?.toString() ?? 'Member',
+    userLocation: json['userLocation'] != null
+        ? LocationDto.fromJson(
+            Map<String, dynamic>.from(json['userLocation'] as Map),
+          )
+        : null,
+    lastLocationUpdatedAt:
+        DateTime.tryParse(json['lastLocationUpdatedAt']?.toString() ?? '') ??
+        DateTime(1),
+    memberStatus: memberStatusFromJson(json['memberStatus']),
+  );
 }
 
 // ─── Create Community Response ────────────────────────────────────────────────
@@ -141,7 +142,8 @@ class CreateCommunityResponseDto {
             : null,
         createdById: json['createdById']?.toString() ?? '',
         userName: json['userName']?.toString() ?? '',
-        createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+        createdAt:
+            DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
             DateTime.now(),
         inviteCode: json['inviteCode']?.toString(),
         inviteCodeExpiresAt: json['inviteCodeExpiresAt'] != null
@@ -149,7 +151,8 @@ class CreateCommunityResponseDto {
             : null,
         userDetails: json['userDetails'] != null
             ? UserDetailsDto.fromJson(
-                Map<String, dynamic>.from(json['userDetails'] as Map))
+                Map<String, dynamic>.from(json['userDetails'] as Map),
+              )
             : UserDetailsDto(
                 usrId: '',
                 userName: '',
@@ -209,7 +212,8 @@ class RegenerateCodeResultDto {
   factory RegenerateCodeResultDto.fromJson(Map<String, dynamic> json) =>
       RegenerateCodeResultDto(
         communityId: json['communityId']?.toString() ?? '',
-        inviteCode: json['newInviteCode']?.toString() ??
+        inviteCode:
+            json['newInviteCode']?.toString() ??
             json['inviteCode']?.toString() ??
             '',
         inviteCodeExpiresAt: json['inviteCodeExpiresAt'] != null
@@ -297,8 +301,10 @@ class CommunityApiModel {
     if (raw is! List) return const [];
     return raw
         .whereType<Map>()
-        .map((m) =>
-            CommunityMemberApiModel.fromApiJson(Map<String, dynamic>.from(m)))
+        .map(
+          (m) =>
+              CommunityMemberApiModel.fromApiJson(Map<String, dynamic>.from(m)),
+        )
         .toList();
   }
 }
@@ -319,18 +325,21 @@ class CommunityMemberApiModel {
   final LocationDto? userLocation;
 
   factory CommunityMemberApiModel.fromApiJson(Map<String, dynamic> json) {
-    final id = json['usrId']?.toString() ??
+    final id =
+        json['usrId']?.toString() ??
         json['id']?.toString() ??
         json['userId']?.toString() ??
         '';
-    final userName = json['userName']?.toString() ??
+    final userName =
+        json['userName']?.toString() ??
         json['displayName']?.toString() ??
         json['name']?.toString() ??
         '';
     final email = json['email']?.toString() ?? '';
     final location = json['userLocation'] != null
         ? LocationDto.fromJson(
-            Map<String, dynamic>.from(json['userLocation'] as Map))
+            Map<String, dynamic>.from(json['userLocation'] as Map),
+          )
         : null;
     return CommunityMemberApiModel(
       id: id,
@@ -389,16 +398,23 @@ class CommunityRemoteDataSource {
 
   Future<List<CommunityApiModel>> fetchAllCommunities() async {
     final token = await _requiredToken();
-    final response = await _client.getJson(ApiEndpoints.community, token: token);
-    debugPrint('[Community] fetchAllCommunities response type: ${response.runtimeType}');
+    final response = await _client.getJson(
+      ApiEndpoints.community,
+      token: token,
+    );
+    debugPrint(
+      '[Community] fetchAllCommunities response type: ${response.runtimeType}',
+    );
 
     final List<dynamic> rawList = _normalizeToList(response);
     if (rawList.isEmpty) return const [];
 
     return rawList
         .whereType<Map>()
-        .map((item) =>
-            CommunityApiModel.fromApiJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) =>
+              CommunityApiModel.fromApiJson(Map<String, dynamic>.from(item)),
+        )
         .where((item) => item.id.isNotEmpty && item.name.isNotEmpty)
         .toList();
   }
@@ -454,7 +470,8 @@ class CommunityRemoteDataSource {
       token: token,
       body: {'inviteCode': code.trim().toUpperCase()},
     );
-    final map = _extractMap(response) ??
+    final map =
+        _extractMap(response) ??
         (response is Map ? Map<String, dynamic>.from(response) : null);
     if (map == null) throw Exception('Invalid join response');
     return CommunityJoinResultDto.fromJson(map);
@@ -469,7 +486,8 @@ class CommunityRemoteDataSource {
       token: token,
       body: {},
     );
-    final map = _extractMap(response) ??
+    final map =
+        _extractMap(response) ??
         (response is Map ? Map<String, dynamic>.from(response) : null);
     if (map == null) throw Exception('Invalid join-request response');
     return CommunityJoinResultDto.fromJson(map);
@@ -487,8 +505,9 @@ class CommunityRemoteDataSource {
     if (list == null) return const [];
     return list
         .whereType<Map>()
-        .map((item) =>
-            MemberDetailDto.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) => MemberDetailDto.fromJson(Map<String, dynamic>.from(item)),
+        )
         .where((item) => item.userId.isNotEmpty)
         .toList();
   }
@@ -505,8 +524,7 @@ class CommunityRemoteDataSource {
     if (list == null) return const [];
     return list
         .whereType<Map>()
-        .map((item) =>
-            JoinRequestDto.fromJson(Map<String, dynamic>.from(item)))
+        .map((item) => JoinRequestDto.fromJson(Map<String, dynamic>.from(item)))
         .where((item) => item.userId.isNotEmpty)
         .toList();
   }
@@ -574,7 +592,8 @@ class CommunityRemoteDataSource {
       token: token,
       body: {},
     );
-    final map = _extractMap(response) ??
+    final map =
+        _extractMap(response) ??
         (response is Map ? Map<String, dynamic>.from(response) : null);
     if (map == null) throw Exception('Invalid regenerate-code response');
     return RegenerateCodeResultDto.fromJson(map);
@@ -614,8 +633,10 @@ class CommunityRemoteDataSource {
     if (list == null) return const [];
     return list
         .whereType<Map>()
-        .map((item) =>
-            CommunitySearchResult.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) =>
+              CommunitySearchResult.fromJson(Map<String, dynamic>.from(item)),
+        )
         .where((item) => item.id.isNotEmpty)
         .toList();
   }
@@ -637,8 +658,10 @@ class CommunityRemoteDataSource {
     if (list == null) return const [];
     return list
         .whereType<Map>()
-        .map((item) =>
-            NearbyCommunityDto.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) =>
+              NearbyCommunityDto.fromJson(Map<String, dynamic>.from(item)),
+        )
         .where((item) => item.id.isNotEmpty)
         .toList();
   }
@@ -669,8 +692,11 @@ class CommunityRemoteDataSource {
     if (list == null) return const [];
     return list
         .whereType<Map>()
-        .map((item) =>
-            CommunityMemberApiModel.fromApiJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) => CommunityMemberApiModel.fromApiJson(
+            Map<String, dynamic>.from(item),
+          ),
+        )
         .toList();
   }
 
@@ -692,8 +718,9 @@ class CommunityRemoteDataSource {
     if (list == null) return const [];
     return list
         .whereType<Map>()
-        .map((item) =>
-            SosHistoryItem.fromApiJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) => SosHistoryItem.fromApiJson(Map<String, dynamic>.from(item)),
+        )
         .where((item) => item.id.isNotEmpty)
         .toList();
   }
@@ -719,7 +746,8 @@ class CommunityRemoteDataSource {
   List<dynamic>? _extractList(dynamic payload) {
     if (payload is List) return payload;
     if (payload is Map) {
-      final candidate = payload['data'] ?? payload['items'] ?? payload['result'];
+      final candidate =
+          payload['data'] ?? payload['items'] ?? payload['result'];
       if (candidate is List) return candidate;
       for (final value in payload.values) {
         final nested = _extractList(value);

@@ -3,14 +3,17 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'local_notification_service.dart';
+import '../../features/notifications/data/models/notification_model.dart';
+import 'notification_channels.dart';
+import 'notification_payload_codec.dart';
+import 'pending_notification_launch.dart';
 import 'push_notification_service.dart';
 
-/// Top-level background handler — must be a top-level function.
+/// Top-level background handler — required by Firebase.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  debugPrint('[FCM] Background message: ${message.messageId}');
+  // Notification payload messages are shown automatically in the system tray.
 }
 
 class FcmNotificationService implements PushNotificationService {
@@ -22,20 +25,13 @@ class FcmNotificationService implements PushNotificationService {
 
   bool _isInitialized = false;
   bool _firebaseAvailable = false;
+  final Set<String> _recentBannerIds = {};
 
-  /// Called when a foreground/background message should refresh the inbox.
+  /// When true, SignalR handles foreground delivery — skip FCM local banners.
+  bool Function()? isRealtimeConnected;
+
   VoidCallback? onMessageReceived;
-
-  /// Called when FCM rotates the device token.
   Future<void> Function(String token)? onTokenRefresh;
-
-  static const AndroidNotificationChannel _defaultChannel =
-      AndroidNotificationChannel(
-        'fcm_default',
-        'General Notifications',
-        description: 'Push notifications from Ai-N',
-        importance: Importance.high,
-      );
 
   @override
   Future<void> initialize() async {
@@ -51,8 +47,6 @@ class FcmNotificationService implements PushNotificationService {
       return;
     }
 
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();
     await _localPlugin.initialize(
@@ -60,21 +54,25 @@ class FcmNotificationService implements PushNotificationService {
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
 
-    final androidImpl = _localPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-    await androidImpl?.createNotificationChannel(_defaultChannel);
-
+    await createNotificationChannels();
     await requestPermissions();
+
+    final token = await getDeviceToken();
+    if (token != null) {
+      onTokenRefresh?.call(token);
+    }
+
+    _messaging.onTokenRefresh.listen((token) {
+      onTokenRefresh?.call(token);
+    });
 
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
 
-    _messaging.onTokenRefresh.listen((token) {
-      onTokenRefresh?.call(token);
-      onMessageReceived?.call();
-    });
+    final initial = await _messaging.getInitialMessage();
+    if (initial != null) {
+      PendingNotificationLaunch.store(initial);
+    }
 
     _isInitialized = true;
   }
@@ -92,11 +90,12 @@ class FcmNotificationService implements PushNotificationService {
   Future<void> requestPermissions() async {
     if (!_firebaseAvailable) return;
 
-    await _messaging.requestPermission(
+    final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
+    if (settings.authorizationStatus == AuthorizationStatus.denied) return;
 
     final androidImpl = _localPlugin
         .resolvePlatformSpecificImplementation<
@@ -135,7 +134,7 @@ class FcmNotificationService implements PushNotificationService {
     await showLocalNotification(
       title: title,
       body: body,
-      payload: reportId != null ? 'report:$reportId' : null,
+      payload: reportId != null ? '/reports/$reportId' : null,
     );
   }
 
@@ -143,74 +142,94 @@ class FcmNotificationService implements PushNotificationService {
     required String title,
     required String body,
     String? payload,
+    int priority = 1,
+    String? notificationId,
   }) async {
+    if (notificationId != null && _recentBannerIds.contains(notificationId)) {
+      return;
+    }
+
     await initialize();
 
-    const androidDetails = AndroidNotificationDetails(
-      'fcm_default',
-      'General Notifications',
-      importance: Importance.high,
-      priority: Priority.high,
+    final channelId = channelIdForPriority(priority);
+    final isCritical = priority >= 3;
+    final isHigh = priority >= 2;
+
+    final androidDetails = AndroidNotificationDetails(
+      channelId,
+      channelNameForId(channelId),
+      importance: isCritical ? Importance.max : Importance.high,
+      priority: isCritical ? Priority.max : Priority.high,
+      playSound: true,
+      enableVibration: isHigh,
     );
-    const iosDetails = DarwinNotificationDetails();
-    const details = NotificationDetails(
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
 
-    await _localPlugin.show(
-      DateTime.now().microsecondsSinceEpoch.remainder(100000),
-      title,
-      body,
-      details,
-      payload: payload,
+    final showId = notificationId != null
+        ? notificationId.hashCode.abs() % 2147483647
+        : DateTime.now().microsecondsSinceEpoch.remainder(100000);
+
+    await _localPlugin.show(showId, title, body, details, payload: payload);
+
+    if (notificationId != null) {
+      _recentBannerIds.add(notificationId);
+      Future<void>.delayed(const Duration(seconds: 30), () {
+        _recentBannerIds.remove(notificationId);
+      });
+    }
+  }
+
+  Future<void> showLocalFromModel(NotificationModel notification) async {
+    await showLocalNotification(
+      title: notification.title,
+      body: notification.body,
+      payload: NotificationPayloadCodec.fromModel(notification),
+      priority: notification.priority,
+      notificationId: notification.id,
     );
   }
 
   void _onForegroundMessage(RemoteMessage message) {
-    final notification = message.notification;
-    if (notification != null) {
-      showLocalNotification(
-        title: notification.title ?? 'إشعار جديد',
-        body: notification.body ?? '',
-        payload: _payloadFromData(message.data),
-      );
+    final realtimeActive = isRealtimeConnected?.call() ?? false;
+
+    if (!realtimeActive) {
+      final notification = message.notification;
+      final priority =
+          int.tryParse(message.data['priority']?.toString() ?? '') ?? 1;
+      final id = message.data['id']?.toString();
+
+      if (notification != null) {
+        showLocalNotification(
+          title: notification.title ?? 'إشعار جديد',
+          body: notification.body ?? '',
+          payload: NotificationPayloadCodec.fromData(message.data),
+          priority: priority,
+          notificationId: id,
+        );
+      }
     }
+
     onMessageReceived?.call();
   }
 
   void _onMessageOpenedApp(RemoteMessage message) {
-    _navigateFromPayload(_payloadFromData(message.data));
+    _handleTap(message);
     onMessageReceived?.call();
   }
 
   void _onLocalNotificationTap(NotificationResponse response) {
-    _navigateFromPayload(response.payload);
+    NotificationPayloadCodec.route(response.payload);
   }
 
-  String? _payloadFromData(Map<String, dynamic> data) {
-    if (data.containsKey('reportId')) {
-      return 'report:${data['reportId']}';
-    }
-    if (data.containsKey('sosId')) {
-      return 'sos:${data['sosId']}';
-    }
-    return null;
-  }
-
-  void _navigateFromPayload(String? payload) {
-    if (payload == null || payload.isEmpty) return;
-
-    final navigator = appNavigatorKey.currentState;
-    if (navigator == null) return;
-
-    if (payload.startsWith('report:')) {
-      final reportId = payload.substring('report:'.length);
-      if (reportId.isNotEmpty) {
-        navigator.pushNamed('/report', arguments: reportId);
-      }
-    } else if (payload.startsWith('sos:')) {
-      navigator.pushNamed('/sos');
-    }
+  void _handleTap(RemoteMessage message) {
+    NotificationPayloadCodec.route(NotificationPayloadCodec.fromData(message.data));
   }
 }

@@ -76,6 +76,7 @@ class _MemberDetailsPageState extends ConsumerState<MemberDetailsPage> {
   }
 
   String get _lastSeenText {
+    if (!_member.hasLocation) return '';
     final updated = _member.lastLocationUpdatedAt;
     if (updated == null) return 'منذ قليل';
     return 'آخر تحديث ${updated.toLocal()}'.split('.').first;
@@ -297,7 +298,9 @@ class _MemberDetailsPageState extends ConsumerState<MemberDetailsPage> {
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Text(
-                            '$_lastLocationText — $_lastSeenText',
+                            _member.hasLocation
+                                ? '$_lastLocationText — $_lastSeenText'
+                                : _lastLocationText,
                             textDirection: TextDirection.rtl,
                             style: context.text.bodyMedium?.copyWith(
                               color: context.semantic.textMuted,

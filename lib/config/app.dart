@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/local_notification_service.dart';
+import '../core/notifications/pending_notification_launch.dart';
 import '../core/notifications/notification_bootstrap.dart';
 import '../core/realtime/signalr_bridge.dart';
 import '../core/theme/app_theme.dart';
@@ -33,6 +34,7 @@ import '../features/profile/presentation/pages/profile_page.dart';
 import '../features/profile/presentation/pages/edit_password_page.dart';
 import '../features/reports/presentation/pages/report_detail_page.dart';
 import '../features/reports/presentation/providers/report_sync_provider.dart';
+import '../features/notifications/presentation/providers/notifications_provider.dart';
 import '../features/sos/presentation/pages/sos_page.dart';
 import '../features/splash/presentation/pages/splash_page.dart';
 import 'routes/app_routes.dart';
@@ -51,7 +53,16 @@ class _AppState extends ConsumerState<App> {
     // If already authenticated on cold start, connect SignalR.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeBootstrapSignalR();
+      PendingNotificationLaunch.handleIfNeeded();
+      _refreshNotificationsAfterLaunch();
     });
+  }
+
+  Future<void> _refreshNotificationsAfterLaunch() async {
+    final authState = ref.read(authNotifierProvider);
+    if (authState is AuthAuthenticated) {
+      await ref.read(notificationsProvider.notifier).refreshUnreadCount();
+    }
   }
 
   Future<void> _maybeBootstrapSignalR() async {

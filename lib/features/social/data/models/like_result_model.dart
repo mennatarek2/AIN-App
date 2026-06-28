@@ -60,14 +60,16 @@ class CommentLikeResultModel {
   factory CommentLikeResultModel.fromJson(Map<String, dynamic> json) {
     return CommentLikeResultModel(
       totalLikes: LikeResultModel._parseInt(
-        json['totalLikes'] ??
+        json['likeCount'] ??
+            json['totalLikes'] ??
             json['likesCount'] ??
             json['count'] ??
             json['likes'] ??
             0,
       ),
       isLikedByCaller: LikeResultModel._parseBool(
-        json['isLikedByCaller'] ??
+        json['isLikedByCurrentUser'] ??
+            json['isLikedByCaller'] ??
             json['isLikedByCalller'] ??
             json['isLiked'] ??
             json['likedByMe'] ??

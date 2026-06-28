@@ -9,6 +9,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../domain/entities/report_comment.dart';
 import '../providers/social_providers.dart';
+import '../utils/social_api_error.dart';
 
 class CommentTile extends ConsumerStatefulWidget {
   const CommentTile({
@@ -70,12 +71,14 @@ class _CommentTileState extends ConsumerState<CommentTile> {
       ref.invalidate(reportCommentsProvider(widget.reportId));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر حذف التعليق: $e'),
-          backgroundColor: context.semantic.error,
-        ),
-      );
+      if (!handleSocialApiError(context, e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر حذف التعليق: ${socialApiFallbackMessage(e)}'),
+            backgroundColor: context.semantic.error,
+          ),
+        );
+      }
     }
   }
 
@@ -94,12 +97,14 @@ class _CommentTileState extends ConsumerState<CommentTile> {
       if (mounted) setState(() => _showReplyField = false);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر إرسال الرد: $e'),
-          backgroundColor: context.semantic.error,
-        ),
-      );
+      if (!handleSocialApiError(context, e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر إرسال الرد: ${socialApiFallbackMessage(e)}'),
+            backgroundColor: context.semantic.error,
+          ),
+        );
+      }
     }
   }
 
@@ -108,6 +113,8 @@ class _CommentTileState extends ConsumerState<CommentTile> {
     final comment = widget.comment;
     final isOwn =
         _currentUserId != null && comment.authorId == _currentUserId;
+    final isHiddenIdentity =
+        comment.authorName == 'مستخدم' || comment.authorId.isEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -116,7 +123,10 @@ class _CommentTileState extends ConsumerState<CommentTile> {
           crossAxisAlignment: CrossAxisAlignment.start,
           textDirection: TextDirection.rtl,
           children: [
-            _CommentAvatar(photoUrl: comment.authorPhoto, size: 36),
+            _CommentAvatar(
+              photoUrl: isHiddenIdentity ? null : comment.authorPhoto,
+              size: 36,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
@@ -145,7 +155,7 @@ class _CommentTileState extends ConsumerState<CommentTile> {
                   const SizedBox(height: AppSpacing.xxs),
                   if (comment.isDeleted)
                     Text(
-                      '[تم حذف هذا التعليق]',
+                      comment.content,
                       textDirection: TextDirection.rtl,
                       style: context.text.bodyMedium?.copyWith(
                         color: context.semantic.textMuted,
@@ -168,23 +178,24 @@ class _CommentTileState extends ConsumerState<CommentTile> {
                           initialLikes: comment.totalLikes,
                           initialLiked: comment.isLikedByCaller,
                         ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _showReplyField = !_showReplyField;
-                              if (_showReplyField &&
-                                  _replyController.text.isEmpty) {
-                                _replyController.text =
-                                    '@${comment.authorName} ';
-                              }
-                            });
-                          },
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
+                        if (widget.isTopLevel)
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _showReplyField = !_showReplyField;
+                                if (_showReplyField &&
+                                    _replyController.text.isEmpty) {
+                                  _replyController.text =
+                                      '@${comment.authorName} ';
+                                }
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text('رد'),
                           ),
-                          child: const Text('رد'),
-                        ),
                         if (isOwn)
                           TextButton(
                             onPressed: _confirmDelete,
@@ -314,9 +325,23 @@ class _CommentLikeButton extends ConsumerWidget {
 
     return InkWell(
       onTap: isAuthenticated
-          ? () => ref
-                .read(commentLikeNotifierProvider(commentId).notifier)
-                .toggle(initialLikes, initialLiked)
+          ? () async {
+              try {
+                await ref
+                    .read(commentLikeNotifierProvider(commentId).notifier)
+                    .toggle(initialLikes, initialLiked);
+              } catch (e) {
+                if (!context.mounted) return;
+                if (!handleSocialApiError(context, e)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(socialApiFallbackMessage(e)),
+                      backgroundColor: context.semantic.error,
+                    ),
+                  );
+                }
+              }
+            }
           : () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "705448515301",
-    "project_id": "ain-d919e",
-    "storage_bucket": "ain-d919e.firebasestorage.app"
+    "project_number": "507264428808",
+    "project_id": "ain-app-20a34",
+    "storage_bucket": "ain-app-20a34.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:705448515301:android:f057aba99085951c17260c",
+        "mobilesdk_app_id": "1:507264428808:android:10991b423c63aa205e5abd",
         "android_client_info": {
           "package_name": "com.example.ain_graduation_project"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyA-fRs4H1evKJnoCoj9nUtY2-nETzadsRg"
+          "current_key": "AIzaSyBWPWJtsA9jAM4JsAN0FsQ951kYwkm2eg4"
         }
       ],
       "services": {

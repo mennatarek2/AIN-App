@@ -32,9 +32,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
   }
 
   Future<void> _navigateToLocationSetup() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const YourLocationPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const YourLocationPage()));
     if (!mounted) return;
     ref.read(communitiesProvider.notifier).onLocationShared();
   }

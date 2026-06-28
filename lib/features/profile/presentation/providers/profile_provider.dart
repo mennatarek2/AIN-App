@@ -58,22 +58,30 @@ enum TrustBadge {
     TrustBadge.guardian    => const Color(0xFFF59E0B),
   };
 
-  /// Progress within current tier [0.0 – 1.0]
+  /// Progress toward the next tier [0.0 – 1.0] per backend contract.
   double progressFor(int points) {
-    return switch (this) {
-      TrustBadge.newcomer    => (points.clamp(0, 19) / 19).toDouble(),
-      TrustBadge.contributor => ((points - 20).clamp(0, 29) / 29).toDouble(),
-      TrustBadge.trusted     => ((points - 50).clamp(0, 49) / 49).toDouble(),
-      TrustBadge.guardian    => 1.0,
+    if (points >= 100) return 1.0;
+
+    final (currentMin, nextThreshold) = switch (points) {
+      >= 50 => (50, 100),
+      >= 20 => (20, 50),
+      _ => (0, 20),
     };
+
+    return (points - currentMin) / (nextThreshold - currentMin);
   }
 
-  int pointsToNext(int points) => switch (this) {
-    TrustBadge.newcomer    => (20 - points).clamp(0, 20),
-    TrustBadge.contributor => (50 - points).clamp(0, 50),
-    TrustBadge.trusted     => (100 - points).clamp(0, 100),
-    TrustBadge.guardian    => 0,
-  };
+  int pointsToNext(int points) {
+    if (points >= 100) return 0;
+
+    final nextThreshold = switch (points) {
+      >= 50 => 100,
+      >= 20 => 50,
+      _ => 20,
+    };
+
+    return nextThreshold - points;
+  }
 }
 
 // ─── TrustInfo (from GET /api/social/me/trust) ───────────────────────────────

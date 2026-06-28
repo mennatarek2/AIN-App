@@ -1,44 +1,51 @@
 class UserTrust {
   const UserTrust({
     required this.userId,
-    required this.displayName,
-    required this.trustPoints,
-    required this.badge,
-    required this.totalReports,
-    required this.resolvedReports,
-    this.phoneNumber,
-    this.email,
+    this.score,
+    required this.tierName,
+    required this.tierNameAr,
+    this.totalReports,
+    this.resolvedReports,
+    this.rejectedReports,
+    this.totalLikesReceived,
   });
 
   final String userId;
-  final String displayName;
-  final int trustPoints;
-  /// "Newcomer" | "Contributor" | "Trusted" | "Guardian"
-  final String badge;
-  final int totalReports;
-  final int resolvedReports;
-  final String? phoneNumber;
-  final String? email;
+  final int? score;
+  final String tierName;
+  final String tierNameAr;
+  final int? totalReports;
+  final int? resolvedReports;
+  final int? rejectedReports;
+  final int? totalLikesReceived;
+
+  /// Backward-compatible alias for [score].
+  int get trustPoints => score ?? 0;
+
+  /// Backward-compatible alias for [tierName].
+  String get badge => tierName;
+
+  bool get isMaxTier => (score ?? 0) >= 100;
 
   UserTrust copyWith({
     String? userId,
-    String? displayName,
-    int? trustPoints,
-    String? badge,
+    int? score,
+    String? tierName,
+    String? tierNameAr,
     int? totalReports,
     int? resolvedReports,
-    String? phoneNumber,
-    String? email,
+    int? rejectedReports,
+    int? totalLikesReceived,
   }) {
     return UserTrust(
       userId: userId ?? this.userId,
-      displayName: displayName ?? this.displayName,
-      trustPoints: trustPoints ?? this.trustPoints,
-      badge: badge ?? this.badge,
+      score: score ?? this.score,
+      tierName: tierName ?? this.tierName,
+      tierNameAr: tierNameAr ?? this.tierNameAr,
       totalReports: totalReports ?? this.totalReports,
       resolvedReports: resolvedReports ?? this.resolvedReports,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      email: email ?? this.email,
+      rejectedReports: rejectedReports ?? this.rejectedReports,
+      totalLikesReceived: totalLikesReceived ?? this.totalLikesReceived,
     );
   }
 }

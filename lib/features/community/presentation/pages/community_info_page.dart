@@ -1026,18 +1026,24 @@ class _InfoSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Show the banner only when the server explicitly says locationPending
+    // AND the member record doesn't already carry coordinates.
     final showLocationWarning =
-        myMembership?.memberStatus == MemberStatus.locationPending;
+        myMembership?.memberStatus == MemberStatus.locationPending &&
+        !(myMembership?.hasLocation ?? false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showLocationWarning) ...[
           _LocationPendingDetailBanner(
-            onSetLocation: () {
-              Navigator.of(context).push(
+            onSetLocation: () async {
+              await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const YourLocationPage()),
               );
+              // Refresh member data so the banner re-evaluates
+              // once the user has set/updated their location.
+              ref.invalidate(communityMembersDetailProvider(communityId));
             },
           ),
           const SizedBox(height: AppSpacing.md),

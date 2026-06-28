@@ -542,21 +542,26 @@ class _PinDetailSheet extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _StatusChip(status: pin.status),
-                          const SizedBox(width: 8),
-                          Text(
-                            pin.categoryName,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: sub,
-                              fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _StatusChip(status: pin.status),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                pin.categoryName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: sub,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textDirection: TextDirection.rtl,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            textDirection: TextDirection.rtl,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

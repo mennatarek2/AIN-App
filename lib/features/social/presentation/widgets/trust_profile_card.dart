@@ -13,9 +13,11 @@ class TrustProfileCard extends ConsumerWidget {
 
   final String userId;
 
+  bool get _isOwnProfile => userId == 'me';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final trustAsync = userId == 'me'
+    final trustAsync = _isOwnProfile
         ? ref.watch(myTrustProvider)
         : ref.watch(userTrustProvider(userId));
 
@@ -31,13 +33,13 @@ class TrustProfileCard extends ConsumerWidget {
           style: TextStyle(color: context.semantic.textMuted),
         ),
         data: (trust) {
-          final style = trustBadgeStyleFor(trust.badge);
-          final progress = progressWithinCurrentTier(
-            trust.badge,
-            trust.trustPoints,
-          );
-          final toNext = pointsToNextBadge(trust.badge, trust.trustPoints);
-          final isMax = trust.badge.toLowerCase() == 'guardian';
+          final style = trustBadgeStyleFor(trust.tierName);
+          final showScore = trust.score != null;
+          final score = trust.score ?? 0;
+          final progress = trustTierProgress(trust.score);
+          final toNext = pointsToNextTier(trust.score);
+          final isMax = trust.isMaxTier;
+          final nextTier = nextTierLabelAr(trust.score);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -46,56 +48,76 @@ class TrustProfileCard extends ConsumerWidget {
                 textDirection: TextDirection.rtl,
                 children: [
                   TrustBadgeChip(
-                    badge: trust.badge,
+                    badge: trust.tierName,
+                    labelAr: trust.tierNameAr,
                     size: TrustBadgeSize.lg,
                   ),
-                  const Spacer(),
-                  Text(
-                    '${trust.trustPoints} نقطة',
-                    style: context.text.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
+                  if (showScore) ...[
+                    const Spacer(),
+                    Text(
+                      '$score نقطة',
+                      textDirection: TextDirection.rtl,
+                      style: context.text.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 8,
-                  color: style.color,
-                  backgroundColor: context.semantic.borderSubtle,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                isMax
-                    ? '🏆 أعلى مستوى — حارس'
-                    : '$toNext نقطة للمستوى التالي',
-                textDirection: TextDirection.rtl,
-                style: context.text.bodySmall?.copyWith(
-                  color: context.semantic.textMuted,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                textDirection: TextDirection.rtl,
-                children: [
-                  Expanded(
-                    child: _StatMini(
-                      label: 'البلاغات',
-                      value: trust.totalReports,
-                    ),
+              if (showScore) ...[
+                const SizedBox(height: AppSpacing.sm),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    color: style.color,
+                    backgroundColor: context.semantic.borderSubtle,
                   ),
-                  Expanded(
-                    child: _StatMini(
-                      label: 'تم الحل',
-                      value: trust.resolvedReports,
-                    ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  isMax
+                      ? 'أعلى مستوى 🏆'
+                      : '$toNext نقطة إلى $nextTier',
+                  textDirection: TextDirection.rtl,
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.semantic.textMuted,
                   ),
-                ],
-              ),
+                ),
+              ],
+              if (_isOwnProfile &&
+                  (trust.totalReports != null ||
+                      trust.resolvedReports != null ||
+                      trust.totalLikesReceived != null)) ...[
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  textDirection: TextDirection.rtl,
+                  children: [
+                    if (trust.totalReports != null)
+                      Expanded(
+                        child: _StatMini(
+                          label: 'البلاغات',
+                          value: trust.totalReports!,
+                        ),
+                      ),
+                    if (trust.resolvedReports != null)
+                      Expanded(
+                        child: _StatMini(
+                          label: 'تم الحل',
+                          value: trust.resolvedReports!,
+                        ),
+                      ),
+                    if (trust.totalLikesReceived != null)
+                      Expanded(
+                        child: _StatMini(
+                          label: 'الإعجابات',
+                          value: trust.totalLikesReceived!,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
           );
         },

@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../domain/entities/report_comment.dart';
 import '../providers/social_providers.dart';
+import '../utils/social_api_error.dart';
 import 'comment_tile.dart';
 
 class CommentSection extends ConsumerStatefulWidget {
@@ -55,12 +56,14 @@ class _CommentSectionState extends ConsumerState<CommentSection> {
       _controller.clear();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر إرسال التعليق: $e'),
-          backgroundColor: context.semantic.error,
-        ),
-      );
+      if (!handleSocialApiError(context, e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر إرسال التعليق: ${socialApiFallbackMessage(e)}'),
+            backgroundColor: context.semantic.error,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/theme_extensions.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/social_providers.dart';
+import '../utils/social_api_error.dart';
 
 class LikeButton extends ConsumerStatefulWidget {
   const LikeButton({super.key, required this.reportId});
@@ -55,7 +56,19 @@ class _LikeButtonState extends ConsumerState<LikeButton>
     }
 
     await _scaleController.forward(from: 0);
-    await ref.read(reportLikeNotifierProvider(widget.reportId).notifier).toggle();
+    try {
+      await ref.read(reportLikeNotifierProvider(widget.reportId).notifier).toggle();
+    } catch (e) {
+      if (!mounted) return;
+      if (!handleSocialApiError(context, e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(socialApiFallbackMessage(e)),
+            backgroundColor: context.semantic.error,
+          ),
+        );
+      }
+    }
   }
 
   @override

@@ -3,80 +3,82 @@ import '../../domain/entities/user_trust.dart';
 class UserTrustModel {
   const UserTrustModel({
     required this.userId,
-    required this.displayName,
-    required this.trustPoints,
-    required this.badge,
-    required this.totalReports,
-    required this.resolvedReports,
-    this.phoneNumber,
-    this.email,
+    this.score,
+    required this.tierName,
+    required this.tierNameAr,
+    this.totalReports,
+    this.resolvedReports,
+    this.rejectedReports,
+    this.totalLikesReceived,
   });
 
   final String userId;
-  final String displayName;
-  final int trustPoints;
-  final String badge;
-  final int totalReports;
-  final int resolvedReports;
-  final String? phoneNumber;
-  final String? email;
+  final int? score;
+  final String tierName;
+  final String tierNameAr;
+  final int? totalReports;
+  final int? resolvedReports;
+  final int? rejectedReports;
+  final int? totalLikesReceived;
 
   factory UserTrustModel.fromJson(Map<String, dynamic> json) {
-    final points = _parseInt(
-      json['trustPoints'] ?? json['points'] ?? json['trust'] ?? 0,
-    );
-    final rawBadge = json['badge']?.toString();
+    final rawScore = json['score'] ?? json['trustPoints'] ?? json['points'];
+    final score = rawScore == null ? null : _parseInt(rawScore);
+
+    final tierName = json['tierName']?.toString().trim();
+    final tierNameAr = json['tierNameAr']?.toString().trim();
+
     return UserTrustModel(
-      userId:
-          json['userId']?.toString() ??
-          json['id']?.toString() ??
-          '',
-      displayName:
-          json['displayName']?.toString() ??
-          json['name']?.toString() ??
-          json['userName']?.toString() ??
-          '',
-      trustPoints: points,
-      badge: _normalizeBadge(rawBadge, points),
-      totalReports: _parseInt(json['totalReports'] ?? json['total'] ?? 0),
-      resolvedReports: _parseInt(
-        json['resolvedReports'] ?? json['resolved'] ?? 0,
-      ),
-      phoneNumber: json['phoneNumber']?.toString(),
-      email: json['email']?.toString(),
+      userId: json['userId']?.toString() ?? json['id']?.toString() ?? '',
+      score: score,
+      tierName: tierName?.isNotEmpty == true
+          ? tierName!
+          : _tierNameFromScore(score ?? 0),
+      tierNameAr: tierNameAr?.isNotEmpty == true
+          ? tierNameAr!
+          : _tierNameArFromScore(score ?? 0),
+      totalReports: _parseNullableInt(json['totalReports']),
+      resolvedReports: _parseNullableInt(json['resolvedReports']),
+      rejectedReports: _parseNullableInt(json['rejectedReports']),
+      totalLikesReceived: _parseNullableInt(json['totalLikesReceived']),
     );
   }
 
   UserTrust toEntity() => UserTrust(
     userId: userId,
-    displayName: displayName,
-    trustPoints: trustPoints,
-    badge: badge,
+    score: score,
+    tierName: tierName,
+    tierNameAr: tierNameAr,
     totalReports: totalReports,
     resolvedReports: resolvedReports,
-    phoneNumber: phoneNumber,
-    email: email,
+    rejectedReports: rejectedReports,
+    totalLikesReceived: totalLikesReceived,
   );
 
-  static String _normalizeBadge(String? raw, int points) {
-    if (raw != null && raw.trim().isNotEmpty) {
-      return switch (raw.trim().toLowerCase()) {
-        'guardian' => 'Guardian',
-        'trusted' => 'Trusted',
-        'contributor' => 'Contributor',
-        'newcomer' => 'Newcomer',
-        _ => raw.trim(),
-      };
-    }
-    if (points >= 100) return 'Guardian';
-    if (points >= 50) return 'Trusted';
-    if (points >= 20) return 'Contributor';
+  static String _tierNameFromScore(int score) {
+    if (score >= 100) return 'Guardian';
+    if (score >= 50) return 'Trusted';
+    if (score >= 20) return 'Contributor';
     return 'Newcomer';
+  }
+
+  static String _tierNameArFromScore(int score) {
+    if (score >= 100) return 'حارس';
+    if (score >= 50) return 'موثوق';
+    if (score >= 20) return 'مساهم';
+    return 'مبتدئ';
   }
 
   static int _parseInt(dynamic value) {
     if (value is int) return value;
     if (value is double) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static int? _parseNullableInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    return int.tryParse(value.toString());
   }
 }

@@ -11,9 +11,7 @@ import '../../data/models/notification_model.dart';
 import '../../domain/repositories/notification_repository.dart';
 import 'notification_data_providers.dart';
 
-// ─── Notification type (UI helpers) ───────────────────────────────────────────
-
-enum NotificationType { sos, reportUpdate, system }
+// ─── UI section grouping ──────────────────────────────────────────────────────
 
 enum NotificationSection { today, thisWeek }
 
@@ -81,21 +79,6 @@ class NotificationsState {
     if (!createdDay.isBefore(weekAgo)) return NotificationSection.thisWeek;
 
     return NotificationSection.thisWeek;
-  }
-
-  static NotificationType typeFor(NotificationModel item) {
-    final text = '${item.title} ${item.body}'.toLowerCase();
-    if (text.contains('sos') ||
-        text.contains('طوارئ') ||
-        text.contains('نداء')) {
-      return NotificationType.sos;
-    }
-    if (text.contains('بلاغ') ||
-        text.contains('report') ||
-        text.contains('حالة')) {
-      return NotificationType.reportUpdate;
-    }
-    return NotificationType.system;
   }
 }
 
@@ -210,6 +193,23 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     }
   }
 
+  void prependNotification(NotificationModel notification) {
+    if (!mounted) return;
+    if (state.items.any((n) => n.id == notification.id)) return;
+
+    state = state.copyWith(
+      items: [notification, ...state.items],
+      unreadCount: notification.isRead
+          ? state.unreadCount
+          : state.unreadCount + 1,
+    );
+  }
+
+  void setUnreadCount(int count) {
+    if (!mounted) return;
+    state = state.copyWith(unreadCount: count);
+  }
+
   Future<void> markRead(String id) async {
     final original = state.items;
     final updated = state.items
@@ -248,6 +248,45 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     }
   }
 
+  Future<void> deleteNotification(String id) async {
+    final original = state.items;
+    final removed = state.items.firstWhere((n) => n.id == id);
+    final wasUnread = !removed.isRead;
+
+    state = state.copyWith(
+      items: state.items.where((n) => n.id != id).toList(),
+      unreadCount: wasUnread && state.unreadCount > 0
+          ? state.unreadCount - 1
+          : state.unreadCount,
+    );
+
+    try {
+      await _repository.deleteNotification(id);
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(items: original);
+      await refreshUnreadCount();
+    }
+  }
+
+  Future<void> clearAll() async {
+    final original = state.items;
+    final originalUnread = state.unreadCount;
+
+    state = state.copyWith(items: [], unreadCount: 0, hasMore: false);
+
+    try {
+      await _repository.clearAll();
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(
+        items: original,
+        unreadCount: originalUnread,
+        hasMore: original.length >= _pageSize,
+      );
+    }
+  }
+
   // ── SOS notification (called by SignalR bridge) ────────────────────────────
 
   Future<void> addSOSNotification({
@@ -273,7 +312,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       await localService.showLocalNotification(
         title: 'نداء طوارئ',
         body: body,
-        payload: 'sos:$sosId',
+        payload: null,
       );
     }
 
@@ -294,7 +333,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       await localService.showLocalNotification(
         title: 'تم حل نداء الطوارئ',
         body: 'تم الحل بواسطة: $resolvedBy',
-        payload: 'sos:$sosId',
+        payload: null,
       );
     }
 
@@ -384,10 +423,10 @@ class DeviceTokenManager {
   }
 
   String _platformName() {
-    if (kIsWeb) return 'Web';
-    if (Platform.isAndroid) return 'Android';
-    if (Platform.isIOS) return 'iOS';
-    return 'Unknown';
+    if (kIsWeb) return 'web';
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    return 'unknown';
   }
 }
 

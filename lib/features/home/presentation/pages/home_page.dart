@@ -5,10 +5,13 @@ import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/widgets/app_layout_primitives.dart';
 import '../../../../core/widgets/app_premium_location_card.dart';
 import '../../../../core/widgets/app_state_views.dart';
+import '../../../community/presentation/providers/communities_provider.dart';
+import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../reports/domain/report_model.dart';
 import '../../../reports/presentation/pages/report_detail_page.dart';
 import '../providers/home_feed_provider.dart';
+import '../providers/home_location_provider.dart';
 import '../providers/home_navigation_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/filter_bottom_sheet.dart';
@@ -34,6 +37,13 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(homeLocationProvider.notifier).requestLocationIfNeeded();
+      if (!mounted) return;
+      if (ref.read(homeLocationProvider).address != null) {
+        ref.read(communitiesProvider.notifier).onLocationShared();
+      }
+    });
   }
 
   @override
@@ -77,9 +87,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         bottomNavigationBar: BottomNavBar(
           selectedIndex: selectedNavIndex,
           onReportTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddReportPage()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AddReportPage()));
           },
           onTap: (index) {
             if (index == 2) return;
@@ -190,9 +200,11 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       SliverToBoxAdapter(
         child: AppPremiumLocationCard(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const YourLocationPage()),
-          ),
+          subtitle: ref.watch(homeLocationProvider).address,
+          isLoading: ref.watch(homeLocationProvider).isLoading,
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const YourLocationPage())),
         ),
       ),
       SliverToBoxAdapter(
@@ -225,9 +237,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           ? () => ref
                 .read(publicFeedProvider.notifier)
                 .applyFilter(const FeedFilter())
-          : () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddReportPage()),
-            ),
+          : () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AddReportPage())),
     );
   }
 
@@ -259,8 +271,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     }();
 
     final imageUrls = report.imageUrls;
-    final primaryImage =
-        imageUrls.isNotEmpty ? imageUrls.first : report.imagePath;
+    final primaryImage = imageUrls.isNotEmpty
+        ? imageUrls.first
+        : report.imagePath;
 
     return ReportCard(
       reportId: report.id,
@@ -302,7 +315,9 @@ class _NotificationBell extends ConsumerWidget {
                 : Icons.notifications_outlined,
             color: context.semantic.textOnPrimary,
           ),
-          onPressed: () => Navigator.of(context).pushNamed('/notifications'),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+          ),
         ),
         if (unread > 0)
           Positioned(

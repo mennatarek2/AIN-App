@@ -13,7 +13,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
     int pageSize = 20,
   }) {
     return _remoteDataSource.fetchNotifications(
-      pageIndex: pageIndex,
+      page: pageIndex,
       pageSize: pageSize,
     );
   }
@@ -26,6 +26,12 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   @override
   Future<void> markAllAsRead() => _remoteDataSource.markAllAsRead();
+
+  @override
+  Future<void> deleteNotification(String id) => _remoteDataSource.delete(id);
+
+  @override
+  Future<void> clearAll() => _remoteDataSource.clearAll();
 
   @override
   Future<void> registerDeviceToken({

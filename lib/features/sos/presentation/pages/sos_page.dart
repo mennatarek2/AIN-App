@@ -1,9 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -929,39 +928,61 @@ class _ElapsedTimerText extends StatelessWidget {
   }
 }
 
-// ─── Mini FlutterMap ──────────────────────────────────────────────────────────
+// ─── Mini Google Map (light mode) ─────────────────────────────────────────────
 
-class _SosMap extends StatelessWidget {
+class _SosMap extends StatefulWidget {
   const _SosMap({required this.lat, required this.lng});
 
   final double lat;
   final double lng;
 
   @override
+  State<_SosMap> createState() => _SosMapState();
+}
+
+class _SosMapState extends State<_SosMap> {
+  GoogleMapController? _mapController;
+
+  LatLng get _position => LatLng(widget.lat, widget.lng);
+
+  @override
+  void didUpdateWidget(_SosMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lat != widget.lat || oldWidget.lng != widget.lng) {
+      _mapController?.animateCamera(CameraUpdate.newLatLng(_position));
+    }
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final point = LatLng(lat, lng);
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: point,
-        initialZoom: 15,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.none,
-        ),
-      ),
+    return Stack(
+      alignment: Alignment.center,
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.ain.app',
+        GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: _position,
+            zoom: 15,
+          ),
+          myLocationEnabled: false,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          compassEnabled: false,
+          scrollGesturesEnabled: false,
+          zoomGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+          rotateGesturesEnabled: false,
+          mapType: MapType.normal,
+          onMapCreated: (controller) => _mapController = controller,
         ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: point,
-              width: 40,
-              height: 40,
-              child: _PulsingDot(color: context.semantic.sos),
-            ),
-          ],
+        IgnorePointer(
+          child: _PulsingDot(color: context.semantic.sos),
         ),
       ],
     );

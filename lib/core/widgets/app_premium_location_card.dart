@@ -6,9 +6,16 @@ import '../theme/theme_extensions.dart';
 
 /// Standalone premium location card for the home dashboard.
 class AppPremiumLocationCard extends StatelessWidget {
-  const AppPremiumLocationCard({super.key, required this.onTap});
+  const AppPremiumLocationCard({
+    super.key,
+    required this.onTap,
+    this.subtitle,
+    this.isLoading = false,
+  });
 
   final VoidCallback onTap;
+  final String? subtitle;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -79,8 +86,12 @@ class AppPremiumLocationCard extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
-                          'عرض موقعك ومشاركته مع مجتمعك',
+                          isLoading
+                              ? 'جاري تحديد موقعك...'
+                              : (subtitle ?? 'عرض موقعك ومشاركته مع مجتمعك'),
                           textDirection: TextDirection.rtl,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: context.text.bodySmall?.copyWith(
                             color: context.semantic.textMuted,
                           ),

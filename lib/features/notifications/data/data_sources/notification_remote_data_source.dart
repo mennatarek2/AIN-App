@@ -9,7 +9,7 @@ class NotificationRemoteDataSource {
   final Future<String?> Function() readToken;
 
   Future<List<NotificationModel>> fetchNotifications({
-    int pageIndex = 1,
+    int page = 1,
     int pageSize = 20,
   }) async {
     final token = await readToken();
@@ -18,7 +18,7 @@ class NotificationRemoteDataSource {
     final response = await _client.getJson(
       ApiEndpoints.notifications,
       token: token,
-      query: {'PageIndex': pageIndex, 'PageSize': pageSize},
+      query: {'page': page, 'pageSize': pageSize},
     );
 
     return _parseNotificationList(response);
@@ -67,7 +67,31 @@ class NotificationRemoteDataSource {
     );
   }
 
-  Future<void> registerDeviceToken({
+  Future<void> delete(String id) async {
+    final token = await readToken();
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Missing auth token');
+    }
+
+    await _client.deleteJson(
+      ApiEndpoints.notificationDelete(id),
+      token: token,
+    );
+  }
+
+  Future<void> clearAll() async {
+    final token = await readToken();
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('Missing auth token');
+    }
+
+    await _client.deleteJson(
+      ApiEndpoints.notificationsClearAll,
+      token: token,
+    );
+  }
+
+  Future<void> registerFcmToken({
     required String token,
     required String platform,
   }) async {
@@ -77,23 +101,37 @@ class NotificationRemoteDataSource {
     }
 
     await _client.postJson(
-      ApiEndpoints.notificationsDeviceToken,
+      ApiEndpoints.notificationsFcmToken,
       token: authToken,
-      body: {'Token': token, 'Platform': platform},
+      body: {'token': token, 'platform': platform},
     );
   }
 
-  Future<void> deleteDeviceToken({required String token}) async {
+  Future<void> revokeFcmToken({
+    required String token,
+    required String platform,
+  }) async {
     final authToken = await readToken();
     if (authToken == null || authToken.trim().isEmpty) {
       throw Exception('Missing auth token');
     }
 
     await _client.deleteJson(
-      ApiEndpoints.notificationsDeviceToken,
+      ApiEndpoints.notificationsFcmToken,
       token: authToken,
-      body: {'Token': token},
+      body: {'token': token, 'platform': platform},
     );
+  }
+
+  /// Backward-compatible aliases.
+  Future<void> registerDeviceToken({
+    required String token,
+    required String platform,
+  }) =>
+      registerFcmToken(token: token, platform: platform);
+
+  Future<void> deleteDeviceToken({required String token}) async {
+    await revokeFcmToken(token: token, platform: 'android');
   }
 
   List<NotificationModel> _parseNotificationList(dynamic response) {
@@ -103,7 +141,7 @@ class NotificationRemoteDataSource {
     return list
         .whereType<Map>()
         .map(
-          (item) => NotificationModel.fromApiJson(
+          (item) => NotificationModel.fromJson(
             Map<String, dynamic>.from(item),
           ),
         )

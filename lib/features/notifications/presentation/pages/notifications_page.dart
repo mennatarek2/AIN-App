@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/notifications/notification_router.dart';
 import '../../../../core/realtime/signalr_provider.dart';
 import '../../../../core/realtime/signalr_state.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -8,10 +9,9 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/widgets/app_layout_primitives.dart';
 import '../../../../core/widgets/app_state_views.dart';
-import '../../../home/presentation/providers/home_navigation_provider.dart';
-import '../../../home/presentation/widgets/bottom_nav_bar.dart';
 import '../../data/models/notification_model.dart';
 import '../providers/notifications_provider.dart';
+import '../utils/notification_type_ui.dart';
 
 class NotificationsPage extends ConsumerStatefulWidget {
   const NotificationsPage({super.key});
@@ -51,6 +51,29 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     }
   }
 
+  Future<void> _confirmClearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('مسح جميع الإشعارات'),
+        content: const Text('هل أنت متأكد من حذف جميع الإشعارات؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('مسح الكل'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await ref.read(notificationsProvider.notifier).clearAll();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(notificationsProvider);
@@ -71,25 +94,31 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
             subtitle: unread > 0 ? '$unread غير مقروء' : 'لا توجد إشعارات جديدة',
             compact: true,
             trailing: [
-              if (unread > 0)
-                TextButton(
-                  onPressed: () =>
-                      ref.read(notificationsProvider.notifier).markAllRead(),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              if (state.items.isNotEmpty)
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    color: context.semantic.textOnPrimary,
                   ),
-                  child: Text(
-                    'قراءة الكل',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: context.semantic.textOnPrimary,
-                      fontWeight: FontWeight.w600,
+                  onSelected: (value) async {
+                    final notifier = ref.read(notificationsProvider.notifier);
+                    if (value == 'read_all') {
+                      await notifier.markAllRead();
+                    } else if (value == 'clear_all') {
+                      await _confirmClearAll();
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    if (unread > 0)
+                      const PopupMenuItem(
+                        value: 'read_all',
+                        child: Text('قراءة الكل'),
+                      ),
+                    const PopupMenuItem(
+                      value: 'clear_all',
+                      child: Text('مسح الكل'),
                     ),
-                  ),
+                  ],
                 ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -105,13 +134,6 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
 
           Expanded(child: _buildBody(context, state, todayItems, weekItems)),
         ],
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: ref.watch(homeNavigationProvider),
-        onTap: (index) {
-          ref.read(homeNavigationProvider.notifier).setSelectedIndex(index);
-          navigateFromBottomNav(context, ref, index);
-        },
       ),
     );
   }
@@ -167,20 +189,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                 AppSpacing.xs,
               ),
             ),
-            ...todayItems.map(
-              (item) => Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenHorizontal,
-                  0,
-                  AppSpacing.screenHorizontal,
-                  AppSpacing.xs,
-                ),
-                child: _NotificationTile(
-                  item: item,
-                  onTap: () => _onTap(item),
-                ),
-              ),
-            ),
+            ...todayItems.map((item) => _buildTile(item)),
           ],
           if (weekItems.isNotEmpty) ...[
             AppSectionHeader(
@@ -192,20 +201,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                 AppSpacing.xs,
               ),
             ),
-            ...weekItems.map(
-              (item) => Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenHorizontal,
-                  0,
-                  AppSpacing.screenHorizontal,
-                  AppSpacing.xs,
-                ),
-                child: _NotificationTile(
-                  item: item,
-                  onTap: () => _onTap(item),
-                ),
-              ),
-            ),
+            ...weekItems.map((item) => _buildTile(item)),
           ],
           if (state.isLoadingMore)
             const Padding(
@@ -217,17 +213,43 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     );
   }
 
+  Widget _buildTile(NotificationModel item) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        0,
+        AppSpacing.screenHorizontal,
+        AppSpacing.xs,
+      ),
+      child: Dismissible(
+        key: ValueKey(item.id),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: context.semantic.sos,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+          ),
+          child: Icon(Icons.delete_outline, color: context.semantic.textOnPrimary),
+        ),
+        confirmDismiss: (_) async {
+          await ref.read(notificationsProvider.notifier).deleteNotification(item.id);
+          return true;
+        },
+        child: _NotificationTile(
+          item: item,
+          onTap: () => _onTap(item),
+        ),
+      ),
+    );
+  }
+
   void _onTap(NotificationModel item) {
     ref.read(notificationsProvider.notifier).markRead(item.id);
-
-    final type = NotificationsState.typeFor(item);
-    if (type == NotificationType.sos) {
-      Navigator.of(context).pushNamed('/sos');
-    }
+    NotificationRouter.goForModel(item);
   }
 }
-
-// ─── Connection banner ────────────────────────────────────────────────────────
 
 class _ConnectionBanner extends StatelessWidget {
   const _ConnectionBanner({required this.status});
@@ -277,8 +299,6 @@ class _ConnectionBanner extends StatelessWidget {
   }
 }
 
-// ─── Notification tile ────────────────────────────────────────────────────────
-
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({
     required this.item,
@@ -291,8 +311,16 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUnread = !item.isRead;
-    final type = NotificationsState.typeFor(item);
-    final (typeIcon, typeColor) = _typeInfo(context, type);
+    final typeUi = NotificationTypeUi.forType(item.type);
+    final typeColor = typeUi.resolveColor(
+      critical: context.semantic.sos,
+      primary: context.colors.primary,
+      community: context.colors.secondary,
+      account: context.semantic.warning,
+      success: Colors.green.shade600,
+      warning: context.semantic.warning,
+      muted: context.semantic.textMuted,
+    );
 
     return Material(
       color: Colors.transparent,
@@ -323,7 +351,9 @@ class _NotificationTile extends StatelessWidget {
                   Container(
                     width: 4,
                     decoration: BoxDecoration(
-                      color: context.colors.primary,
+                      color: item.isCritical
+                          ? context.semantic.sos
+                          : context.colors.primary,
                       borderRadius: const BorderRadius.horizontal(
                         right: Radius.circular(AppRadius.lg),
                       ),
@@ -343,7 +373,7 @@ class _NotificationTile extends StatelessWidget {
                             color: typeColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(AppRadius.sm),
                           ),
-                          child: Icon(typeIcon, size: 20, color: typeColor),
+                          child: Icon(typeUi.icon, size: 20, color: typeColor),
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
@@ -370,6 +400,30 @@ class _NotificationTile extends StatelessWidget {
                                       ),
                                       child: Text(
                                         'جديد',
+                                        style: context.text.labelSmall?.copyWith(
+                                          color: context.semantic.textOnPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    ),
+                                  if (item.isCritical)
+                                    Container(
+                                      margin: const EdgeInsets.only(
+                                        left: AppSpacing.xxs,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: context.semantic.sos,
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.pill,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'حرج',
                                         style: context.text.labelSmall?.copyWith(
                                           color: context.semantic.textOnPrimary,
                                           fontWeight: FontWeight.w700,
@@ -433,23 +487,6 @@ class _NotificationTile extends StatelessWidget {
     );
   }
 
-  (IconData, Color) _typeInfo(BuildContext context, NotificationType type) {
-    return switch (type) {
-      NotificationType.sos => (
-        Icons.crisis_alert_rounded,
-        context.semantic.sos,
-      ),
-      NotificationType.reportUpdate => (
-        Icons.description_rounded,
-        context.colors.primary,
-      ),
-      NotificationType.system => (
-        Icons.info_rounded,
-        context.semantic.warning,
-      ),
-    };
-  }
-
   String _formatDateTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'الآن';
@@ -465,9 +502,6 @@ class _NotificationTile extends StatelessWidget {
   }
 }
 
-// ─── Reusable connection status banner (for other screens) ────────────────────
-
-/// Can be placed at the top of any screen that needs the disconnection banner.
 class SignalRConnectionBanner extends ConsumerWidget {
   const SignalRConnectionBanner({super.key});
 

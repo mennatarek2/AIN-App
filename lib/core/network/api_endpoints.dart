@@ -128,14 +128,15 @@ abstract final class ApiEndpoints {
   static String userTrust(String userId) => '/api/social/users/$userId/trust';
 
   // ── Notifications ───────────────────────────────────────────────────────────
-  static const String notifications = '/api/Notifications';
+  static const String notifications = '/api/notifications';
   static const String notificationsUnreadCount =
-      '/api/Notifications/unread-count';
-  static const String notificationsReadAll = '/api/Notifications/read-all';
-  static const String notificationsDeviceToken =
-      '/api/Notifications/device-token';
+      '/api/notifications/unread-count';
+  static const String notificationsReadAll = '/api/notifications/read-all';
+  static const String notificationsClearAll = '/api/notifications/clear-all';
+  static const String notificationsFcmToken = '/api/notifications/fcm-token';
   static String notificationMarkRead(String id) =>
-      '/api/Notifications/$id/read';
+      '/api/notifications/$id/read';
+  static String notificationDelete(String id) => '/api/notifications/$id';
 
   // ── AI Chatbot ──────────────────────────────────────────────────────────────
   static const String aiChat = '/api/AI/chat';
